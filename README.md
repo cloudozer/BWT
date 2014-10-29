@@ -35,3 +35,11 @@ http://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
 	G-C
 	ok
 	3> 
+
+You may also run sw function with random sequences of any length as:
+	1> sw:sw(20,40).
+	CAGAGAAGCGT-GCG--TGC
+	||| |  || | |||  |||
+	CAG-G--GCATCGCGTTTGC
+	ok
+	2> 

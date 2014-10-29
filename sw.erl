@@ -5,7 +5,8 @@
 %
 
 -module(sw).
--export([sw/2]).
+-export([sw/2,
+		rand_seq/1]).
 
 -define(MATCH,2).
 -define(MISMATCH,-1).
@@ -13,11 +14,18 @@
 
 
 
-sw(W1,W2) ->
+rand_seq(N)->
+	rand_seq([],N).
+rand_seq(Acc,0) -> Acc;
+rand_seq(Acc,N) -> rand_seq([lists:nth(random:uniform(4),["A","C","G","T"])|Acc], N-1).
+
+
+sw([_|_]=W1,[_|_]=W2) ->
 	Tab = [ {L1,[{0,undef}]} || L1 <- W1 ],
 	Tab1 = build_tab(Tab,W2),
 	{C1,Match,C2} = find_max(Tab1,W2),
-	io:format("~s~n~s~n~s~n",[C1,Match,C2]).
+	io:format("~s~n~s~n~s~n",[C1,Match,C2]);
+sw(N1,N2) -> sw(rand_seq(N1),rand_seq(N2)).
 
 
 build_tab(Tab,[S2|W2]) ->
@@ -60,7 +68,7 @@ extract_matches(X1, Match, X2, Index, [{S1,Column}|Tab],W2) ->
 		true -> {X1,Match,X2};
 		_ -> 
 			case Dir of
-				u -> extract_matches(["-"|X1], [" "|Match], [S2|X2], Index+1, Tab, W2);
+				u -> extract_matches(["-"|X1], [" "|Match], [S2|X2], Index+1, [{S1,Column}|Tab], W2);
 				l -> extract_matches([S1|X1],  [" "|Match], ["-"|X2], Index, Tab, W2);
 				ul when S1=/=S2 -> extract_matches([S1|X1],  [" "|Match], [S2|X2], Index+1, Tab, W2);
 				ul -> extract_matches([S1|X1],  ["|"|Match], [S2|X2], Index+1, Tab, W2)
