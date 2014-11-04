@@ -37,14 +37,15 @@ read(FileName,NumChunks,Overlap)->
     ChunkSize = trunc(Size / NumChunks),
     ChunkRem = Size rem ChunkSize,
     NewSize = (NumChunks * ChunkSize) + ChunkRem,
-    NewSize == Size,
+    NewSize = Size,
     {ok,FileDev} = file:open(FileName,[read,binary]),
     ReadArray = make_pread_array(NumChunks,0,NumChunks,ChunkSize,ChunkRem,Overlap,[]),
     {ok,Data} = file:pread(FileDev,ReadArray),
     Chunks = lists:zip(ReadArray,Data).
 
 spawn_find_pattern(Chunks,BinPattern)->
-    spawn_find_pattern(Chunks,length(Chunks),BinPattern).
+    Results = spawn_find_pattern(Chunks,length(Chunks),BinPattern),
+    lists:sort(sets:to_list(sets:from_list(Results))).
 
 spawn_find_pattern([],NumChunks,BinPattern)->
     listen_find_pattern(0,NumChunks,[]);
