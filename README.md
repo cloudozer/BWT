@@ -72,8 +72,7 @@ These are small tools to help process large files in Erlang.  In general, the st
     10001
     3> lists:nth(1,Data).                                                                   
     {{0,32553715},<<">chr1  AC:CM000663.2  gi:568336023  LN:248956422  rl:Chromosome  M5:6aef897c3d6ff0c78aff06ac189178dd  AS:GRC"...>>}
-    4>  bio_pfile:spawn_find_pattern(Data,<<"TATATTCAGTCTTTCTAACACCATTTATTGAAGAGACTGTAG">>).
-    [{162758595,42}]
+    4>  
 
 
 5. run: bio_pfile:spawn_find_pattern(ChunkArray,BinaryPattern) which returns an array of all the stat positions where the pattern was found as {StartPosition,LengthOfPattern}.
