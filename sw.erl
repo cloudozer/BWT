@@ -10,7 +10,10 @@
 
 -define(MATCH,2).
 -define(MISMATCH,-1).
--define(GAP_PENALTY,-1).
+-define(GAP_PENALTY,-1.5).
+-define(UNDEF,0).
+
+-define(THRESHOLD, 0.9).
 
 
 
@@ -20,12 +23,24 @@ rand_seq(Acc,0) -> Acc;
 rand_seq(Acc,N) -> rand_seq([lists:nth(random:uniform(4),["A","C","G","T"])|Acc], N-1).
 
 
+sw([_|_]=W1,[_|_]=W2) when length(W1) > length(W2) -> sw(W2,W1);
+
 sw([_|_]=W1,[_|_]=W2) ->
+	THR = length(W1) * ?THRESHOLD * ?MATCH, 
+	io:format("Threshold: ~p~n",[THR]),
 	Tab = [ {L1,[{0,undef}]} || L1 <- W1 ],
 	Tab1 = build_tab(Tab,W2),
-	{C1,Match,C2} = find_max(Tab1,W2),
-	io:format("~s~n~s~n~s~n",[C1,Match,C2]);
-sw(N1,N2) -> sw(rand_seq(N1),rand_seq(N2)).
+	case find_max(Tab1,W2,THR) of
+		{C1,Match,C2} ->
+			io:format("~s~n~s~n~s~n",[C1,Match,C2]);
+		no_match ->
+			io:format("Match above threshold ~p% not found~n",[?THRESHOLD * 100])
+	end;
+
+sw(N1,N2) when N1 < N2 -> sw(rand_seq(N1),rand_seq(N2));
+sw(N1,N2) when N1 >= N2 -> sw(rand_seq(N2),rand_seq(N1)).
+
+
 
 
 build_tab(Tab,[S2|W2]) ->
@@ -48,16 +63,19 @@ build_tab(AccT,_,_,[],_) -> lists:reverse(AccT).
 
 
 
-find_max(Tab,W2) ->
+find_max(Tab,W2,THR) ->
 	%io:format("Tab~n~p~n",[Tab]),
 	{Vmax,_} = lists:max([ lists:max(Column) || {_,Column} <- Tab ]),
-	%io:format("Vmax:~p~n",[Vmax]),
-	Tab1 = remove_last_columns(Vmax,lists:reverse(Tab)),
-	%io:format("Tab after removal~n~p~n",[Tab1]),
-	[{_,Col}|_] = Tab1,
-	Index = get_index(1,Col,Vmax),
-	%io:format("Index:~p~n",[Index]),
-	extract_matches([],[],[],Index,Tab1,lists:reverse(W2)).
+	case Vmax < THR of
+		true -> no_match;
+		_ ->
+			Tab1 = remove_last_columns(Vmax,lists:reverse(Tab)),
+			%io:format("Tab after removal~n~p~n",[Tab1]),
+			[{_,Col}|_] = Tab1,
+			Index = get_index(1,Col,Vmax),
+			%io:format("Index:~p~n",[Index]),
+			extract_matches([],[],[],Index,Tab1,lists:reverse(W2))
+	end.
 
 
 
@@ -102,6 +120,8 @@ remove_last_columns(Vmax,[{_,Col}|Rest]=Tab) ->
 
 
 
-sigma(S1,S1) -> ?MATCH;
+sigma(S,S) -> ?MATCH;
+sigma(_,'N') -> ?UNDEF;
+sigma('N',_) -> ?UNDEF;
 sigma(_,_) -> ?MISMATCH.
 
