@@ -38,21 +38,49 @@ t2(OutBin)->
     ExtRem = BinSize rem ?EXT_SIZE,
     ExtArray = make_pread_array(NumExts,0,NumExts,?EXT_SIZE,ExtRem,0,[]),
     {ok,OutFile} = file:open("newtes",[write]),
-    write_exts(OutFile,OutBin,ExtArray,0).
+    write_exts(OutFile,OutBin,ExtArray).
 
 t3()->
     Out = t1(),
     OutBin = term_to_binary(Out),
     t2(OutBin).
 
-write_exts(OutFile,_OutBin,[],_ExtNum)->
+t4()->
+    {ok,InFile} = file:open("newtes",[binary,read]),
+    Size = file_size("newtes"),
+    InBin = read_exts(InFile,<<>>,Size).
+
+read_exts(InFile,Acc,0)->
+    file:close(InFile),
+    Acc;
+read_exts(InFile,Acc,NumToRead)->
+    case NumToRead > ?EXT_SIZE of
+	true ->
+	    {ok, BinData} = file:read(InFile,?EXT_SIZE),
+	    NewAcc = <<Acc/binary,BinData/binary>>,
+	    read_exts(InFile,NewAcc,NumToRead-?EXT_SIZE);
+	false ->
+	    {ok, BinData} = file:read(InFile,NumToRead),
+	    NewAcc = <<Acc/binary,BinData/binary>>,
+	    read_exts(InFile,NewAcc,0)
+    end.
+
+write_exts(OutFile,_OutBin,[])->
     file:sync(OutFile),
     file:close(OutFile),
     ok;
-write_exts(OutFile,OutBin,[Part|Rest],ExtNum)->
+write_exts(OutFile,OutBin,[Part|Rest])->
     ExtBin = binary:part(OutBin,Part),
     file:write(OutFile,ExtBin),
-    write_exts(OutFile,OutBin,Rest,ExtNum+1).
+    write_exts(OutFile,OutBin,Rest).
+
+file_size(FileName)->
+    {ok,{file_info,Size,Type,Access,
+	 ATime,
+	 MTime,
+	 CTime,
+	 Mode,Links,MajorDev,MinorDev,INode,UID,GID}} = file:read_file_info(FileName),
+    Size.
     
     
 
