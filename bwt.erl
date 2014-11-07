@@ -9,28 +9,22 @@
 
 
 bwt(X) ->
-	T = lists:reverse(["$"|lists:reverse(X)]),
+	T = lists:reverse([$$|lists:reverse(X)]),
+
 	N = length(T),
 
 	Permutations = get_all_permutations([],T,N,N),
-	%lists:foreach(fun(S)-> io:format("~s~n",[S]) end, Permutations),
-	get_last_column(Permutations).
+	%lists:foreach(fun(S)-> io:format("~p~n",[S]) end, Permutations),
+	[ lists:nth(N,Seq) || Seq <- Permutations].
+	
 
-
-get_all_permutations(Acc,_,0,_) -> lists:sort(fun(A,B)-> A>B end,Acc);
+get_all_permutations(Acc,_,0,_) -> lists:sort(Acc);
 get_all_permutations(Acc,T,K,N) -> 
-	T1 = [lists:nth(N,T)|lists:sublist(T,N-1)],
-	get_all_permutations([T1|Acc],T1,K-1,N).
+	{T1,Last} = lists:split(N-1,T),
+	NewT = Last++T1,
+	%io:format("NewT:~s~n",[NewT]),
+	get_all_permutations([NewT|Acc],NewT,K-1,N).
 
 
 
-get_last_column(P) ->
-	[T|_] = P,
-	get_last_column([],P,length(T)).
-
-get_last_column(Acc,[T|P],N) ->
-	get_last_column([lists:nth(N,T)|Acc],P,N);
-get_last_column(Acc,[],_) ->
-	io:format("~nOutput: ~ts~n",[Acc]),
-	Acc.
 

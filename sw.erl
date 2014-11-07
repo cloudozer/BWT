@@ -5,8 +5,9 @@
 %
 
 -module(sw).
--export([sw/2, sw/3,
+-export([sw/2, sw/4,
 		sw_multi/4,
+		get_alignments/3,
 		rand_seq/1]).
 
 -define(MATCH,2).
@@ -14,7 +15,7 @@
 -define(GAP_PENALTY,-1.5).
 -define(UNDEF,0).
 
--define(THRESHOLD, 0.7).
+-define(THRESHOLD, 0.47).
 
 
 
@@ -29,40 +30,59 @@ sw_multi(N,[_|_]=Seq,Ref_seq_name,File) ->
 	case get_reference_seq(Ref_seq_name,File) of
 		error -> error;
 		Ref_seq ->
-			case length(Ref_seq)/length(Seq) < N of
-				true ->
-					io:format("Reference genome too short to be cut into ~p chunks~n",[N]),
-					error;
-				_ -> %% spawn N processes
-					Overlap = round(length(Seq) / ?THRESHOLD),
-					Chunk_size = length(Ref_seq) div N,
-					spawn_sw(Seq,Ref_seq,Chunk_size,Overlap),
-					Results = get_alignments([],N),
-					io:format("~p alignments found~n",[length(Results)])
+			Overlap = round(length(Seq) / ?THRESHOLD),
+			Chunk_size = Overlap*20,
+			Collector_pid = spawn(?MODULE,get_alignments,[self(),[],0]),
+			spawn_sw(Collector_pid,N,Seq,Ref_seq,Chunk_size,Overlap,0),
+			receive
+				{alignments,Res} ->
+					io:format("~p alignments found~n",[length(Res)]),
+					Res
 			end
 	end. 
 
 
-get_alignments(Acc,0) -> Acc;
-get_alignments(Acc,N) -> 
+get_alignments(Pid,Acc,Chunks_proc) -> 
 	receive
-		no_match -> get_alignments(Acc,N-1);
-		{C1,Match,C2} -> get_alignments([{C1,Match,C2}|Acc],N-1)
+		no_match -> get_alignments(Pid,Acc,Chunks_proc+1);
+		{C1,Match,C2} -> get_alignments(Pid,[{C1,Match,C2}|Acc],Chunks_proc+1);
+		{chunks_nbr, Chunks_nbr} -> 
+			io:format("~p chunks remained~n",[Chunks_nbr-Chunks_proc]),
+			get_rest_alignments(Pid,Acc,Chunks_nbr-Chunks_proc)
+	end.
+
+get_rest_alignments(Pid,Acc,0) -> Pid ! {alignments,Acc};
+get_rest_alignments(Pid,Acc,K) ->
+	receive
+		no_match -> get_rest_alignments(Pid,Acc,K-1);
+		{C1,Match,C2} -> get_rest_alignments(Pid,[{C1,Match,C2}|Acc],K-1)
 	end.
 
 
-spawn_sw(Seq,Ref_seq,Chunk_size,Overlap) when length(Ref_seq) > Chunk_size+Overlap ->
+
+spawn_sw(Collector_pid,0,Seq,Ref_seq,Chunk_size,Overlap,K) ->
+	receive
+		processed -> spawn_sw(Collector_pid,1,Seq,Ref_seq,Chunk_size,Overlap,K)
+	end;
+
+spawn_sw(Collector_pid,N,Seq,Ref_seq,Chunk_size,Overlap,K) when length(Ref_seq) > Chunk_size+Overlap ->
+	io:format("N:~p,~n",[N]),
 	{Chunk,Tail} = lists:split(Chunk_size+Overlap,Ref_seq),
 	Right = lists:nthtail(Chunk_size,Chunk),
-	spawn(?MODULE, sw, [self(), Seq,Chunk]),
-	spawn_sw(Seq,Right++Tail,Chunk_size,Overlap);
+	spawn(?MODULE, sw, [self(), Collector_pid,Seq,Chunk]),
 
-spawn_sw(Seq,Ref_seq,_,_) ->
-	spawn(?MODULE, sw, [self(), Seq, Ref_seq]).
+	spawn_sw(Collector_pid,N-1,Seq,Right++Tail,Chunk_size,Overlap,K+1);
+
+spawn_sw(Collector_pid,_,Seq,Ref_seq,_,_,K) ->
+	spawn(?MODULE, sw, [self(), Collector_pid,Seq, Ref_seq]),
+	io:format("~p chunks sent to alignment~n",[K+1]),
+	Collector_pid ! {chunks_nbr, K+1}.
 
 
 
-sw(Pid,Seq,Ref_seq) -> Pid ! sw(Seq,Ref_seq).
+sw(Pid,Collector_pid,Seq,Ref_seq) -> 
+	Collector_pid ! sw(Seq,Ref_seq),
+	Pid ! processed.
 
 
 
@@ -95,7 +115,7 @@ get_reference_seq(Ref_seq_name,File) ->
 					case file:open(File,read) of
 						{ok,Dev2} ->
 							{ok,Reference_seq} = file:pread(Dev2, Pos, Len),
-							Reference_seq;
+							lists:filter(fun(S)-> S =/= 10 end,Reference_seq);
         
 						{error,_} -> 
 							io:format("Cannot open reference sequence file: ~p~n",[File]),
@@ -112,6 +132,8 @@ get_reference_seq(Ref_seq_name,File) ->
 			io:format("index file: '~s' cannot be opened~n~p~n",[File++".index",Reason]),
 			error
 	end.
+
+
 
 
 
