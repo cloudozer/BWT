@@ -22,7 +22,7 @@
 rand_seq(N)->
 	rand_seq([],N).
 rand_seq(Acc,0) -> Acc;
-rand_seq(Acc,N) -> rand_seq([lists:nth(random:uniform(4),["A","C","G","T"])|Acc], N-1).
+rand_seq(Acc,N) -> rand_seq([lists:nth(random:uniform(4),[$A,$C,$G,$T])|Acc], N-1).
 
 
 
@@ -229,7 +229,7 @@ remove_last_columns(Vmax,[{_,Col}|Rest]=Tab) ->
 
 
 sigma(S,S) -> ?MATCH;
-sigma(_,'N') -> ?UNDEF;
-sigma('N',_) -> ?UNDEF;
+sigma(_,$N) -> ?UNDEF;
+sigma($N,_) -> ?UNDEF;
 sigma(_,_) -> ?MISMATCH.
 
