@@ -50,7 +50,7 @@ You may also run sw function with random sequences of any length as:
 
 You may find all matches of your sequence against some reference sequence contained in the .fasta file.
  	
- 	1> swp:main(10,"ATGTGACACAGATCACTGCGGCCTTGACCTCCCAGGCTCCAGGTGGTTCTT","21","data/human_g1k_v37_decoy.fasta").
+ 	1> msw:main(10,"ATGTGACACAGATCACTGCGGCCTTGACCTCCCAGGCTCCAGGTGGTTCTT","21","data/human_g1k_v37_decoy.fasta").
 
  The first argument means the number of parallel process. The third argument is a name of the reference sequence contained in the fasta file. In this example this is 21st chromosome.
  The function assumes that there is an index file containing the pointers to all reference sequences in the fasta file. You can build this index file using simple python application:
