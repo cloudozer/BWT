@@ -14,7 +14,7 @@ bwt(X) ->
 	N = length(T),
 
 	Permutations = get_all_permutations([],T,N,N),
-	%lists:foreach(fun(S)-> io:format("~p~n",[S]) end, Permutations),
+	lists:foreach(fun(S)-> io:format("~p~n",[S]) end, Permutations),
 	[ lists:nth(N,Seq) || Seq <- Permutations].
 	
 
