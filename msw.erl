@@ -21,7 +21,7 @@ main(N,[_|_]=Seq,Ref_seq_name,File) ->
 									Pos+J*Chunk_size, 
 									Chunk_size+?THRESHOLD+length(Seq) ]) || J <- lists:seq(0,N-1)],
 			Res = collect(N,[]),
-			io:format("~p matches obtained~n",[length(Res)]),
+			io:format("~p match(es) obtained~n",[length(Res)]),
 			Res;
 
 		error -> error
