@@ -30,6 +30,7 @@ main(N,[_|_]=Seq,Ref_seq_name,File) ->
 main_serial(N,[_|_]=Seq,Ref_seq_name,File) ->
   seeds:generate_fs(Seq,15,2),
   compile:file("fs.erl",[report_errors]),
+  code:add_path("."),
 
   case get_reference_position(Ref_seq_name,File) of
     {Pos,Len} ->
