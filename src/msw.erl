@@ -5,7 +5,7 @@
 
 -module(msw).
 -export([main/4,main_serial/4,
-		worker/5]).
+		worker/5, get_reference_position/2]).
 
 -define(THRESHOLD,5).
 
