@@ -4,8 +4,8 @@
 % 
 
 -module(msw).
--export([main/4,
-		worker/5]).
+-export([main/4,main_serial/4,
+		worker/5, get_reference_position/2]).
 
 -define(THRESHOLD,5).
 
@@ -27,6 +27,38 @@ main(N,[_|_]=Seq,Ref_seq_name,File) ->
 		error -> error
 	end.
 
+main_serial(N,[_|_]=Seq,Ref_seq_name,File) ->
+  seeds:generate_fs(Seq,15,2),
+  compile:file("fs.erl",[report_errors]),
+  code:add_path("."),
+  code:load_file(fs),
+
+  case get_reference_position(Ref_seq_name,File) of
+    {Pos,Len} ->
+      Chunk_size = Len div N,
+
+      Res = lists:foldl(
+        fun(J,Acc) ->
+          spawn(?MODULE, worker, [self(),Seq,File,
+                      Pos+J*Chunk_size,
+                      Chunk_size+?THRESHOLD+length(Seq) ]),
+
+          receive
+            error ->
+              io:format("An error occur. ~n"),
+              Acc;
+            Matches ->
+              Matches++Acc
+          end
+        end,
+        [],
+        lists:seq(0,N-1)
+      ),
+      io:format("~p match(es) obtained~n",[length(Res)]),
+      Res;
+
+    error -> error
+  end.
 
 
 collect(0,Acc) -> Acc;
