@@ -4,7 +4,7 @@
 -export([start_link/0, run/2,
 seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
--export([init/1, handle_info/3, idle/2]).
+-export([init/1, terminate/3, handle_info/3, idle/2]).
 
 -record(state, {current_worker, current_workload = [], workload, master_pid, seq, ref_file_abs, seq_reader}).
 
@@ -14,9 +14,13 @@ start_link() ->
 run(Pid, Args) ->
   gen_fsm:send_event(Pid, {run, Args}).
 
+%% 
 
 init(_Args) ->
   {ok, idle, #state{}}. 
+
+terminate(Reason, StateName, StateData) ->
+  lager:info("worker terminated ~p", [Reason]).
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [],
