@@ -1,4 +1,4 @@
--module(worker).
+-module(worker_bwt).
 -behaviour(gen_fsm).
 %% API
 -export([start_link/0, run/2,
@@ -9,7 +9,7 @@ seq_file_reader/1, seq_file_reader_loop/1, worker_loop/0]).
 -record(state, {current_worker, tasks_queue, master_pid, seq, ref_file_abs}).
 
 start_link() ->
-  gen_fsm:start_link({local, worker_bwt}, ?MODULE, {}, []).
+  gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).
 
 run(Pid, Args) ->
   gen_fsm:sync_send_event(Pid, {run, Args}).

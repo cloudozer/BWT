@@ -20,7 +20,7 @@ run_on_worker/6]).
 
 test_local() ->
   lager:start(),
-  {ok, WorkerSrv} = worker:start_link(),
+  {ok, WorkerSrv} = worker_bwt:start_link(),
   Nodes = [node(WorkerSrv)],
   {ok, Master} = ?MODULE:start_link(),
   RefFile = "human_g1k_v37_decoy.fasta",
@@ -55,7 +55,7 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, NodesNbr, C
 
   MasterPid = self(),
   lists:foreach(fun({NodeName,Workload}) ->
-    Worker = {worker, NodeName},
+    Worker = {worker_bwt, NodeName},
     %Pid = spawn_link(NodeName, ?MODULE, run_on_worker, [N,Seq,Ref_seq_name,File,ReturnPid,J]),
     Args = {
       RefFile,IndexFile,SeqFile,WorkerPath,
