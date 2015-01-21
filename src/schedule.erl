@@ -4,7 +4,7 @@
 %
 
 -module(schedule).
--export([get_schedule/3, get_workload_and_index/3]).
+-export([get_schedule/3, get_workload_and_index/3, get_genome_part_name/2]).
 
 -define(QSEQ_SIZE,100).
 
