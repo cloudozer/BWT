@@ -60,7 +60,7 @@ idle({run, Args}, _From, State = #state{}) ->
 
   RefFileAbs = filename:absname_join(WorkerPath, RefFile),
   {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
-  {reply, ok, busy, State#state{
+  {reply, {ok, self()}, busy, State#state{
     workload = Workload,
     current_workload = WorkloadRest,
     current_worker = Pid, 
