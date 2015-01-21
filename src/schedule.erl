@@ -62,7 +62,7 @@ distribute_parts(Acc, Ls, Curr_workload, Avg_workload,
 	distribute_parts(Acc, [{Curr_pos,Chunk_size}|Ls], Curr_workload+Chunk_size-?QSEQ_SIZE, 
 		Avg_workload, Curr_pos+Chunk_size-?QSEQ_SIZE, Rest-Chunk_size+?QSEQ_SIZE, Partitions, Chunk_size);
 
-distribute_parts(Acc, Ls, Curr_workload, Avg_workload, Curr_pos, Rest, [{Pos,Len}|Partitions], Chunk_size) ->
+distribute_parts(Acc, Ls, Curr_workload, Avg_workload, Curr_pos, Rest, [{Pos,Len,_}|Partitions], Chunk_size) ->
 	distribute_parts(Acc, [{Curr_pos,Rest}|Ls], Curr_workload+Rest, 
 		Avg_workload, Pos, Len, Partitions, Chunk_size);
 
