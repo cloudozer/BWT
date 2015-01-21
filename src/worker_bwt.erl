@@ -4,9 +4,9 @@
 -export([start_link/0, run/2,
 seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
--export([init/1, idle/3, busy/2, busy/3]).
+-export([init/1, idle/3, busy/2]).
 
--record(state, {current_worker, tasks_queue, master_pid, seq, ref_file_abs}).
+-record(state, {workload, current_workload = [], current_worker, master_pid, seq, ref_file_abs}).
 
 start_link() ->
   gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).
@@ -45,8 +45,9 @@ lager:info("Seq = ~p", [Seq]),
   RefFileAbs = filename:absname_join(WorkerPath, RefFile),
   Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {reply, ok, busy, State#state{
+    workload = Workload,
+    current_workload = WorkloadRest,
     current_worker = Pid, 
-    tasks_queue = queue:from_list(WorkloadRest), 
     master_pid = MasterPid,
     seq = Seq,
     ref_file_abs = RefFileAbs
@@ -54,26 +55,16 @@ lager:info("Seq = ~p", [Seq]),
 
 busy({done, WorkPiece}, S) ->
   #state{
-    current_worker=CurrentPid, 
-    tasks_queue = Tasks,
+    current_workload = [{Pos,ChunkSize}|WorkloadRest],
+    current_worker = CurrentPid, 
     master_pid = MasterPid,
     seq = {SeqName, SeqData},
     ref_file_abs = RefFileAbs
   } = S,
 
-  Tasks1 = Tasks, % queue:in(CurrentPid, Tasks),
-  case queue:get(Tasks1) of
-    {Pos, ChunkSize} -> 
-      Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize])
-  end,
-lager:info("~p in queue", [queue:len(Tasks1)]),
-  Tasks2 = queue:drop(Tasks1),
-  {next_state, busy, S#state{current_worker = Pid, tasks_queue = Tasks2}}.
-
-busy(stop, _From, #state{current_worker = Pid, tasks_queue = Tasks}) ->
-  exit(Pid, kill),
-  lists:foreach(fun(P) when is_pid(P) -> exit(P, kill); (_) -> ok end, queue:to_list(Tasks)),
-  {reply, ok, idle, #state{}}.
+  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+lager:info("~p in queue", [length(WorkloadRest)]),
+  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
 
 %% Private
 
