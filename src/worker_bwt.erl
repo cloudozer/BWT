@@ -2,7 +2,7 @@
 -behaviour(gen_fsm).
 %% API
 -export([start_link/0, run/2,
-seq_file_reader/1, seq_file_reader_loop/1, worker_loop/0]).
+seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
 -export([init/1, idle/3, busy/2, busy/3]).
 
@@ -42,9 +42,8 @@ lager:info("Seq = ~p", [Seq]),
 
   [{Pos,ChunkSize}|WorkloadRest] = Workload,
 
-  Pid = spawn_link(?MODULE, worker_loop, []),
   RefFileAbs = filename:absname_join(WorkerPath, RefFile),
-  Pid ! {run, self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize},
+  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {reply, ok, busy, State#state{
     current_worker = Pid, 
     tasks_queue = queue:from_list(WorkloadRest), 
@@ -65,8 +64,7 @@ busy({done, WorkPiece}, S) ->
   Tasks1 = Tasks, % queue:in(CurrentPid, Tasks),
   case queue:get(Tasks1) of
     {Pos, ChunkSize} -> 
-      Pid = spawn_link(?MODULE, worker_loop, []),
-      Pid ! {run, self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize}
+      Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize])
   end,
 lager:info("~p in queue", [queue:len(Tasks1)]),
   Tasks2 = queue:drop(Tasks1),
@@ -122,14 +120,10 @@ get_next_seq(Pid) ->
       exit(kill)
   end.
 
-worker_loop() -> 
-  receive
-    {run, WorkerMngrPid, MasterPid, Seq, RefFile, Pos, ChunkSize} ->
-      msw:worker(self(), Seq, RefFile, Pos, ChunkSize),
-      Results = receive R -> R end,
-      if (Results =/= []) -> 
-        master:send_result(MasterPid, Results);
-      true -> ok end,
-      ok = gen_fsm:send_event(WorkerMngrPid, {done, {Pos, ChunkSize}}),
-      worker_loop()
-  end.
+worker_loop(WorkerMngrPid, MasterPid, Seq, RefFile, Pos, ChunkSize) -> 
+  msw:worker(self(), Seq, RefFile, Pos, ChunkSize),
+  Results = receive R -> R end,
+  if (Results =/= []) -> 
+    master:send_result(MasterPid, Results);
+  true -> ok end,
+  ok = gen_fsm:send_event(WorkerMngrPid, {done, {Pos, ChunkSize}}).

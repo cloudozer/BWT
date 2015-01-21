@@ -80,7 +80,7 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, NodesNbr, C
   {reply, ok, busy, State}.
 
 busy({result, Matches}, State) when is_list(Matches) ->
-  lager:info("Master got matches: ~n~p"),
+  lager:info("Master got matches:"),
   lists:foreach(fun({Id, {Up,Lines,Down}}) ->
     lager:info("Pos: ~p", [Id]),
     lager:info("~p", [Up]),
