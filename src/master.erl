@@ -61,8 +61,10 @@ init(_Args) ->
   {ok, idle, #state{}}.
 
 idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, NodesNbr, ChunkSize}}, _From, State) when NodesNbr >= length(Nodes) -> 
-  Schedule = schedule:get_schedule(filename:absname_join(MasterPath, IndexFile), ChunkSize, NodesNbr), 
-  NodesNbr = length(Schedule),
+
+  {Workload,Partitions} = schedule:get_workload_and_index(filename:absname_join(MasterPath, IndexFile), ChunkSize, NodesNbr),
+  NodesNbr = length(Nodes),
+  Schedule = schedule:get_schedule(Workload, Partitions, NodesNbr), 
 
   {Nodes1,_} = lists:split(NodesNbr, Nodes),
 

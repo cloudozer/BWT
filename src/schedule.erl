@@ -18,7 +18,7 @@ get_workload_and_index(Index_file, Chunk_size, Nodes_nbr) ->
 			{Workload,Partitions} = get_average_workload_and_parts(0, [], Dev, Chunk_size, Nodes_nbr),
 			file:close(Dev),
 			io:format("Average workload=~.2g~n",[Workload]),
-			{Workload,Partitions}
+			{Workload,Partitions};
 			
 		{error,Reason} ->
 			io:format("index file: '~s' cannot be opened~n~p~n",[Index_file,Reason]),
@@ -45,7 +45,7 @@ get_genome_part_name(Parts, Pos) ->
 	get_part(Parts_sorted,Pos).
 
 get_part([{P,Len,Name}|Parts_sorted],Pos) when P =< Pos, P+Len >= Pos -> Name;
-get_part([{P,Len,_}|Parts_sorted],Pos) when Pos > P+Len -> get_part(sorted,Parts_sorted,Pos);
+get_part([{P,Len,_}|Parts_sorted],Pos) when Pos > P+Len -> get_part(Parts_sorted,Pos);
 get_part(_,_) -> no_name_found.
 
 
