@@ -4,7 +4,7 @@
 -export([start_link/0, run/2,
 seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
--export([init/1, idle/3, busy/2]).
+-export([init/1, handle_info/3, idle/3]).
 
 -record(state, {workload, current_workload = [], current_worker, master_pid, seq, ref_file_abs, seq_reader}).
 
@@ -20,10 +20,31 @@ run(Pid, Args) ->
 init(_Args) ->
   {ok, idle, #state{}}. 
 
-%handle_info({'DOWN', Ref, process, Pid, normal}, busy, S=#state{current_worker={Pid,Ref}}) ->
-%lager:info("exi"),
-%  {next_state, idle, S#state{current_worker = undefined}}.
+handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
+    current_workload = [],
+    current_worker = CurrentPid,
+    workload = [{Pos,ChunkSize}|WorkloadRest],
+    master_pid = MasterPid,
+    ref_file_abs = RefFileAbs,
+    seq_reader = SeqsReaderPid
+  }) ->
 
+  {ok, Seq} = get_next_seq(SeqsReaderPid),
+  {SeqName, SeqData} = Seq,
+
+  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
+
+handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
+    current_workload = [{Pos,ChunkSize}|WorkloadRest],
+    current_worker = CurrentPid, 
+    master_pid = MasterPid,
+    seq = {_,SeqData},
+    ref_file_abs = RefFileAbs
+  }) ->
+
+  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
 
 idle({run, Args}, _From, State = #state{}) ->
   {
@@ -49,30 +70,6 @@ idle({run, Args}, _From, State = #state{}) ->
     seq_reader = SeqsReaderPid
   }}.
 
-busy({done, WorkPiece}, S=#state{
-    current_workload = [],
-    workload = [{Pos,ChunkSize}|WorkloadRest],
-    master_pid = MasterPid,
-    ref_file_abs = RefFileAbs,
-    seq_reader = SeqsReaderPid
-  }) ->
-
-  {ok, Seq} = get_next_seq(SeqsReaderPid),
-  {SeqName, SeqData} = Seq,
-
-  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
-  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
-busy({done, WorkPiece}, S) ->
-  #state{
-    current_workload = [{Pos,ChunkSize}|WorkloadRest],
-    current_worker = CurrentPid, 
-    master_pid = MasterPid,
-    seq = {_,SeqData},
-    ref_file_abs = RefFileAbs
-  } = S,
-
-  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
-  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
 
 %% Private
 
@@ -118,7 +115,8 @@ get_next_seq(Pid) ->
       compile:file("fs.erl",[report_errors]),
       code:add_path("."),
       case code:is_loaded(fs) of
-        {file, _} -> true = code:purge(fs);
+        {file, _} -> 
+          true = code:purge(fs);
         false -> ok
       end,
       {module, fs} = code:load_file(fs),
@@ -133,5 +131,4 @@ worker_loop(WorkerMngrPid, MasterPid, Seq, RefFile, Pos, ChunkSize) ->
   Results = receive R -> R end,
   if (Results =/= []) -> 
     master:send_result(MasterPid, Results);
-  true -> ok end,
-  ok = gen_fsm:send_event(WorkerMngrPid, {done, {Pos, ChunkSize}}).
+  true -> ok end.

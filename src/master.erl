@@ -16,6 +16,9 @@ run_on_worker/6]).
 test_cluster() ->
   lager:start(),
   Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
+  lager:info("Genome sequence matching Demo"),
+  lager:info("Erlang cluster: ~b nodes", [length(Nodes)]),
+  lager:info("Node RAM: 512Mb"),
   {ok, Master} = ?MODULE:start_link(),
   RefFile = "human_g1k_v37_decoy.fasta",
   IndexFile = "human_g1k_v37_decoy.fasta.index",
@@ -47,7 +50,7 @@ start_link() ->
   gen_fsm:start_link(?MODULE, {}, []).
 
 run(Pid, Args) ->
-  ok = gen_fsm:sync_send_event(Pid, {run, Args}).
+  ok = gen_fsm:sync_send_event(Pid, {run, Args}, infinity).
 
 send_result(Pid, Matches) ->
   ok = gen_fsm:send_event(Pid, {result, Matches}).
@@ -72,10 +75,10 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, NodesNbr, C
       Workload,
       MasterPid
     },
-    spawn_link(fun() ->
+    %spawn_link(fun() ->
       ok = worker:run(Worker, Args),
       lager:info("started ~p~n", [Worker])
-    end)
+    %end)
   end, lists:zip(Nodes1, Schedule)),
   {reply, ok, busy, State}.
 
