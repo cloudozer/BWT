@@ -4,7 +4,7 @@
 -export([start_link/0, run/2,
 seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
--export([init/1, terminate/2, handle_info/3, idle/2]).
+-export([init/1, handle_info/3, idle/2]).
 
 -record(state, {current_worker, current_workload = [], workload, master_pid, seq, ref_file_abs, seq_reader}).
 
@@ -18,10 +18,7 @@ run(Pid, Args) ->
 init(_Args) ->
   {ok, idle, #state{}}. 
 
-terminate(Reason, State) -> 
-  lager:info("worker terminated: ~p", [Reason]).
-
-handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
+handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [],
     current_worker = CurrentPid,
     workload = [{Pos,ChunkSize}|WorkloadRest],
@@ -30,19 +27,23 @@ handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
     seq_reader = SeqsReaderPid
   }) ->
 
+  true = demonitor(Ref),
+
   {ok, Seq} = get_next_seq(SeqsReaderPid),
   {SeqName, SeqData} = Seq,
 
   {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
 
-handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
+handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [{Pos,ChunkSize}|WorkloadRest],
     current_worker = CurrentPid, 
     master_pid = MasterPid,
     seq = {_,SeqData},
     ref_file_abs = RefFileAbs
   }) ->
+
+  true = demonitor(Ref),
 
   {Pid,_} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.

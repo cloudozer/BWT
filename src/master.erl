@@ -85,7 +85,7 @@ busy({result, Matches}, S=#state{partititons=Partitions}) when is_list(Matches) 
     lager:info("Genone part: ~p Pos: ~p", [schedule:get_genome_part_name(Partitions, Pos),Pos]),
     lager:info("~p", [Up]),
     lager:info("~p", [Lines]),
-    lager:info("~p", [Down])
+    lager:info("~p~n", [Down])
   end, Matches),
   {next_state, busy, S}.
 
