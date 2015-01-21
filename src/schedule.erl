@@ -1,6 +1,6 @@
 % scheduling tasks 
 % 
-% Cloudozer(c), 2014
+% Cloudozer(c), 2015
 %
 
 -module(schedule).
@@ -13,7 +13,7 @@
 get_schedule(Index_file, Chunk_size, Nodes_nbr) ->
 	case file:open(Index_file,read) of
 		{ok,Dev} ->
-			{Workload,[{Pos,Len}|Partitions]} = get_average_workload_and_parts(0, [], Dev, Chunk_size, Nodes_nbr),
+			{Workload,[{Pos,Len,_}|Partitions]} = get_average_workload_and_parts(0, [], Dev, Chunk_size, Nodes_nbr),
 			file:close(Dev),
 			io:format("Average workload=~.2g~n",[Workload]),
 			distribute_parts([], [], 0, Workload, Pos,Len,Partitions, Chunk_size);
@@ -31,10 +31,20 @@ get_average_workload_and_parts(Sum, Acc, Dev, Chunk_size, Nodes_nbr) ->
 			{Sum / Nodes_nbr, lists:reverse(Acc)};
 
 		{ok,Data} -> 
-			[_,Pos,Len]=string:tokens(Data," \n"),
+			[Name,Pos,Len]=string:tokens(Data," \n"),
 			get_average_workload_and_parts(Sum+list_to_integer(Len), 
-				[{list_to_integer(Pos),list_to_integer(Len)}|Acc], Dev, Chunk_size, Nodes_nbr)
+				[{list_to_integer(Pos),list_to_integer(Len),Name}|Acc], Dev, Chunk_size, Nodes_nbr)
 	end.
+
+
+% returns part name for a given position Pos
+get_genome_part_name(Parts, Pos) -> 
+	Parts_sorted = lists:sort(Parts),
+	get_part(Parts_sorted,Pos).
+
+get_part([{P,Len,Name}|Parts_sorted],Pos) when P =< Pos, P+Len >= Pos -> Name;
+get_part([{P,Len,_}|Parts_sorted],Pos) when Pos > P+Len -> get_part(sorted,Parts_sorted,Pos);
+get_part(_,_) -> no_name_found.
 
 
 
