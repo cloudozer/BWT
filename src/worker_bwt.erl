@@ -24,6 +24,7 @@ init(_Args) ->
 %lager:info("exi"),
 %  {next_state, idle, S#state{current_worker = undefined}}.
 
+
 idle({run, Args}, _From, State = #state{}) ->
   {
     RefFile,IndexFile,SeqFile,WorkerPath,
@@ -32,13 +33,7 @@ idle({run, Args}, _From, State = #state{}) ->
   } = Args,
   SeqsReaderPid = seq_file_reader(filename:absname_join(WorkerPath, SeqFile)),
   {ok, Seq} = get_next_seq(SeqsReaderPid),
-lager:info("Seq = ~p", [Seq]),
   {SeqName, SeqData} = Seq,
-
-  seeds:generate_fs(SeqData,15,2),
-  compile:file("fs.erl",[report_errors]),
-  code:add_path("."),
-  code:load_file(fs),
 
   [{Pos,ChunkSize}|WorkloadRest] = Workload,
 
@@ -65,13 +60,7 @@ busy({done, WorkPiece}, S=#state{
   {ok, Seq} = get_next_seq(SeqsReaderPid),
   {SeqName, SeqData} = Seq,
 
-  seeds:generate_fs(SeqData,15,2),
-  compile:file("fs.erl",[report_errors]),
-  code:add_path("."),
-  code:load_file(fs),
-
   Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
-lager:info("~p in queue", [length(WorkloadRest)]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
 busy({done, WorkPiece}, S) ->
   #state{
@@ -123,8 +112,13 @@ get_next_seq(Pid) ->
   Ref = monitor(process, Pid),
   Pid ! {get_seq, Ref, self()},
   receive
-    {ok, Ref, Seq} ->
+    {ok, Ref, Seq = {_,SeqData}} ->
       true = demonitor(Ref),
+      seeds:generate_fs(SeqData,15,2),
+      compile:file("fs.erl",[report_errors]),
+      code:add_path("."),
+      {module, fs} = code:load_file(fs),
+lager:info("Next Seq = ~p", [Seq]),
       {ok, Seq};
     _ ->
       exit(kill)
