@@ -32,7 +32,7 @@ test_cluster() ->
 
 test_local() ->
   lager:start(),
-  {ok, WorkerSrv} = worker_bwt:start_link(),
+  {ok, WorkerSrv} = worker_bio:start_link(),
   Nodes = [node(WorkerSrv)],
   {ok, Master} = ?MODULE:start_link(),
   RefFile = "human_g1k_v37_decoy.fasta",
@@ -66,7 +66,7 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
 
   MasterPid = self(),
   lists:foreach(fun({NodeName,Workload}) ->
-    Worker = {worker_bwt, NodeName},
+    Worker = {worker_bio, NodeName},
     %Pid = spawn_link(NodeName, ?MODULE, run_on_worker, [N,Seq,Ref_seq_name,File,ReturnPid,J]),
     Args = {
       RefFile,IndexFile,SeqFile,WorkerPath,

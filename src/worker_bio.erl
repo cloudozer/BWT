@@ -1,4 +1,4 @@
--module(worker_bwt).
+-module(worker_bio).
 -behaviour(gen_fsm).
 %% API
 -export([start_link/0, run/2,
@@ -116,7 +116,7 @@ get_next_seq(Pid) ->
       code:add_path("."),
       case code:is_loaded(fs) of
         {file, _} -> 
-          true = code:purge(fs);
+          code:purge(fs);
         false -> ok
       end,
       {module, fs} = code:load_file(fs),
