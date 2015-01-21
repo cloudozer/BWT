@@ -8,6 +8,8 @@ seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 
 -record(state, {current_worker, current_workload = [], workload, master_pid, seq, ref_file_abs, seq_reader}).
 
+-define(THRESHOLD,5).
+
 start_link() ->
   gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).
 
@@ -134,8 +136,16 @@ lager:info("Next Seq = ~p", [Seq]),
   end.
 
 worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, ChunkSize) -> 
-  msw:worker(self(), SeqData, RefFile, Pos, ChunkSize),
-  Matches = receive M -> M end,
+  %msw:worker(self(), SeqData, RefFile, Pos, ChunkSize),
+  %Matches = receive M -> M end,
+  Ref_seq = msw:get_chunk(RefFile, Pos, ChunkSize),
+  Seeds = fs:find_seeds(Ref_seq), 
+  Matches = lists:foldl(fun(S,Acc)->  
+          case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
+                  no_match -> Acc;
+                  Match -> [{Pos+S,Match}|Acc]
+          end
+                                    end,[],Seeds),
   if (Matches =/= []) -> 
     master:send_result(MasterPid, {Seq, Matches});
   true -> ok end.
