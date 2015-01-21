@@ -117,6 +117,10 @@ get_next_seq(Pid) ->
       seeds:generate_fs(SeqData,15,2),
       compile:file("fs.erl",[report_errors]),
       code:add_path("."),
+      case code:is_loaded(fs) of
+        {file, _} -> true = code:purge(fs);
+        false -> ok
+      end,
       {module, fs} = code:load_file(fs),
 lager:info("Next Seq = ~p", [Seq]),
       {ok, Seq};
