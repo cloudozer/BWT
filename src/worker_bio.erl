@@ -50,7 +50,11 @@ handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
   true = demonitor(Ref),
 
   {Pid,_} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
-  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
+  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
+
+handle_info(M, S, D) ->
+  lager:info("message: ~p", [M]),
+  {stop, bug, D}.
 
 idle({run, Args}, State = #state{}) ->
   {
