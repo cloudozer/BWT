@@ -6,7 +6,7 @@ seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
 -export([init/1, idle/3, busy/2]).
 
--record(state, {workload, current_workload = [], current_worker, master_pid, seq, ref_file_abs}).
+-record(state, {workload, current_workload = [], current_worker, master_pid, seq, ref_file_abs, seq_reader}).
 
 start_link() ->
   gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).
@@ -31,7 +31,7 @@ idle({run, Args}, _From, State = #state{}) ->
     MasterPid
   } = Args,
   SeqsReaderPid = seq_file_reader(filename:absname_join(WorkerPath, SeqFile)),
-  {ok, Seq} = {ok, {test, "ATGTGACACAGATCACTGCGGCCTTGACCTCCCAGGCTCCAGGTGGTTCTT"}}, % get_next_seq(SeqsReaderPid),
+  {ok, Seq} = get_next_seq(SeqsReaderPid),
 lager:info("Seq = ~p", [Seq]),
   {SeqName, SeqData} = Seq,
 
@@ -50,15 +50,35 @@ lager:info("Seq = ~p", [Seq]),
     current_worker = Pid, 
     master_pid = MasterPid,
     seq = Seq,
-    ref_file_abs = RefFileAbs
+    ref_file_abs = RefFileAbs,
+    seq_reader = SeqsReaderPid
   }}.
 
+busy({done, WorkPiece}, S=#state{
+    current_workload = [],
+    workload = [{Pos,ChunkSize}|WorkloadRest],
+    master_pid = MasterPid,
+    ref_file_abs = RefFileAbs,
+    seq_reader = SeqsReaderPid
+  }) ->
+
+  {ok, Seq} = get_next_seq(SeqsReaderPid),
+  {SeqName, SeqData} = Seq,
+
+  seeds:generate_fs(SeqData,15,2),
+  compile:file("fs.erl",[report_errors]),
+  code:add_path("."),
+  code:load_file(fs),
+
+  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+lager:info("~p in queue", [length(WorkloadRest)]),
+  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
 busy({done, WorkPiece}, S) ->
   #state{
     current_workload = [{Pos,ChunkSize}|WorkloadRest],
     current_worker = CurrentPid, 
     master_pid = MasterPid,
-    seq = {SeqName, SeqData},
+    seq = {_,SeqData},
     ref_file_abs = RefFileAbs
   } = S,
 
