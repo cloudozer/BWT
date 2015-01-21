@@ -25,9 +25,8 @@ test_cluster() ->
   SeqFile = "SRR770176_1.fastq",
   MasterPath = "bwt_files",
   WorkerPath = "/home/drc/bwt_files",
-  NodesNbr = length(Nodes),
   ChunkSize = 2000,
-  Args = {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, NodesNbr, ChunkSize},  
+  Args = {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize},  
   ?MODULE:run(Master, Args).
 %  ok = gen_fsm:send_event(Pid, {run, 20, "ATGTGACACAGATCACTGCGGCCTTGACCTCCCAGGCTCCAGGTGGTTCTT","21","/home/drc/bwt_files/human_g1k_v37_decoy.fasta", Nodes}).
 
@@ -41,9 +40,8 @@ test_local() ->
   SeqFile = "SRR770176_1.fastq",
   MasterPath = "bwt_files",
   WorkerPath = MasterPath, % "/home/drc/bwt_files",
-  NodesNbr = length(Nodes),
-  ChunkSize = 20000,
-  Args = {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, NodesNbr, ChunkSize},  
+  ChunkSize = 2000,
+  Args = {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize},  
   ?MODULE:run(Master, Args).
 
 start_link() ->
@@ -60,12 +58,10 @@ send_result(Pid, Matches) ->
 init(_Args) ->
   {ok, idle, #state{}}.
 
-idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, NodesNbr, ChunkSize}}, _From, State) when NodesNbr >= length(Nodes) -> 
-
-  {Workload,Partitions} = schedule:get_workload_and_index(filename:absname_join(MasterPath, IndexFile), ChunkSize, NodesNbr),
+idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}, _From, State) -> 
   NodesNbr = length(Nodes),
-  Schedule = schedule:get_schedule(Workload, Partitions, NodesNbr), 
-
+  {Workload,Partitions} = schedule:get_workload_and_index(filename:absname_join(MasterPath, IndexFile), ChunkSize, NodesNbr),
+  Schedule = schedule:get_schedule(Workload, Partitions, ChunkSize), 
   {Nodes1,_} = lists:split(NodesNbr, Nodes),
 
   MasterPid = self(),
