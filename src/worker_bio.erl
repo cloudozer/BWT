@@ -36,20 +36,20 @@ handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
   {ok, Seq} = get_next_seq(SeqsReaderPid),
   {SeqName, SeqData} = Seq,
 
-  {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, Seq, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [{Pos,ChunkSize}|WorkloadRest],
     %current_worker = CurrentPid, 
     master_pid = MasterPid,
-    seq = {_,SeqData},
+    seq = Seq,
     ref_file_abs = RefFileAbs
   }) ->
 
   true = demonitor(Ref),
 
-  {Pid,_} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {Pid,_} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, Seq, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
 
 idle({run, Args}, State = #state{}) ->
@@ -66,7 +66,7 @@ idle({run, Args}, State = #state{}) ->
   [{Pos,ChunkSize}|WorkloadRest] = Workload,
 
   RefFileAbs = filename:absname_join(WorkerPath, RefFile),
-  {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, Seq, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, State#state{
     workload = Workload,
     current_workload = WorkloadRest,
@@ -133,9 +133,9 @@ lager:info("Next Seq = ~p", [Seq]),
       exit(kill)
   end.
 
-worker_loop(WorkerMngrPid, MasterPid, Seq, RefFile, Pos, ChunkSize) -> 
-  msw:worker(self(), Seq, RefFile, Pos, ChunkSize),
-  Results = receive R -> R end,
-  if (Results =/= []) -> 
-    master:send_result(MasterPid, Results);
+worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, ChunkSize) -> 
+  msw:worker(self(), SeqData, RefFile, Pos, ChunkSize),
+  Matches = receive M -> M end,
+  if (Matches =/= []) -> 
+    master:send_result(MasterPid, {Seq, Matches});
   true -> ok end.

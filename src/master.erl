@@ -16,9 +16,9 @@ run_on_worker/6]).
 test_cluster() ->
   lager:start(),
   Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
-  lager:info("Genome sequence matching Demo"),
-  lager:info("Erlang cluster: ~b nodes", [length(Nodes)]),
-  lager:info("Node RAM: 512Mb"),
+  io:format("Genome sequence matching Demo~n"),
+  io:format("Erlang cluster: ~b nodes~n", [length(Nodes)]),
+  io:format("Node RAM: 512Mb~n"),
   {ok, Master} = ?MODULE:start_link(),
   RefFile = "human_g1k_v37_decoy.fasta",
   IndexFile = "human_g1k_v37_decoy.fasta.index",
@@ -73,19 +73,19 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
       Workload,
       MasterPid
     },
-    %spawn_link(fun() ->
+    spawn_link(fun() ->
       ok = worker_bio:run(Worker, Args),
       lager:info("started ~p~n", [Worker])
-    %end)
+    end)
   end, lists:zip(Nodes1, Schedule)),
   {reply, ok, busy, State#state{partititons=Partitions}}.
 
-busy({result, Matches}, S=#state{partititons=Partitions}) when is_list(Matches) ->
+busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions}) when is_list(Matches) ->
   lists:foreach(fun({Pos, {Up,Lines,Down}}) ->
-    lager:info("Genone part: ~p Pos: ~p", [schedule:get_genome_part_name(Partitions, Pos),Pos]),
-    lager:info("~p", [Up]),
-    lager:info("~p", [Lines]),
-    lager:info("~p~n", [Down])
+    io:format("Seq: ~p Genone part: ~p Pos: ~p~n", [SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
+    io:format("~s~n", [Up]),
+    io:format("~s~n", [Lines]),
+    io:format("~s~n~n", [Down])
   end, Matches),
   {next_state, busy, S}.
 
