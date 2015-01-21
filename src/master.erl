@@ -9,7 +9,7 @@ run_on_worker/6]).
 -export([start_link/0, run/2, send_result/2]).
 -export([init/1, idle/3, busy/2]).
 
--record(state, {client}).
+-record(state, {client, partititons}).
 
 -define(THRESHOLD,5).
 
@@ -78,17 +78,16 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
       lager:info("started ~p~n", [Worker])
     %end)
   end, lists:zip(Nodes1, Schedule)),
-  {reply, ok, busy, State}.
+  {reply, ok, busy, State#state{partititons=Partitions}}.
 
-busy({result, Matches}, State) when is_list(Matches) ->
-  lager:info("Master got matches:"),
-  lists:foreach(fun({Id, {Up,Lines,Down}}) ->
-    lager:info("Pos: ~p", [Id]),
+busy({result, Matches}, S=#state{partititons=Partitions}) when is_list(Matches) ->
+  lists:foreach(fun({Pos, {Up,Lines,Down}}) ->
+    lager:info("Genone part: ~p Pos: ~p", [schedule:get_genome_part_name(Partitions, Pos),Pos]),
     lager:info("~p", [Up]),
     lager:info("~p", [Lines]),
     lager:info("~p", [Down])
   end, Matches),
-  {next_state, busy, State}.
+  {next_state, busy, S}.
 
 %% 
 
