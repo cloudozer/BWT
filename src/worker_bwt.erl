@@ -32,7 +32,7 @@ handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
   {ok, Seq} = get_next_seq(SeqsReaderPid),
   {SeqName, SeqData} = Seq,
 
-  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
 
 handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
@@ -43,7 +43,7 @@ handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
     ref_file_abs = RefFileAbs
   }) ->
 
-  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {Pid,_} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
 
 idle({run, Args}, _From, State = #state{}) ->
@@ -59,7 +59,7 @@ idle({run, Args}, _From, State = #state{}) ->
   [{Pos,ChunkSize}|WorkloadRest] = Workload,
 
   RefFileAbs = filename:absname_join(WorkerPath, RefFile),
-  Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
+  {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {reply, ok, busy, State#state{
     workload = Workload,
     current_workload = WorkloadRest,
