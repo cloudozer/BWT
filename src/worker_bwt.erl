@@ -83,7 +83,6 @@ busy({done, WorkPiece}, S) ->
   } = S,
 
   Pid = spawn_link(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
-lager:info("~p in queue", [length(WorkloadRest)]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
 
 %% Private
