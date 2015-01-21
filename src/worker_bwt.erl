@@ -12,7 +12,9 @@ start_link() ->
   gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).
 
 run(Pid, Args) ->
-  gen_fsm:sync_send_event(Pid, {run, Args}).
+  {ok, WorkerPid} = gen_fsm:sync_send_event(Pid, {run, Args}),
+  true = link(WorkerPid),
+  ok.
 
 
 init(_Args) ->
