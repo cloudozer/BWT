@@ -118,7 +118,7 @@ get_next_seq(Pid) ->
       compile:file("fs.erl",[report_errors]),
       code:add_path("."),
       case code:is_loaded(fs) of
-        {file, _} -> true = purge(fs);
+        {file, _} -> true = code:purge(fs);
         false -> ok
       end,
       {module, fs} = code:load_file(fs),
