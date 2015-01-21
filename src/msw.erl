@@ -78,7 +78,7 @@ worker(Pid,Seq,File,Pos,Len) ->
 	 	error -> Pid ! error;
 	 	Ref_seq ->
 	 		Seeds = fs:find_seeds(Ref_seq),
-	 		io:format("~p seeds found~n",[length(Seeds)]),
+	 		%%io:format("~p seeds found~n",[length(Seeds)]),
 	 		Res = lists:foldl(fun(S,Acc)->  
  				case sw:sw(Seq,lists:sublist(Ref_seq,S,length(Seq)+?THRESHOLD)) of
  					no_match -> Acc;
@@ -95,6 +95,7 @@ get_chunk(File,Pos,Len) ->
 	case file:open(File,read) of
 		{ok,Dev} ->
 			{ok,Ref_seq} = file:pread(Dev, Pos, Len),
+                        file:close(Dev),
 			lists:filter(fun(S)-> S > 64 end,Ref_seq);
 		{error,Reason} ->
 			io:format("file: '~s' cannot be opened~n~p~n",[File,Reason]),

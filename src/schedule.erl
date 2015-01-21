@@ -6,7 +6,6 @@
 -module(schedule).
 -export([get_schedule/3]).
 
--define(CHUNK_SIZE,2000).
 -define(QSEQ_SIZE,100).
 
 % returns the list of lists that contain tuples (start_point, end_point)
@@ -44,9 +43,9 @@ distribute_parts(Acc, Ls, Curr_workload, Avg_workload,
 	distribute_parts([Ls|Acc], [], 0, Avg_workload, Curr_pos, Rest, Partitions, Chunk_size);
 
 distribute_parts(Acc, Ls, Curr_workload, Avg_workload, 
-	Curr_pos, Rest, Partitions, Chunk_size) when Rest >= 1.5 * ?CHUNK_SIZE ->
-	distribute_parts(Acc, [{Curr_pos,?CHUNK_SIZE}|Ls], Curr_workload+?CHUNK_SIZE-?QSEQ_SIZE, 
-		Avg_workload, Curr_pos+?CHUNK_SIZE-?QSEQ_SIZE, Rest-?CHUNK_SIZE+?QSEQ_SIZE, Partitions, Chunk_size);
+	Curr_pos, Rest, Partitions, Chunk_size) when Rest >= 1.5 * Chunk_size ->
+	distribute_parts(Acc, [{Curr_pos,Chunk_size}|Ls], Curr_workload+Chunk_size-?QSEQ_SIZE, 
+		Avg_workload, Curr_pos+Chunk_size-?QSEQ_SIZE, Rest-Chunk_size+?QSEQ_SIZE, Partitions, Chunk_size);
 
 distribute_parts(Acc, Ls, Curr_workload, Avg_workload, Curr_pos, Rest, [{Pos,Len}|Partitions], Chunk_size) ->
 	distribute_parts(Acc, [{Curr_pos,Rest}|Ls], Curr_workload+Rest, 
