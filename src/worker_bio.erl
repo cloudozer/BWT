@@ -4,7 +4,7 @@
 -export([start_link/0, run/2,
 seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
--export([init/1, handle_info/3, idle/3]).
+-export([init/1, handle_info/3, idle/2]).
 
 -record(state, {workload, current_workload = [], current_worker, master_pid, seq, ref_file_abs, seq_reader}).
 
@@ -12,9 +12,7 @@ start_link() ->
   gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).
 
 run(Pid, Args) ->
-  {ok, WorkerPid} = gen_fsm:sync_send_event(Pid, {run, Args}),
-  true = link(WorkerPid),
-  ok.
+  gen_fsm:send_event(Pid, {run, Args}).
 
 
 init(_Args) ->
@@ -46,12 +44,13 @@ handle_info({'DOWN', _, process, CurrentPid, normal}, busy, S=#state{
   {Pid,_} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}}.
 
-idle({run, Args}, _From, State = #state{}) ->
+idle({run, Args}, State = #state{}) ->
   {
     RefFile,IndexFile,SeqFile,WorkerPath,
     Workload,
     MasterPid
   } = Args,
+  true = link(MasterPid),
   SeqsReaderPid = seq_file_reader(filename:absname_join(WorkerPath, SeqFile)),
   {ok, Seq} = get_next_seq(SeqsReaderPid),
   {SeqName, SeqData} = Seq,
@@ -60,7 +59,7 @@ idle({run, Args}, _From, State = #state{}) ->
 
   RefFileAbs = filename:absname_join(WorkerPath, RefFile),
   {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, SeqData, RefFileAbs, Pos, ChunkSize]),
-  {reply, {ok, self()}, busy, State#state{
+  {next_state, busy, State#state{
     workload = Workload,
     current_workload = WorkloadRest,
     current_worker = Pid, 
