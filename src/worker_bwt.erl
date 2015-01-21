@@ -33,6 +33,11 @@ idle({run, Args}, _From, State = #state{}) ->
 lager:info("Seq = ~p", [Seq]),
   {SeqName, SeqData} = Seq,
 
+  seeds:generate_fs(SeqData,15,2),
+  compile:file("fs.erl",[report_errors]),
+  code:add_path("."),
+  code:load_file(fs),
+
   [{Pos,ChunkSize}|WorkloadRest] = Workload,
 
   Pid = spawn_link(?MODULE, worker_loop, []),
