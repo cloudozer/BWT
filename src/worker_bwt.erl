@@ -4,7 +4,7 @@
 -export([start_link/0, run/2,
 seq_file_reader/1, seq_file_reader_loop/1, worker_loop/0]).
 %% Callbacks
--export([init/1, idle/3, busy/3]).
+-export([init/1, idle/3, busy/2, busy/3]).
 
 -record(state, {current_worker, tasks_queue, master_pid, seq, ref_file_abs}).
 
@@ -53,7 +53,7 @@ lager:info("Seq = ~p", [Seq]),
     ref_file_abs = RefFileAbs
   }}.
 
-busy({done, WorkPiece}, {CurrentPid,_}, S) ->
+busy({done, WorkPiece}, S) ->
   #state{
     current_worker=CurrentPid, 
     tasks_queue = Tasks,
@@ -70,7 +70,7 @@ busy({done, WorkPiece}, {CurrentPid,_}, S) ->
   end,
 lager:info("~p in queue", [queue:len(Tasks1)]),
   Tasks2 = queue:drop(Tasks1),
-  {reply, ok, busy, S#state{current_worker = Pid, tasks_queue = Tasks2}}; 
+  {next_state, busy, S#state{current_worker = Pid, tasks_queue = Tasks2}}.
 
 busy(stop, _From, #state{current_worker = Pid, tasks_queue = Tasks}) ->
   exit(Pid, kill),
@@ -127,7 +127,9 @@ worker_loop() ->
     {run, WorkerMngrPid, MasterPid, Seq, RefFile, Pos, ChunkSize} ->
       msw:worker(self(), Seq, RefFile, Pos, ChunkSize),
       Results = receive R -> R end,
-      master:send_result(MasterPid, Results),
-      ok = gen_fsm:sync_send_event(WorkerMngrPid, {done, {Pos, ChunkSize}}),
+      if (Results =/= []) -> 
+        master:send_result(MasterPid, Results);
+      true -> ok end,
+      ok = gen_fsm:send_event(WorkerMngrPid, {done, {Pos, ChunkSize}}),
       worker_loop()
   end.
