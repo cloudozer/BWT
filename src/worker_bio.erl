@@ -6,7 +6,7 @@ seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
 -export([init/1, handle_info/3, idle/2]).
 
--record(state, {current_worker, workload, current_workload = [], master_pid, seq, ref_file_abs, seq_reader}).
+-record(state, {current_worker, current_workload = [], workload, master_pid, seq, ref_file_abs, seq_reader}).
 
 start_link() ->
   gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).
