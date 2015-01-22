@@ -105,17 +105,17 @@ busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch, seq_chunk = SeqChunk, n
     NumChunksDone when NumChunksDone == length(Nodes) - 1 ->
       case proplists:append_values(SeqName, SeqMatch) of
         [] ->
-          lager:info("Seq ~s not found.");
+          io:format("Sequence ~s no match found.~n~n", [SeqName]);
         MatchesList ->
-          lager:info("Done seq ~s matches: ~b", [SeqName, length(MatchesList)])
+          io:format("~s sequence: ~b matches found~n~n", [SeqName, length(MatchesList)])
       end,
       {next_state, busy, S};
     0 ->
-      lager:info("Seq ~s done 1 node", [SeqName]),
+%%       lager:info("Seq ~s done 1 node", [SeqName]),
       {next_state, busy, S#state{seq_chunk = [{SeqName,1} | SeqChunk]}};
     NumChunksDone ->
       NumNodesDone1 = NumChunksDone + 1,
-      lager:info("Seq ~s done ~b nodes", [SeqName, NumNodesDone1]),
+%%       lager:info("Seq ~s done ~b nodes", [SeqName, NumNodesDone1]),
       SeqNode1 = lists:keyreplace(SeqName, 1, SeqChunk, {SeqName, NumNodesDone1}),
       {next_state, busy, S#state{seq_chunk = SeqNode1}}
   end.
