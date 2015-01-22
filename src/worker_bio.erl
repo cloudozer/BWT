@@ -141,11 +141,15 @@ worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, Ch
   Ref_seq = msw:get_chunk(RefFile, Pos, ChunkSize),
   Seeds = fs:find_seeds(Ref_seq), 
   Matches = lists:foldl(fun(S,Acc)->
+    if (S + length(SeqData)+?THRESHOLD =< ChunkSize) ->
           case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
                   no_match -> Acc;
                   Match -> [{Pos+S,Match}|Acc]
-          end
-                                    end,[],Seeds),
+          end;
+      true ->
+        Acc
+      end
+    end,[],Seeds),
   if (Matches =/= []) -> 
     master:send_result(MasterPid, {Seq, Matches});
   true -> ok end.
