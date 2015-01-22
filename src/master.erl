@@ -84,13 +84,13 @@ busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions}) 
   lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
     io:format("Quality: ~p   Seq: ~p   Genome part: ~p   Pos: ~p~n", [Quality, SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
 
-    T = fun(L) ->
-      Limit = 30,
-      lists:suplist(L, Limit)
+    Trim = fun(L) ->
+      Limit = 50,
+      lists:sublist(L, Limit)
     end,
 
-    io:format("~s ...~n", [T(Up)]),
-    io:format("~s ...~n", [T(Lines)]),
-    io:format("~s ...~n~n", [T(Down)])
+    io:format("~s ...~n", [Trim(Up)]),
+    io:format("~s ...~n", [Trim(Lines)]),
+    io:format("~s ...~n~n", [Trim(Down)])
   end, Matches),
   {next_state, busy, S}.

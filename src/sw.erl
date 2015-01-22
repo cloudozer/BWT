@@ -101,7 +101,7 @@ extract_matches(X1,Match,X2,_,[],_) -> {X1,Match,X2}.
 
 get_next(1,[{V,Dir}|_],[S2|_]) -> {V,S2,Dir};
 get_next(Index,[_|Column],[_|W2]) -> get_next(Index-1, Column, W2);
-get_next(_,_,[]) -> {0, " ", undef}.
+get_next(_,_,[]) -> {0, 32, undef}.
 
 
 
