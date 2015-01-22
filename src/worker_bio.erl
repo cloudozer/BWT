@@ -135,19 +135,13 @@ lager:info("Next Seq = ~p", [Seq]),
       exit(kill)
   end.
 
-worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, ChunkSize) -> 
-  %msw:worker(self(), SeqData, RefFile, Pos, ChunkSize),
-  %Matches = receive M -> M end,
+worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, ChunkSize) ->
   Ref_seq = msw:get_chunk(RefFile, Pos, ChunkSize),
   Seeds = fs:find_seeds(Ref_seq), 
   Matches = lists:foldl(fun(S,Acc)->
-    if (S + length(SeqData)+?THRESHOLD =< ChunkSize) ->
-          case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
-                  no_match -> Acc;
-                  Match -> [{Pos+S,Match}|Acc]
-          end;
-      true ->
-        Acc
+      case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
+        no_match -> Acc;
+        Match -> [{Pos+S,Match}|Acc]
       end
     end,[],Seeds),
   if (Matches =/= []) -> 

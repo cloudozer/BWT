@@ -22,7 +22,7 @@ generate_fs(Qsec,Len,Defects) ->
 	Args_str = args(Len),
 	io:format(Dev,"~n
 find_seeds(Ref_Seq) ->
-	find_seeds([],0, Ref_Seq).~n
+	find_seeds([],1, Ref_Seq).~n
 find_seeds(Acc,N,[~s]) ->
 	case matches(~s) of
 		true -> [N,Acc];
