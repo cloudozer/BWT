@@ -85,9 +85,10 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
   end, lists:zip(Nodes1, Schedule)),
   {reply, ok, busy, State#state{partititons=Partitions, nodes = Nodes}}.
 
-busy({result, {{SeqName, _SeqData}, Matches}}, S=#state{partititons=Partitions, seq_match = SeqMatch}) when is_list(Matches) ->
+busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions, seq_match = SeqMatch}) when is_list(Matches) ->
   lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
-    io:format("Quality: ~p   Seq: ~p   Genome part: ~p   Pos: ~p~n", [Quality, SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
+    QualityPers = (Quality / length(SeqData)) * 50,
+    io:format("Accuracy: ~p%   Seq: ~p   Genome part: ~p   Pos: ~p~n", [QualityPers, SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
 
     Trim = fun(L) ->
       Limit = 70,
