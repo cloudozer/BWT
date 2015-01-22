@@ -60,7 +60,8 @@ idle({run, Args}, State = #state{}) ->
     Workload,
     MasterPid
   } = Args,
-  monitor(process, MasterPid),
+%%   monitor(process, MasterPid),
+  true = link(MasterPid),
   SeqsReaderPid = seq_file_reader(filename:absname_join(WorkerPath, SeqFile)),
   {ok, Seq} = get_next_seq(SeqsReaderPid),
   {SeqName, SeqData} = Seq,
