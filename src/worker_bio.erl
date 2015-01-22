@@ -6,7 +6,7 @@ seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
 -export([init/1, terminate/3, handle_info/3, idle/2]).
 
--record(state, {current_worker, current_workload = [], workload, master_pid, seq, ref_file_abs, seq_reader}).
+-record(state, {current_worker, current_workload = [], workload, master_pid, current_seq, ref_file_abs, seq_reader}).
 
 -include("bwt.hrl").
 
@@ -26,7 +26,8 @@ terminate(Reason, StateName, StateData) ->
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [],
-    %current_worker = CurrentPid,
+    current_worker = CurrentPid,
+    current_seq = {CurrentSeqName, _},
     workload = [{Pos,ChunkSize}|WorkloadRest],
     master_pid = MasterPid,
     ref_file_abs = RefFileAbs,
@@ -35,17 +36,18 @@ handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
 
   true = demonitor(Ref),
 
+  master:send_done_seq(MasterPid, CurrentSeqName),
+
   {ok, Seq} = get_next_seq(SeqsReaderPid),
-  {SeqName, SeqData} = Seq,
 
   {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, Seq, RefFileAbs, Pos, ChunkSize]),
   {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [{Pos,ChunkSize}|WorkloadRest],
-    %current_worker = CurrentPid, 
+    current_worker = CurrentPid,
     master_pid = MasterPid,
-    seq = Seq,
+    current_seq = Seq,
     ref_file_abs = RefFileAbs
   }) ->
 
@@ -60,11 +62,11 @@ idle({run, Args}, State = #state{}) ->
     Workload,
     MasterPid
   } = Args,
-%%   monitor(process, MasterPid),
+
   true = link(MasterPid),
+
   SeqsReaderPid = seq_file_reader(filename:absname_join(WorkerPath, SeqFile)),
   {ok, Seq} = get_next_seq(SeqsReaderPid),
-  {SeqName, SeqData} = Seq,
 
   [{Pos,ChunkSize}|WorkloadRest] = Workload,
 
@@ -75,7 +77,7 @@ idle({run, Args}, State = #state{}) ->
     current_workload = WorkloadRest,
     current_worker = Pid, 
     master_pid = MasterPid,
-    seq = Seq,
+    current_seq = Seq,
     ref_file_abs = RefFileAbs,
     seq_reader = SeqsReaderPid
   }}.

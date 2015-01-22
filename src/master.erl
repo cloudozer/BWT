@@ -6,10 +6,10 @@
   test_local/0
 ]).
 
--export([start_link/0, run/2, send_result/2]).
+-export([start_link/0, run/2, send_result/2, send_done_seq/2]).
 -export([init/1, idle/3, busy/2]).
 
--record(state, {client, partititons}).
+-record(state, {client, partititons, seq_match = []}).
 
 -include("bwt.hrl").
 
@@ -53,6 +53,11 @@ run(Pid, Args) ->
 send_result(Pid, Matches) ->
   ok = gen_fsm:send_event(Pid, {result, Matches}).
 
+send_done_seq(Pid, SeqName) ->
+  ok = gen_fsm:send_event(Pid, {done_seq, SeqName}).
+
+
+
 %% Callbacks
 
 init(_Args) ->
@@ -80,12 +85,12 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
   end, lists:zip(Nodes1, Schedule)),
   {reply, ok, busy, State#state{partititons=Partitions}}.
 
-busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions}) when is_list(Matches) ->
+busy({result, {{SeqName, _SeqData}, Matches}}, S=#state{partititons=Partitions, seq_match = SeqMatch}) when is_list(Matches) ->
   lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
     io:format("Quality: ~p   Seq: ~p   Genome part: ~p   Pos: ~p~n", [Quality, SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
 
     Trim = fun(L) ->
-      Limit = 50,
+      Limit = 70,
       lists:sublist(L, Limit)
     end,
 
@@ -93,4 +98,11 @@ busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions}) 
     io:format("~s ...~n", [Trim(Lines)]),
     io:format("~s ...~n~n", [Trim(Down)])
   end, Matches),
-  {next_state, busy, S}.
+  {next_state, busy, S#state{seq_match = [{SeqName, Matches} | SeqMatch]}};
+
+busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch}) ->
+  case proplists:append_values(SeqName, SeqMatch) of
+    [] ->
+      lager:info("Seq ~s not found.");
+    _ -> ok
+  end.

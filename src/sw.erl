@@ -67,7 +67,7 @@ find_max(Tab,W2,THR) ->
 	case Vmax < THR of
 		true ->
 			if (Vmax > ?THRESHOLD / 2) ->
-				lager:info("near find Vmax = ~p", [Vmax]);
+				lager:info("Vmax = ~p", [Vmax]);
 				true -> ok
 				end,
 			no_match;
