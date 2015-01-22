@@ -85,6 +85,7 @@ idle({run, Args}, State = #state{}) ->
 
 seq_file_reader(SeqFile) ->
   {ok, Dev} = file:open(SeqFile, [read]),
+skip_seqs(Dev, 50),
   spawn_link(?MODULE, seq_file_reader_loop, [Dev]).
 
 seq_file_reader_loop(Dev) ->
@@ -102,15 +103,26 @@ seq_file_reader_loop(Dev) ->
   end.
 
 seq_file_reader_loop_loop(Dev) ->
-  [Dot] = "@",
   case file:read_line(Dev) of
-    {ok, [Dot | SeqName]} ->
+    {ok, [$@ | SeqName]} ->
       {ok, SeqData} = file:read_line(Dev),
       Seq = {lists:droplast(SeqName),
              lists:droplast(SeqData)},
       {ok, Seq};
     {ok, E} ->
       seq_file_reader_loop_loop(Dev);
+    eof ->
+      eof
+  end.
+
+skip_seqs(_, 0) -> ok;
+skip_seqs(Dev, N) ->
+  case file:read_line(Dev) of
+    {ok, [$@ | _]} ->
+      {ok, _} = file:read_line(Dev),
+      skip_seqs(Dev, N-1);
+    {ok, _} ->
+      skip_seqs(Dev, N);
     eof ->
       eof
   end.
