@@ -66,10 +66,10 @@ find_max(Tab,W2,THR) ->
 	{Vmax,_} = lists:max([ lists:max(Column) || {_,Column} <- Tab ]),
 	case Vmax < THR of
 		true ->
-			if (Vmax > ?THRESHOLD / 2) ->
-				lager:info("Vmax = ~p", [Vmax]);
-				true -> ok
-				end,
+%% 			if (Vmax > ?THRESHOLD / 2) ->
+%% 				lager:info("Vmax = ~p", [Vmax]);
+%% 				true -> ok
+%% 				end,
 			no_match;
 		_ ->
 			Tab1 = remove_last_columns(Vmax,lists:reverse(Tab)),
