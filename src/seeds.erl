@@ -25,7 +25,7 @@ find_seeds(Ref_Seq) ->
 	find_seeds([],1, Ref_Seq).~n
 find_seeds(Acc,N,[~s]) ->
 	case matches(~s) of
-		true -> [N,Acc];
+		true -> [N|Acc];
 		_ -> Acc
 	end;~n",
 		[Args_str,Args_str]),
