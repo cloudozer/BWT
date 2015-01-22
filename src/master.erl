@@ -3,8 +3,8 @@
 
 -export([
   test_cluster/0,
-  test_local/0,
-run_on_worker/6]).
+  test_local/0
+]).
 
 -export([start_link/0, run/2, send_result/2]).
 -export([init/1, idle/3, busy/2]).
@@ -82,20 +82,9 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
 
 busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions}) when is_list(Matches) ->
   lists:foreach(fun({Pos, {Up,Lines,Down}}) ->
-    io:format("Seq: ~p Genone part: ~p Pos: ~p~n", [SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
+    io:format("Seq: ~p   Genome part: ~p   Pos: ~p~n", [SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
     io:format("~s~n", [Up]),
     io:format("~s~n", [Lines]),
     io:format("~s~n~n", [Down])
   end, Matches),
   {next_state, busy, S}.
-
-%% 
-
-run_on_worker(N,Seq,Ref_seq_name,File,ReturnPid,J) ->
-  seeds:generate_fs(Seq,15,2),
-  compile:file("fs.erl",[report_errors]),
-  code:add_path("."),
-  code:load_file(fs),
-  {Pos,Len} = msw:get_reference_position(Ref_seq_name,File),
-  Chunk_size = Len div N,
-  msw:worker(ReturnPid, Seq,File, Pos+J*Chunk_size, Chunk_size+?THRESHOLD+length(Seq)).

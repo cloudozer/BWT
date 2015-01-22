@@ -27,10 +27,10 @@ rand_seq(Acc,N) -> rand_seq([lists:nth(random:uniform(4),[$A,$C,$G,$T])|Acc], N-
 
 
 
-sw([_|_]=W1,[_|_]=W2) when length(W1) > length(W2) -> sw(W2,W1);
+sw([_|_]=W1,[_|_]=W2) when length(W1) > length(W2) -> no_match;
 
 sw([_|_]=W1,[_|_]=W2) ->
-	THR = (length(W1) - ?THRESHOLD)*?MATCH - ?THRESHOLD, 
+	THR = (length(W1) - ?THRESHOLD)*?MATCH - ?THRESHOLD,
 
 	Tab = [ {L1,[{0,undef}]} || L1 <- W1 ],
 	Tab1 = build_tab(Tab,W2),
