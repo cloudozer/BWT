@@ -60,8 +60,8 @@ idle({run, Args}, State = #state{}) ->
     Workload,
     MasterPid
   } = Args,
-%%   monitor(process, MasterPid),
-  true = link(MasterPid),
+  monitor(process, MasterPid),
+%%   true = link(MasterPid),
   SeqsReaderPid = seq_file_reader(filename:absname_join(WorkerPath, SeqFile)),
   {ok, Seq} = get_next_seq(SeqsReaderPid),
   {SeqName, SeqData} = Seq,
@@ -141,7 +141,7 @@ worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, Ch
   Seeds = fs:find_seeds(Ref_seq), 
   Matches = lists:foldl(fun(S,Acc)->
 lager:info("debug ~p", [{length(Ref_seq),S,length(SeqData)+?THRESHOLD}]),
-      case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD+1)) of
+      case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
         no_match -> Acc;
         Match -> [{Pos+S,Match}|Acc]
       end
