@@ -11,7 +11,7 @@
 
 -record(state, {client, partititons}).
 
--define(THRESHOLD,5).
+-include("bwt.hrl").
 
 test_cluster() ->
   lager:start(),

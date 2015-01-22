@@ -8,7 +8,7 @@ seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 
 -record(state, {current_worker, current_workload = [], workload, master_pid, seq, ref_file_abs, seq_reader}).
 
--define(THRESHOLD,5).
+-include("bwt.hrl").
 
 start_link() ->
   gen_fsm:start_link({local, ?MODULE}, ?MODULE, {}, []).

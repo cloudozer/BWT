@@ -7,7 +7,7 @@
 -export([main/4,main_serial/4,
 		worker/5, get_reference_position/2, get_chunk/3]).
 
--define(THRESHOLD,5).
+-include("bwt.hrl").
 
 
 main(N,[_|_]=Seq,Ref_seq_name,File) ->

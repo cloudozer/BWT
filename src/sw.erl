@@ -13,7 +13,7 @@
 -define(GAP_PENALTY,-1).
 -define(UNDEF,0).
 
--define(THRESHOLD, 5).
+-include("bwt.hrl").
 
 
 
