@@ -156,7 +156,9 @@ worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, Ch
   Matches = lists:foldl(fun(S,Acc)->
       case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
         no_match -> Acc;
-        {Match, Quality} -> [{Quality,Pos+S,Match}|Acc]
+        {Match, Quality} ->
+          QualityPers = round(Quality / length(SeqData)) * 50,
+          [{QualityPers,Pos+S,Match}|Acc]
       end
     end,[],Seeds),
   if (Matches =/= []) -> 
