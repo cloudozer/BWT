@@ -77,7 +77,7 @@ find_max(Tab,W2,THR) ->
 			[{_,Col}|_] = Tab1,
 			Index = get_index(1,Col,Vmax),
 			%io:format("Index:~p~n",[Index]),
-			extract_matches([],[],[],Index,Tab1,lists:reverse(W2))
+			{extract_matches([],[],[],Index,Tab1,lists:reverse(W2)), Vmax}
 	end.
 
 

@@ -1,1 +1,1 @@
--define(THRESHOLD, 50).
+-define(THRESHOLD, 40).

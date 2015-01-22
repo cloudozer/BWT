@@ -81,10 +81,16 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
   {reply, ok, busy, State#state{partititons=Partitions}}.
 
 busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions}) when is_list(Matches) ->
-  lists:foreach(fun({Pos, {Up,Lines,Down}}) ->
-    io:format("Seq: ~p   Genome part: ~p   Pos: ~p~n", [SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
-    io:format("~s~n", [Up]),
-    io:format("~s~n", [Lines]),
-    io:format("~s~n~n", [Down])
+  lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
+    io:format("Quality: ~p   Seq: ~p   Genome part: ~p   Pos: ~p~n", [Quality, SeqName, schedule:get_genome_part_name(Partitions, Pos),Pos]),
+
+    T = fun(L) ->
+      Limit = 30,
+      lists:suplist(L, Limit)
+    end,
+
+    io:format("~s ...~n", [T(Up)]),
+    io:format("~s ...~n", [T(Lines)]),
+    io:format("~s ...~n~n", [T(Down)])
   end, Matches),
   {next_state, busy, S}.
