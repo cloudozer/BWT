@@ -139,6 +139,7 @@ worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, Ch
   Ref_seq = msw:get_chunk(RefFile, Pos, ChunkSize),
   Seeds = fs:find_seeds(Ref_seq), 
   Matches = lists:foldl(fun(S,Acc)->
+lager:info("debug ~p", [{length(Ref_seq),S,length(SeqData)+?THRESHOLD}]),
       case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
         no_match -> Acc;
         Match -> [{Pos+S,Match}|Acc]
