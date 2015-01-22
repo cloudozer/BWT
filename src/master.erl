@@ -9,7 +9,7 @@
 -export([start_link/0, run/2, send_result/2, send_done_seq/2]).
 -export([init/1, idle/3, busy/2]).
 
--record(state, {client, partititons, seq_match = []}).
+-record(state, {client, partititons, seq_match = [], seq_chunk = [], nodes}).
 
 -include("bwt.hrl").
 
@@ -83,7 +83,7 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
       %lager:info("started ~p~n", [Worker])
     end)
   end, lists:zip(Nodes1, Schedule)),
-  {reply, ok, busy, State#state{partititons=Partitions}}.
+  {reply, ok, busy, State#state{partititons=Partitions, nodes = Nodes}}.
 
 busy({result, {{SeqName, _SeqData}, Matches}}, S=#state{partititons=Partitions, seq_match = SeqMatch}) when is_list(Matches) ->
   lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
@@ -100,9 +100,22 @@ busy({result, {{SeqName, _SeqData}, Matches}}, S=#state{partititons=Partitions, 
   end, Matches),
   {next_state, busy, S#state{seq_match = [{SeqName, Matches} | SeqMatch]}};
 
-busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch}) ->
-  case proplists:append_values(SeqName, SeqMatch) of
-    [] ->
-      lager:info("Seq ~s not found.");
-    _ -> ok
+busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch, seq_chunk = SeqChunk, nodes = Nodes}) ->
+  case proplists:get_value(SeqName, SeqChunk, 0) of
+    NumChunksDone when NumChunksDone == length(Nodes) - 1 ->
+      case proplists:append_values(SeqName, SeqMatch) of
+        [] ->
+          lager:info("Seq ~s not found.");
+        MatchesList ->
+          lager:info("Done seq ~s matches: ~b", [SeqName, length(MatchesList)])
+      end,
+      {next_state, busy, S};
+    0 ->
+      lager:info("Seq ~s done 1 node", [SeqName]),
+      {next_state, busy, S#state{seq_chunk = [{SeqName,1} | SeqChunk]}};
+    NumChunksDone ->
+      NumNodesDone1 = NumChunksDone + 1,
+      lager:info("Seq ~s done ~b nodes", [SeqName, NumNodesDone1]),
+      SeqNode1 = lists:keyreplace(SeqName, 1, SeqChunk, {SeqName, NumNodesDone1}),
+      {next_state, busy, S#state{seq_chunk = SeqNode1}}
   end.

@@ -41,7 +41,7 @@ handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
   {ok, Seq} = get_next_seq(SeqsReaderPid),
 
   {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, Seq, RefFileAbs, Pos, ChunkSize]),
-  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest}};
+  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest, current_seq = Seq}};
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [{Pos,ChunkSize}|WorkloadRest],
