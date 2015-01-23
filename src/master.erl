@@ -7,7 +7,7 @@
 ]).
 
 -export([start_link/0, run/2, send_result/2, send_done_seq/2, send_done/1]).
--export([init/1, idle/3, busy/2]).
+-export([init/1, idle/3, terminate/3, busy/2]).
 
 -record(state, {client, partititons, seq_match = [], seq_chunk = [], nodes, nodes_done_count = 0, start_time}).
 
@@ -66,6 +66,9 @@ send_done(Pid) ->
 init(_Args) ->
   {ok, idle, #state{}}.
 
+terminate(normal, busy, _S) ->
+  ok.
+
 idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}, _From, State) -> 
   NodesNbr = length(Nodes),
   {Workload,Partitions} = schedule:get_workload_and_index(filename:absname_join(MasterPath, IndexFile), ChunkSize, NodesNbr),
@@ -80,14 +83,14 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
       RefFile,IndexFile,SeqFile,WorkerPath,
       Workload,
       MasterPid,
-      2
+      1
     },
     spawn_link(fun() ->
       ok = worker_bio:run(Worker, Args)
       %lager:info("started ~p~n", [Worker])
     end)
   end, lists:zip(Nodes1, Schedule)),
-  {reply, ok, busy, State#state{partititons=Partitions, nodes = Nodes}}.
+  {reply, ok, busy, State#state{partititons=Partitions, nodes = Nodes, start_time = now()}}.
 
 busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions, seq_match = SeqMatch}) when is_list(Matches) ->
   lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
@@ -125,9 +128,9 @@ busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch, seq_chunk = SeqChunk, n
       {next_state, busy, S#state{seq_chunk = SeqNode1}}
   end;
 
-busy(done, S=#state{nodes_done_count = DoneCount, nodes = Nodes}) when DoneCount == length(Nodes) - 1 ->
-  lager:info("all done"),
-  {stop, normal, S#state{nodes_done_count = DoneCount+1}};
+busy(done, S=#state{nodes_done_count = DoneCount, nodes = Nodes, start_time = StartNow}) when DoneCount == length(Nodes) - 1 ->
+  lager:info("all done in ~.1f% seconds", [timer:now_diff(now(), StartNow) / 1000000]),
+  {next_state, busy, S#state{nodes_done_count = DoneCount+1}};
 
 busy(done, S=#state{nodes_done_count = DoneCount}) ->
   DoneCount1 = DoneCount + 1,

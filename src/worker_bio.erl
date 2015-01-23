@@ -29,11 +29,13 @@ handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
   seq_counter = SeqCounter,
   seq_limit = SeqLimit,
   master_pid = MasterPid,
-  current_worker = CurrentPid
+  current_worker = CurrentPid,
+  current_seq = {CurrentSeqName, _}
 }) when SeqCounter == SeqLimit ->
   true = demonitor(Ref),
+  master:send_done_seq(MasterPid, CurrentSeqName),
   master:send_done(MasterPid),
-  {next_state, idle, #state{}};
+  {stop, normal, #state{}};
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [],
