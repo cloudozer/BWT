@@ -15,8 +15,8 @@
 
 test_cluster() ->
   lager:start(),
-%%   Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
-  Nodes = lists:sublist(gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes), 25),
+  Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
+%%   Nodes = lists:sublist(gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes), 25),
   io:format("Genome sequence matching Demo~n"),
   io:format("Erlang cluster: ~b nodes~n", [length(Nodes)]),
   io:format("Node RAM: 512Mb~n"),
