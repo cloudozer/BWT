@@ -15,7 +15,8 @@
 
 test_cluster() ->
   lager:start(),
-  Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
+%%   Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
+  Nodes = lists:sublist(gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes), 25),
   io:format("Genome sequence matching Demo~n"),
   io:format("Erlang cluster: ~b nodes~n", [length(Nodes)]),
   io:format("Node RAM: 512Mb~n"),
@@ -83,7 +84,7 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
       RefFile,IndexFile,SeqFile,WorkerPath,
       Workload,
       MasterPid,
-      1
+      1000
     },
     spawn_link(fun() ->
       ok = worker_bio:run(Worker, Args)
@@ -129,7 +130,7 @@ busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch, seq_chunk = SeqChunk, n
   end;
 
 busy(done, S=#state{nodes_done_count = DoneCount, nodes = Nodes, start_time = StartNow}) when DoneCount == length(Nodes) - 1 ->
-  lager:info("all done in ~.1f% seconds", [timer:now_diff(now(), StartNow) / 1000000]),
+  lager:info("all done in ~.1f seconds", [timer:now_diff(now(), StartNow) / 1000000]),
   {next_state, busy, S#state{nodes_done_count = DoneCount+1}};
 
 busy(done, S=#state{nodes_done_count = DoneCount}) ->
