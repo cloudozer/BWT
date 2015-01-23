@@ -6,10 +6,10 @@
   test_local/0
 ]).
 
--export([start_link/0, run/2, send_result/2, send_done_seq/2]).
+-export([start_link/0, run/2, send_result/2, send_done_seq/2, send_done/1]).
 -export([init/1, idle/3, busy/2]).
 
--record(state, {client, partititons, seq_match = [], seq_chunk = [], nodes}).
+-record(state, {client, partititons, seq_match = [], seq_chunk = [], nodes, nodes_done_count = 0}).
 
 -include("bwt.hrl").
 
@@ -56,6 +56,9 @@ send_result(Pid, Matches) ->
 send_done_seq(Pid, SeqName) ->
   ok = gen_fsm:send_event(Pid, {done_seq, SeqName}).
 
+send_done(Pid) ->
+  ok = gen_fsm:send_event(Pid, done_seq).
+
 
 
 %% Callbacks
@@ -76,7 +79,8 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
     Args = {
       RefFile,IndexFile,SeqFile,WorkerPath,
       Workload,
-      MasterPid
+      MasterPid,
+      2
     },
     spawn_link(fun() ->
       ok = worker_bio:run(Worker, Args)
@@ -119,4 +123,15 @@ busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch, seq_chunk = SeqChunk, n
 %%       lager:info("Seq ~s done ~b nodes", [SeqName, NumNodesDone1]),
       SeqNode1 = lists:keyreplace(SeqName, 1, SeqChunk, {SeqName, NumNodesDone1}),
       {next_state, busy, S#state{seq_chunk = SeqNode1}}
-  end.
+  end;
+
+busy(done, S=#state{nodes_done_count = DoneCount, nodes = Nodes}) when DoneCount == length(Nodes) - 1 ->
+  lager:info("all done"),
+  {stop, normal, S#state{nodes_done_count = DoneCount+1}};
+
+busy(done, S=#state{nodes_done_count = DoneCount}) ->
+  DoneCount1 = DoneCount + 1,
+  lager:info("~b nodes done", [DoneCount1]),
+  {next_state, busy, S#state{nodes_done_count = DoneCount1}}.
+
+

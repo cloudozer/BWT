@@ -6,7 +6,7 @@ seq_file_reader/1, seq_file_reader_loop/1, worker_loop/6]).
 %% Callbacks
 -export([init/1, terminate/3, handle_info/3, idle/2]).
 
--record(state, {current_worker, current_workload = [], workload, master_pid, current_seq, ref_file_abs, seq_reader}).
+-record(state, {current_worker, current_workload = [], workload, master_pid, current_seq, ref_file_abs, seq_reader, seq_limit, seq_counter}).
 
 -include("bwt.hrl").
 
@@ -25,13 +25,25 @@ terminate(Reason, StateName, StateData) ->
   lager:info("worker terminated ~p", [Reason]).
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
+  current_workload = [],
+  seq_counter = SeqCounter,
+  seq_limit = SeqLimit,
+  master_pid = MasterPid,
+  current_worker = CurrentPid
+}) when SeqCounter == SeqLimit ->
+  true = demonitor(Ref),
+  master:send_done(MasterPid),
+  {next_state, idle, #state{}};
+
+handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [],
     current_worker = CurrentPid,
     current_seq = {CurrentSeqName, _},
     workload = [{Pos,ChunkSize}|WorkloadRest],
     master_pid = MasterPid,
     ref_file_abs = RefFileAbs,
-    seq_reader = SeqsReaderPid
+    seq_reader = SeqsReaderPid,
+    seq_counter = SeqCounter
   }) ->
 
   true = demonitor(Ref),
@@ -41,7 +53,7 @@ handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
   {ok, Seq} = get_next_seq(SeqsReaderPid),
 
   {Pid, _} = spawn_monitor(?MODULE, worker_loop, [self(), MasterPid, Seq, RefFileAbs, Pos, ChunkSize]),
-  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest, current_seq = Seq}};
+  {next_state, busy, S#state{current_worker = Pid, current_workload = WorkloadRest, current_seq = Seq, seq_counter = SeqCounter + 1}};
 
 handle_info({'DOWN', Ref, process, CurrentPid, normal}, busy, S=#state{
     current_workload = [{Pos,ChunkSize}|WorkloadRest],
@@ -60,7 +72,8 @@ idle({run, Args}, State = #state{}) ->
   {
     RefFile,IndexFile,SeqFile,WorkerPath,
     Workload,
-    MasterPid
+    MasterPid,
+    SeqLimit
   } = Args,
 
   true = link(MasterPid),
@@ -79,7 +92,9 @@ idle({run, Args}, State = #state{}) ->
     master_pid = MasterPid,
     current_seq = Seq,
     ref_file_abs = RefFileAbs,
-    seq_reader = SeqsReaderPid
+    seq_reader = SeqsReaderPid,
+    seq_limit = SeqLimit,
+    seq_counter = 1
   }}.
 
 
