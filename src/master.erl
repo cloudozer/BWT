@@ -9,7 +9,7 @@
 -export([start_link/0, run/2, send_result/2, send_done_seq/2, send_done/1]).
 -export([init/1, idle/3, busy/2]).
 
--record(state, {client, partititons, seq_match = [], seq_chunk = [], nodes, nodes_done_count = 0}).
+-record(state, {client, partititons, seq_match = [], seq_chunk = [], nodes, nodes_done_count = 0, start_time}).
 
 -include("bwt.hrl").
 
@@ -57,7 +57,7 @@ send_done_seq(Pid, SeqName) ->
   ok = gen_fsm:send_event(Pid, {done_seq, SeqName}).
 
 send_done(Pid) ->
-  ok = gen_fsm:send_event(Pid, done_seq).
+  ok = gen_fsm:send_event(Pid, done).
 
 
 
