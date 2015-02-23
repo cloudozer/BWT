@@ -16,6 +16,7 @@
 test_cluster() ->
   lager:start(),
   Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
+lager:info("Nodes ~p", [Nodes]),
 %%   Nodes = lists:sublist(gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes), 25),
   io:format("Genome sequence matching Demo~n"),
   io:format("Erlang cluster: ~b nodes~n", [length(Nodes)]),
@@ -87,8 +88,8 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
       1000
     },
     spawn_link(fun() ->
-      ok = worker_bio:run(Worker, Args)
-      %lager:info("started ~p~n", [Worker])
+      ok = worker_bio:run(Worker, Args),
+      lager:info("started ~p~n", [Worker])
     end)
   end, lists:zip(Nodes1, Schedule)),
   {reply, ok, busy, State#state{partititons=Partitions, nodes = Nodes, start_time = now()}}.
