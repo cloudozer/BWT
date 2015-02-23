@@ -174,7 +174,7 @@ worker_loop(WorkerMngrPid, MasterPid, Seq = {SeqName, SeqData}, RefFile, Pos, Ch
       case sw:sw(SeqData,lists:sublist(Ref_seq,S,length(SeqData)+?THRESHOLD)) of
         no_match -> Acc;
         {Match, Quality} ->
-          [{Quality,Pos+S*60 div 59,Match}|Acc]
+          [{Quality,Pos+S*61 div 60,Match}|Acc]
       end
     end,[],Seeds),
   if (Matches =/= []) -> 
