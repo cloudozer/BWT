@@ -46,7 +46,7 @@ get_genome_part_name(Parts, Pos) ->
 
 get_part([{P,Len,Name}|_],Pos) when P =< Pos, P+Len >= Pos -> {Name, (Pos-P)/60*59};
 get_part([{P,Len,_}|Parts_sorted],Pos) when Pos > P+Len -> get_part(Parts_sorted,Pos);
-get_part(_,_) -> no_name_found.
+get_part(_,_) -> {no_name_found,undef}.
 
 
 
