@@ -96,7 +96,7 @@ get_chunk(File,Pos,Len) ->
 		{ok,Dev} ->
 			{ok,Ref_seq} = file:pread(Dev, Pos, Len),
                         file:close(Dev),
-			lists:filter(fun(10)-> false; (_)->true end,Ref_seq);
+			lists:filter(fun(10)-> false; (13)-> false; (_)->true end,Ref_seq);
 %% 			lists:filter(fun(S)-> S > 64 end,Ref_seq);
 		{error,Reason} ->
 			io:format("file: '~s' cannot be opened~n~p~n",[File,Reason]),
