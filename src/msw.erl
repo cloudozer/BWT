@@ -82,7 +82,7 @@ worker(Pid,Seq,File,Pos,Len) ->
 	 		Res = lists:foldl(fun(S,Acc)->  
  				case sw:sw(Seq,lists:sublist(Ref_seq,S,length(Seq)+?THRESHOLD)) of
  					no_match -> Acc;
- 					Match -> [{Pos+S,Match}|Acc]
+ 					Match -> [{Pos+S div 60 * 61,Match}|Acc]
  				end
 	 						  end,[],Seeds),
 	 		Pid ! Res

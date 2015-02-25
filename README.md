@@ -97,3 +97,7 @@ These are small tools to help process large files in Erlang.  In general, the st
 
     4>  bio_pfile:spawn_find_pattern(Data,<<"TATATTCAGTCTTTCTAACACCATTTATTGAAGAGACTGTAG">>).
     [{162758595,42}]
+
+## Cluster
+$ ./rebar compile
+$ ./start.sh
