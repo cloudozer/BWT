@@ -87,10 +87,10 @@ idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}
       MasterPid,
       1000
     },
-    spawn_link(fun() ->
+    %spawn_link(fun() ->
       ok = worker_bio:run(Worker, Args),
       lager:info("started ~p~n", [Worker])
-    end)
+    %end)
   end, lists:zip(Nodes1, Schedule)),
   {reply, ok, busy, State#state{partititons=Partitions, nodes = Nodes, start_time = now()}}.
 
