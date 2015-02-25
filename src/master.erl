@@ -98,8 +98,8 @@ busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions, s
   lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
     QualityPers = (Quality / length(SeqData)) * 50,
 
-    {Chromo_name, Pos_from_start} = schedule:get_genome_part_name(Partitions, Pos),
-    io:format("Accuracy: ~.1f%   Seq: ~p   Genome part: ~p   Pos: ~p~n", [QualityPers, SeqName, Chromo_name,Pos_from_start]),
+    {Chromo_name, Pos_in_part} = schedule:get_genome_part_name(Partitions, Pos),
+    io:format("Accuracy: ~.1f%   Seq: ~p   Genome part: ~p   Pos: ~p~n", [QualityPers, SeqName, Chromo_name,Pos_in_part]),
 
     Trim = fun(L) ->
       Limit = 70,
