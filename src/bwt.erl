@@ -80,3 +80,14 @@ get_suffs(Acc, N, [H|X]) ->
 get_suffs(Acc,_,[]) -> Acc.
 
 
+
+count_matches(Qsec, FM) ->
+	[H|Tail] = lists:reverse(Qsec),
+	count_matches(H,0,inf,Tail,FM).
+
+count_matches(C, Low_bound, Upper_bound, Qsec, FM) ->
+	0.
+
+
+
+

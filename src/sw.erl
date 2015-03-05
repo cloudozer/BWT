@@ -33,21 +33,21 @@ sw([_|_]=W1,[_|_]=W2) ->
 	THR = (length(W1) - ?THRESHOLD)*?MATCH - ?THRESHOLD,
 
 	Tab = [ {L1,[{0,undef}]} || L1 <- W1 ],
-	Tab1 = build_tab(Tab,W2),
-	find_max(Tab1,W2,THR);
+	{Vmax,Tab1} = build_tab(Tab,W2,0),
+	find_max(Tab1,W2,THR,Vmax);
 
 sw(N1,N2) when N1 < N2 -> sw(rand_seq(N1),rand_seq(N2));
 sw(N1,N2) when N1 >= N2 -> sw(rand_seq(N2),rand_seq(N1)).
 
 
 
-build_tab(Tab,[S2|W2]) ->
-	Tab1 = build_tab([], 0, 0, Tab, S2),
-	build_tab(Tab1,W2);
-build_tab(Tab,[]) -> Tab.
+build_tab(Tab,[S2|W2],V1max) ->
+	{V2max,Tab1} = build_tab(Tab, S2, [], 0, 0, V1max),
+	build_tab(Tab1,W2,V2max);
+build_tab(Tab,[],Vmax) -> {Vmax,Tab}.
 
 
-build_tab(AccT, V11, V10, [{S1,[{V01,_}|_]=Ls}|Tab], S2) ->
+build_tab([{S1,[{V01,_}|_]=Ls}|Tab], S2, AccT, V11, V10, Vmax) ->
 	%io:format("V11:~p, V10:~p, S1:~c, V01:~p~n",[V11,V10,S1,V01]),
 	{V,Dir} = lists:max([
 		{0,undef},
@@ -55,28 +55,20 @@ build_tab(AccT, V11, V10, [{S1,[{V01,_}|_]=Ls}|Tab], S2) ->
 		{V10+?GAP_PENALTY,l},
 		{V01+?GAP_PENALTY,u} 
 		]),
-	build_tab([{S1,[{V,Dir}|Ls]}|AccT], V01, V, Tab, S2);
+	build_tab(Tab, S2, [{S1,[{V,Dir}|Ls]}|AccT], V01, V, max(Vmax,V));
 
-build_tab(AccT,_,_,[],_) -> lists:reverse(AccT).
+build_tab([],_,AccT,_,_,Vmax) -> {Vmax,lists:reverse(AccT)}.
 
 
 
-find_max(Tab,W2,THR) ->
-	%io:format("Tab~n~p~n",[Tab]),
-	{Vmax,_} = lists:max([ lists:max(Column) || {_,Column} <- Tab ]),
+find_max(Tab,W2,THR,Vmax) ->
 	case Vmax < THR of
 		true ->
-%% 			if (Vmax > ?THRESHOLD / 2) ->
-%% 				lager:info("Vmax = ~p", [Vmax]);
-%% 				true -> ok
-%% 				end,
-			no_match;
+ 			no_match;
 		_ ->
 			Tab1 = remove_last_columns(Vmax,lists:reverse(Tab)),
-			%io:format("Tab after removal~n~p~n",[Tab1]),
 			[{_,Col}|_] = Tab1,
 			Index = get_index(1,Col,Vmax),
-			%io:format("Index:~p~n",[Index]),
 			{extract_matches([],[],[],Index,Tab1,lists:reverse(W2)), Vmax}
 	end.
 
@@ -115,10 +107,8 @@ get_index(Index,[_|Col],Vmax) ->
 remove_last_columns(Vmax,[{_,Col}|Rest]=Tab) ->
 	{V,_} = lists:max(Col),
 	case V < Vmax of
-		true ->
-			remove_last_columns(Vmax,Rest);
-		_ ->
-			Tab
+		true -> remove_last_columns(Vmax,Rest);
+		_ -> Tab
 	end.
 
 
