@@ -7,11 +7,11 @@
 -export([bwt/1,
 		get_suffs/1,
 		fm/1,
-		rank_all/1,
 		sa/1,
-		test/1]).
+		count_matches/2
+		]).
 
--record(fm,{f,l,d,a,c,g,t,sa}).
+%-record(fm,{f,l,d,a,c,g,t,sa}).
 
 
 
@@ -34,35 +34,56 @@ get_all_permutations(Acc,T,K,N) ->
 	get_all_permutations([NewT|Acc],NewT,K-1,N).
 
 
+%% returns an FM index for a given reference sequence
 fm(X) ->
 	Ls = lists:sort(get_suffs(X)),
 	%io:format("Sufs:~p~n",[Ls]),
-	Index = lists:reverse( lists:foldl(fun({[H|_],N},Acc)->
-		case N of
-			0 -> [#fm{f=H, l=$$, sa=0}|Acc];
-			J -> [#fm{f=H, l=lists:nth(J,X), sa=J}|Acc]
-		end
-										end,[],Ls)),
-	rank_all(Index).
-	
+	{FM, Dq, Aq, Cq, Gq, Tq} = fm(X,Ls,[],1,{[],[],[],[],[]}),
+	list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
 
-rank_all(FM) ->
-	rank_all(FM,[],0,0,0,0,0).
 
-rank_all([Rec=#fm{l=L}|FM],Acc,Dn,An,Cn,Gn,Tn) ->
-	case L of
-		$A -> rank_all(FM,[Rec#fm{d=Dn,a=An+1,c=Cn,g=Gn,t=Tn}|Acc],Dn,An+1,Cn,Gn,Tn);
-		$C -> rank_all(FM,[Rec#fm{d=Dn,a=An,c=Cn+1,g=Gn,t=Tn}|Acc],Dn,An,Cn+1,Gn,Tn);
-		$G -> rank_all(FM,[Rec#fm{d=Dn,a=An,c=Cn,g=Gn+1,t=Tn}|Acc],Dn,An,Cn,Gn+1,Tn);
-		$T -> rank_all(FM,[Rec#fm{d=Dn,a=An,c=Cn,g=Gn,t=Tn+1}|Acc],Dn,An,Cn,Gn,Tn+1);
-		$$ -> rank_all(FM,[Rec#fm{d=Dn+1,a=An,c=Cn,g=Gn,t=Tn}|Acc],Dn+1,An,Cn,Gn,Tn)
+fm(X,[{[S|_],N}|Ls], Acc, K, {Dq,Aq,Cq,Gq,Tq}) ->
+	case N of
+		0 -> Acc1 = [{S,$$,0}|Acc];
+		J -> Acc1 = [{S,lists:nth(J,X),J}|Acc]
+	end,
+	case S of
+		$A -> fm(X,Ls,Acc1,K+1,{Dq,[K|Aq],Cq,Gq,Tq});
+		$C -> fm(X,Ls,Acc1,K+1,{Dq,Aq,[K|Cq],Gq,Tq});
+		$G -> fm(X,Ls,Acc1,K+1,{Dq,Aq,Cq,[K|Gq],Tq});
+		$T -> fm(X,Ls,Acc1,K+1,{Dq,Aq,Cq,Gq,[K|Tq]});
+		$$ -> fm(X,Ls,Acc1,K+1,{[K|Dq],Aq,Cq,Gq,Tq})
 	end;
-rank_all([],Acc,_,_,_,_,_) -> lists:reverse(Acc).
-	
+fm(_,[], Acc, _, {Dq,Aq,Cq,Gq,Tq}) -> 
+	{lists:reverse(Acc),
+	lists:reverse(Dq),
+	lists:reverse(Aq),
+	lists:reverse(Cq),
+	lists:reverse(Gq),
+	lists:reverse(Tq)
+	}.
+				
 
-test(X) ->
-	FM = fm(X),
-	rank_all(FM).
+add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq) ->
+	case L of
+		$A -> 
+			[I|Aq1] = Aq, 
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq1,Cq,Gq,Tq);
+		$C -> 
+			[I|Cq1] = Cq, 
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq1,Gq,Tq);
+		$G -> 
+			[I|Gq1] = Gq, 
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq1,Tq);
+		$T -> 
+			[I|Tq1] = Tq, 
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq1);
+		$$ -> 
+			[I|Dq1] = Dq, 
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq1,Aq,Cq,Gq,Tq)
+	end;
+add_indices([],Acc,[],[],[],[],[]) -> lists:reverse(Acc).
+	
 
 
 
@@ -81,13 +102,51 @@ get_suffs(Acc,_,[]) -> Acc.
 
 
 
+%% returns the list of matches of the given Qsec sequence against 
+%% the reference sequence represented as FM index
 count_matches(Qsec, FM) ->
 	[H|Tail] = lists:reverse(Qsec),
-	count_matches(H,0,inf,Tail,FM).
+	case count_matches(H,1,size(FM),Tail,FM,size(FM)) of
+		no_matches -> 0;
+		{Sp,Se} -> 1+Se-Sp
+	end.
 
-count_matches(C, Low_bound, Upper_bound, Qsec, FM) ->
-	0.
+count_matches(C2, Sp, Ep, [C1|Qsec], FM, Size) ->
+	Sp1 = search_down(Sp,C2,C1,FM,Size),
+	Ep1 = search_up(Ep,C2,C1,FM),
+	%io:format("New range:~p - ~p~n",[Sp1,Ep1]),
+	case Sp1 =< Ep1 of
+		true -> count_matches(C1, Sp1, Ep1, Qsec, FM, Size);
+		_ -> no_matches
+	end;
+
+count_matches(_, Sp, Ep, [], _, _) ->
+	%io:format("We got matches from ~p to ~p~n",[Sp,Ep]),
+	{Sp,Ep}.
 
 
+search_down(Size,_,_,_,Size) -> 
+	%io:format("Match not found when going down~n"),
+	Size;
+search_down(Sp,C2,C1,FM,Size) ->
+	Tup = {F,L,_,_} = element(Sp,FM),
+	case {F,L} of
+		{C2,C1} -> element(3,Tup);
+		_ ->
+			%io:format("{~p,~p} did not match~n",[F,L]), 
+			search_down(Sp+1,C2,C1,FM,Size)
+	end.
+
+search_up(1,_,_,_) -> 
+	%io:format("Match not found when going up~n"),
+	1;
+search_up(Se,C2,C1,FM) ->
+	Tup = {F,L,_,_} = element(Se,FM),
+	case {F,L} of
+		{C2,C1} -> element(3,Tup);
+		_ -> 
+			%io:format("{~p,~p} did not match~n",[F,L]), 
+			search_up(Se-1,C2,C1,FM)
+	end. 
 
 

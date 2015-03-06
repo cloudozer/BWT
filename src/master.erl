@@ -116,10 +116,9 @@ busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch, seq_chunk = SeqChunk, n
   case proplists:get_value(SeqName, SeqChunk, 0) of
     NumChunksDone when NumChunksDone == length(Nodes) - 1 ->
       case proplists:append_values(SeqName, SeqMatch) of
-        [] ->
-          io:format("Sequence ~s no match found.~n~n", [SeqName]);
-        MatchesList ->
-          io:format("~s sequence: ~b matches found~n~n", [SeqName, length(MatchesList)])
+        [] -> io:format("Sequence ~s no match found.~n~n", [SeqName]);
+        [_] -> io:format("~s : one match found.~n~n", [SeqName]);
+        MatchesList -> io:format("~s : ~b matches found~n~n", [SeqName, length(MatchesList)])
       end,
       {next_state, busy, S};
     0 ->
