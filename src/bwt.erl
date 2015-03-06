@@ -8,7 +8,7 @@
 		get_suffs/1,
 		fm/1,
 		sa/1,
-		count_matches/2
+		find_match/2
 		]).
 
 %-record(fm,{f,l,d,a,c,g,t,sa}).
@@ -104,49 +104,66 @@ get_suffs(Acc,_,[]) -> Acc.
 
 %% returns the list of matches of the given Qsec sequence against 
 %% the reference sequence represented as FM index
-count_matches(Qsec, FM) ->
+find_match(Qsec, FM) ->
 	[H|Tail] = lists:reverse(Qsec),
-	case count_matches(H,1,size(FM),Tail,FM,size(FM)) of
-		no_matches -> 0;
-		{Sp,Se} -> 1+Se-Sp
+	%initialize_sp_ep(H,1,size(FM),FM)
+	case find_match(H,1,size(FM),Tail,FM) of
+		no_match -> [];
+		{Sp,Se} -> get_pos([],Sp,Se,FM)
 	end.
 
-count_matches(C2, Sp, Ep, [C1|Qsec], FM, Size) ->
-	Sp1 = search_down(Sp,C2,C1,FM,Size),
-	Ep1 = search_up(Ep,C2,C1,FM),
-	%io:format("New range:~p - ~p~n",[Sp1,Ep1]),
-	case Sp1 =< Ep1 of
-		true -> count_matches(C1, Sp1, Ep1, Qsec, FM, Size);
-		_ -> no_matches
+find_match(C1, Sp, Ep, [C2|Qsec], FM) ->
+	io:format("Looking for {~p,~p}~n",[C1,C2]),
+	io:format("Range:[~p - ~p]~n",[Sp,Ep]),
+	case se(Sp,not_found,Ep,not_found,C1,C2,FM) of
+		not_found -> no_match;
+		{Sp1,Ep1} -> find_match(C2, Sp1, Ep1, Qsec, FM)
 	end;
 
-count_matches(_, Sp, Ep, [], _, _) ->
-	%io:format("We got matches from ~p to ~p~n",[Sp,Ep]),
-	{Sp,Ep}.
+find_match(_, Sp, Ep, [], _) -> {Sp,Ep}.
 
 
-search_down(Size,_,_,_,Size) -> 
-	%io:format("Match not found when going down~n"),
-	Size;
-search_down(Sp,C2,C1,FM,Size) ->
-	Tup = {F,L,_,_} = element(Sp,FM),
-	case {F,L} of
-		{C2,C1} -> element(3,Tup);
-		_ ->
-			%io:format("{~p,~p} did not match~n",[F,L]), 
-			search_down(Sp+1,C2,C1,FM,Size)
-	end.
-
-search_up(1,_,_,_) -> 
-	%io:format("Match not found when going up~n"),
-	1;
-search_up(Se,C2,C1,FM) ->
-	Tup = {F,L,_,_} = element(Se,FM),
-	case {F,L} of
-		{C2,C1} -> element(3,Tup);
-		_ -> 
-			%io:format("{~p,~p} did not match~n",[F,L]), 
-			search_up(Se-1,C2,C1,FM)
+se(Sp,found,Ep,found,_,_,FM) -> 
+	{_,_,Sp1,_} = element(Sp,FM),
+	{_,_,Ep1,_} = element(Ep,FM),
+	{Sp1,Ep1};
+se(Sp,State1,Ep,State2,C1,C2,FM) ->
+	case State1 of
+		not_found ->
+			{State11, Sp1} = get_state(Sp,down,C1,C2,FM);
+		found -> State11 = found, Sp1 = Sp
+	end,
+	case State2 of
+		not_found ->
+			{State22, Ep1} = get_state(Ep,up,C1,C2,FM);
+		found -> State22 = found, Ep1 = Ep
+	end,
+	io:format("(~p,~p), (~p,~p)~n",[Sp1,State11,Ep1,State22]),
+	
+	case Sp1 > Ep1 of
+		true -> not_found;
+		_ -> se(Sp1,State11,Ep1,State22,C1,C2,FM)
 	end. 
 
+
+get_state(P,Dir,C1,C2,FM) ->
+	{F,L,_,_} = element(P,FM),
+	case {F,L} of
+		{C1,C2} -> {found,P};
+		_ ->
+			case Dir of
+				down -> {not_found,P+1};
+				up -> {not_found,P-1}
+			end
+	end.
+
+
+
+% returns a list of SA positions where the matches happened
+get_pos(Acc,Ep,Ep,FM) -> 
+	{_,_,_,SA} = element(Ep,FM),
+	[SA|Acc];
+get_pos(Acc,Sp,Ep,FM) ->
+	{_,_,_,SA} = element(Sp,FM),
+	get_pos([SA|Acc],Sp+1,Ep,FM).
 
