@@ -25,20 +25,21 @@ def make_index(data_file):
 	print "Reading file. Please wait..."
 	with open(data_file) as f:
 	        line = f.readline()
-	        Cn = 1
+	        Cn = 0
 	        N = 0
 	        K = 0
 	        ID = ''
 	        while line != '':
+	            LL = len(line)
 	            if line[0] == '>':
 	            	res.append((ID,N,K))
 	            	K = 0
-	            	N = Cn
+	            	N = Cn+LL
 	            	ID = line.split()[0][1:] 
 	            else:
-	            	K += len(line)
+	            	K += LL
 	            
-	            Cn += len(line)
+	            Cn += LL
 	            line = f.readline()
 	        res.append((ID,N,K))
 	res.pop(0)

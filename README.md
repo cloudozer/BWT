@@ -44,6 +44,22 @@ You may also run sw function with random sequences of any length as:
 	CAG-G--GCATCGCGTTTGC
 	ok
 	2> 
+
+
+# Seeking matches in a fasta file
+
+You may find all matches of your sequence against some reference sequence contained in the .fasta file.
+ 	
+ 	1> msw:main(10,"ATGTGACACAGATCACTGCGGCCTTGACCTCCCAGGCTCCAGGTGGTTCTT","21","data/human_g1k_v37_decoy.fasta").
+
+ The first argument means the number of parallel process. The third argument is a name of the reference sequence contained in the fasta file. In this example this is 21st chromosome.
+ The function assumes that there is an index file containing the pointers to all reference sequences in the fasta file. You can build this index file using simple python application:
+
+ 	>>> python make_index.py data/human_g1k_v37_decoy.fasta
+ 	>>>
+
+ You need to build an index file only once.
+ 
 	
 	
 # Big file processing 
@@ -81,3 +97,7 @@ These are small tools to help process large files in Erlang.  In general, the st
 
     4>  bio_pfile:spawn_find_pattern(Data,<<"TATATTCAGTCTTTCTAACACCATTTATTGAAGAGACTGTAG">>).
     [{162758595,42}]
+
+## Cluster
+$ ./rebar compile
+$ ./start.sh
