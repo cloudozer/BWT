@@ -46,9 +46,14 @@ t3()->
     t2(OutBin).
 
 t4()->
-    {ok,InFile} = file:open("newtes",[binary,read]),
-    Size = file_size("newtes"),
-    InBin = read_exts(InFile,<<>>,Size).
+    bin_term_file_read("data/human_g1k_v37_decoy.foam").
+    
+
+bin_term_file_read(FileName)->
+    {ok,InFile} = file:open(FileName,[binary,read]),
+    Size = file_size(FileName),
+    InBin = read_exts(InFile,<<>>,Size),
+    binary_to_term(InBin).
 
 read_exts(InFile,Acc,0)->
     file:close(InFile),
@@ -189,7 +194,178 @@ make_genome_index_pread(Index,TotalSize,Acc)->
     [Next|Rest2] = Rest,
     NewAcc = Acc ++ [{Cur,Next-Cur}],
     make_genome_index_pread(Rest,TotalSize,NewAcc).
+
+bwt(BinSeq)->
+    TBinSeq = case binary:match(BinSeq,<<"$">>) of
+		  nomatch ->  <<BinSeq/binary,<<"$">>/binary>>;
+		  _ -> BinSeq
+	      end,
+    Size = byte_size(TBinSeq),
+    M = list_tab(TBinSeq,0,Size-1,[TBinSeq]),
+    {F,L} = lists:foldl(fun(X,Acc)->
+				{First,Last} = bin_get_fl(X),
+				{FCol,LCol} = Acc,
+				{<<FCol/binary,First/binary>>,<<LCol/binary,Last/binary>>}
+			end,{<<>>,<<>>},M),
+    L.
+
+inv_bwt(L)->
+    List = binary:bin_to_list(L),
+    S = lists:sort(List),
+    F = binary:list_to_bin(S),
+    <<Start:1/binary,Rest/binary>> = L,
+    {Inv,L2F} = walk_fl({<<"$">>,1},F,L,{<<>>,array:new()},byte_size(L)),
+    {Inv,F,L,L2F}.
+
+bwt_match_naive(BinSub,BinPat)->
+    {_Inv,F,L,L2F} = inv_bwt(bwt(BinSub)),
+    io:format("F = ~p, L = ~p, L2F = ~p~n",[F,L,L2F]),
+    {Top,Bottom} = bwt_match_naive(F,L,BinPat,L2F,0,byte_size(F)-1),
+    Bottom-Top+1.
+
+bwt_match_naive(_F,_L,<<>>,_L2F,Top,Bottom) ->
+    {Top,Bottom};
+bwt_match_naive(F,L,BinPat,L2F,Top,Bottom) ->
+    io:format("Top = ~p, Bottom = ~p~n",[Top,Bottom]),
+    HeadSize = byte_size(BinPat)-1,
+    <<Head:HeadSize/binary,Sym:1/binary>> = BinPat,
+    io:format("Sym = ~p~n",[Sym]),
+    case find_sym(L,Sym,Top,Top,Bottom,{undef,undef}) of
+	{undef,_} -> nomatch;
+	{TopIndex,BottomIndex} ->
+	    NewTop = lists:nth(TopIndex+1,L2F),
+	    NewBottom = lists:nth(BottomIndex+1,L2F),
+	    io:format("NewTop = ~p, NewBottom = ~p~n",[NewTop,NewBottom]),
+	    bwt_match_naive(F,L,Head,L2F,NewTop,NewBottom)
+    end.
+						   
+
+find_sym(Col,Sym,Start,Cur,End,Acc) when Cur > End ->
+    io:format("Acc = ~p~n",[Acc]),
+    Acc;
+find_sym(Col,Sym,Start,Cur,End,{Top,Bottom}) ->
+    io:format("~p,~p,~p,~p,~p,~p,~p~n",[Col,Sym,Start,Cur,End,Top,Bottom]),
+    <<Head:Cur/binary,CurBin:1/binary,Rest/binary>> = Col,
+    io:format("CurBin = ~p, Sym = ~p~n",[CurBin,Sym]),
+    case CurBin == Sym of
+	true ->
+	    case Top of
+		undef -> find_sym(Col,Sym,Start,Cur+1,End,{Cur,Cur});
+		_ -> find_sym(Col,Sym,Start,Cur+1,End,{Top,Cur})
+	    end;
+	false -> 
+	    find_sym(Col,Sym,Start,Cur+1,End,{Top,Bottom})
+    end.
+
+		    
+	    
     
+
+				      
+    
+    
+
+
+    
+    
+
+
+    
+walk_fl(_,_,_,{BinAcc,FLAcc} = Acc,Size) when byte_size(BinAcc) == Size ->
+    {BinAcc,array:to_list(FLAcc)};
+walk_fl({Pat,Num}=Target,F,L,{BinAcc,FLAcc} = Acc,Size)->
+    %%io:format("~p,~p,~p,~p,~p~n",[Target,F,L,Acc,Size]),
+    Row = find_row(L,Pat,Num),
+    %%io:format("Row = ~p~n",[Row]),
+    {NewPat,NewNum} = find_pat(F,Row),
+    %%io:format("{NewPat,NewNum} = {~p,~p}~n",[NewPat,NewNum]),
+    NewAcc = {<<BinAcc/binary,NewPat/binary>>,array:set(Row,find_row(F,Pat,Num),FLAcc)},
+    walk_fl({NewPat,NewNum},F,L,NewAcc,Size). 
+
+find_pat(Col,Row)->   
+    find_pat(Col,Row,0,<<>>,0).
+
+find_pat(Col,Row,CurRow,CurPat,Count)->
+    <<Start:1/binary,Rest/binary>> = Col,
+    NewCount = case Start == CurPat of
+		   true ->
+		       Count+1;
+		   false ->
+		       1
+	       end,
+    case Row == CurRow of
+	true ->
+	    {Start,NewCount};
+	false ->
+	    find_pat(Rest,Row,CurRow+1,Start,NewCount)
+    end.
+	
+
+
+find_row(Col,Pat,Num)->
+    find_row(Col,Pat,Num,0,1).
+
+find_row(Col,Pat,Num,Pos,CurNum)->
+    CurPat = binary:part(Col,{Pos,1}),
+    case {Pat,Num} == {CurPat,CurNum} of
+	true ->
+	    Pos;
+	false ->	
+	    case Pat == CurPat of
+		true ->
+		    find_row(Col,Pat,Num,Pos+1,CurNum+1);
+		false -> 
+		    find_row(Col,Pat,Num,Pos+1,CurNum)
+	    end
+    end.
+    
+    
+
+ 
+    
+list_tab(TBinSeq,Count,NewSize,Acc) when Count > NewSize-1 ->
+    lists:sort(Acc);
+list_tab(TBinSeq,Count,NewSize,Acc) when is_list(Acc) ->
+    NewSeq = one_byte_ror(TBinSeq,NewSize),
+    NewAcc = Acc ++ [NewSeq],
+    list_tab(NewSeq,Count+1,NewSize,NewAcc).
+
+bin_tab(TBinSeq,Count,NewSize,Acc) when is_binary(Acc) ->
+    NewSeq = one_byte_ror(TBinSeq,NewSize),
+    NewAcc = <<Acc/binary,TBinSeq/binary>>,
+    bin_tab(NewSeq,Count+1,NewSize,NewAcc).
+
+bin_get_fl(Bin) ->
+    Size = byte_size(Bin),
+    MSize = Size - 2,
+    <<First:1/binary,Middle:MSize/binary,Last:1/binary>> = Bin,
+    {First,Last}.
+
+
+
+
+tab(_Bin,Acc,0)->
+    Acc;
+tab(Bin,Acc,Size)->
+    FullSize = byte_size(Bin),
+    NewBin = one_byte_rol(Bin),
+    NewAcc = <<Acc/binary,NewBin/binary>>,
+    tab( NewBin, NewAcc, Size-1 ).
+    
+    
+    
+
+
+bit_rol(Bin,Shift) -> 
+    <<U:Shift/bits,Rest/bits>> = Bin, <<Rest/bits,U:Shift/bits>>.    
+
+
+one_byte_rol( <<U:1/binary,Rest/binary>> = Bin) -> 
+    <<Rest/binary,U:1/binary>>.
+
+one_byte_ror( Bin, NewSize) ->
+    <<Rest:NewSize/binary,U:1/binary>> = Bin,
+    <<U:1/binary,Rest/binary>>.
     
 
     
@@ -247,3 +423,47 @@ bin_pfind(BinIn,BinPat,PatLen,CurPos,Left,Count,Acc) ->
 
 find_header(Chunk,Pos)->
     binary:match(Chunk,<<">">>,[{Pos,byte_size(Chunk)}]).
+
+
+bin_to_ets(Bin)->
+    E = ets:new('genes',[{read_concurrency,true}]),
+    bin_to_ets(Bin,E,0).
+    
+bin_to_ets(<<>>,Ets,_Count)->
+    Ets;
+bin_to_ets(Bin,Ets,Count)->
+    <<Byte:1/binary,Rest/binary>> = Bin,
+    ets:insert(Ets,{Count,Byte}),
+    bin_to_ets(Rest,Ets,Count+1).
+
+count_ets(Bin,BinChar,Ets)->
+    count_ets(Bin,BinChar,0,0,Ets,byte_size(Bin)).
+    
+count_ets(_Bin,_BinChar,Pos,_Count,Ets,Size) when Pos >= Size ->
+    Ets;
+count_ets(Bin,BinChar,Pos,Count,Ets,Size) when Pos < Size ->
+    <<Cur:1/binary,Rest/binary>> = Bin,
+    case Cur == BinChar of
+	true ->
+	    ets:insert(Ets,{{Cur,Count},Pos}),
+	    count_ets(Rest,BinChar,Pos+1,Count+1,Ets,Size);
+	false ->
+	    count_ets(Rest,BinChar,Pos+1,Count,Ets,Size)
+    end.
+
+count_array(Bin,BinChar,Array)->
+    count_array(Bin,BinChar,0,0,Array,byte_size(Bin)).
+    
+count_array(_Bin,_BinChar,Pos,_Count,Array,Size) when Pos >= Size ->
+    Array;
+count_array(Bin,BinChar,Pos,Count,Array,Size) when Count < Size ->
+    <<Cur:1/binary,Rest/binary>> = Bin,
+    case Cur == BinChar of
+	true ->
+	    NewArray = array:set(Count,Pos,Array),
+	    count_array(Bin,BinChar,Pos+1,Count+1,NewArray,Size);
+	false ->
+	    count_array(Bin,BinChar,Pos+1,Count,Array,Size)
+    end.
+	    
+
