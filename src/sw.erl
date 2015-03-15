@@ -111,51 +111,6 @@ count(Tup,J,V) ->
 		_ -> count(Tup,J+1,V)
 	end.
 
-find_max(Tab,W2,Vmax) ->
-	%Tab1 = remove_last_columns(Vmax,lists:reverse(Tab)),
-	[{_,Col}|_] = Tab,
-	Index = get_index(1,Col,Vmax),
-	{extract_matches([],[],[],Index,Tab,lists:reverse(W2)), Vmax}.
-
-
-
-
-extract_matches(X1, Match, X2, Index, [{S1,Column}|Tab],W2) ->
-	{V,S2, Dir} = get_next(Index,Column,W2),
-	case V =:= 0 of
-		true -> {X1,Match,X2};
-		_ -> 
-			case Dir of
-				u -> extract_matches([$-|X1], [32|Match], [S2|X2], Index+1, [{S1,Column}|Tab], W2);
-				l -> extract_matches([S1|X1],  [32|Match], [$-|X2], Index, Tab, W2);
-				ul when S1=/=S2 -> extract_matches([S1|X1],  [32|Match], [S2|X2], Index+1, Tab, W2);
-				ul -> extract_matches([S1|X1],  [$||Match], [S2|X2], Index+1, Tab, W2)
-			end
-	end;
-extract_matches(X1,Match,X2,_,[],_) -> {X1,Match,X2}.
-
-
-
-get_next(1,[{V,Dir}|_],[S2|_]) -> {V,S2,Dir};
-get_next(Index,[_|Column],[_|W2]) -> get_next(Index-1, Column, W2);
-get_next(_,_,[]) -> {0, 32, undef}.
-
-
-
-
-get_index(Index,[{Vmax,_}|_],Vmax) -> Index;
-get_index(Index,[_|Col],Vmax) ->
-	get_index(Index+1,Col,Vmax).
-
-
-
-remove_last_columns(Vmax,[{_,Col}|Rest]=Tab) ->
-	{V,_} = lists:max(Col),
-	case V < Vmax of
-		true -> remove_last_columns(Vmax,Rest);
-		_ -> Tab
-	end.
-
 
 
 sigma(S,S) -> ?MATCH;

@@ -8,40 +8,32 @@
 		get_suffs/1,
 		fm/1,
 		sa/1,
-		find_match/2,
 		make_index/0,
 		test/0
 		]).
 
--define(TRSH,0.8).
--define(RANGE,10).
+%-define(TRSH,0.8).
 
 
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
-	File = "../bwt_files/human_g1k_v37_decoy.fasta",
-	%"GGCTCTGTTAGAGTAGATAGCTAGCTAGACATGAACAGGAGGGGGAGCTCCTGGAAAAGG",
+	%File = "../bwt_files/human_g1k_v37_decoy.fasta",
+	Qseq = "GGCTCTGTTAGAGTAGATAGCTAGCTAGACATGAACAGGAGGGGGAGCTCCTGGAAAAGG",
 	%"GAAAGTCTGTGAAGGCTCACCTGGAGGGACCACCAAAAATGCACATATTAGTAGCATCTC",
 	%"TAGTGCTGGAGTGGATGGGCACTTGTCAATTGTGGTTAGGAGGGAGAAGAGGTACCTACG",
 	%"CAGAAACACCCTAGAACTTCTCTTAAGGTGCCCCAATCGGATGGGCGCGGTGGCTCACGC",
 	%"CTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGTGGATCATGAGGTCAGGAGATCGAGA",
-	Qseq = "CCATCCTGGCTAACAAGGTGAAACCCCGTCTCTACTAAAAATACAAAAAATTAGCCGGGC",
+	%Qseq = "CCATCCTGGCTAACAAGGTGAAACCCCGTCTCTACTAAAAATACAAAAAATTAGCCGGGC",
 	FM = get_index(),
 	Pos = get_subseq(Qseq),
-	Subseq = lists:sublist(Qseq,length(Qseq)-Pos),
+	{Subseq,Tail} = lists:split(length(Qseq)-Pos, Qseq),
 	io:format("Subseq: ~p, Pos: ~p ~n",[Subseq,Pos]),
-	Seeds = [ X-length(Qseq)+Pos || X<-find_match(Subseq,FM) ],
-	io:format("~p seeds found~n~p~n",[length(Seeds),Seeds]),
-	
-	{Ref_pos,Len} = msw:get_reference_position("21", File),
-	Ref = msw:get_chunk(File,Ref_pos+Len div 2,Len div 10),
-	io:format("~p~n",[Qseq]),
-	io:format("~s~n",[[$-|| _ <- lists:seq(0,60)]]),
-	lists:foreach(fun(P)-> 
-		io:format("~p~n",[lists:sublist(Ref,P,60)])
-				end, Seeds).
+	{N,Sp,Ep,Seed_positons} = bwa:find_seeds(Subseq,FM).
+	%Seeds = get_seeds(Sp,Ep,)
 
+
+	
 	
 make_index() ->
 	File = "../bwt_files/human_g1k_v37_decoy.fasta",
@@ -154,78 +146,14 @@ get_suffs(Acc,_,[],_) -> Acc.
 
 
 
-%% returns the list of matches of the given Qseq sequence against 
-%% the reference sequence represented by FM index
-find_match(Qseq, FM) ->
-	[H|Tail] = lists:reverse(Qseq),
-	%initialize_sp_ep(H,1,size(FM),FM)
-	case find_match(H,1,size(FM),Tail,FM) of
-		no_match -> [];
-		{Sp,Se} -> get_pos([],Sp,Se,FM)
-	end.
 
-find_match(C1, Sp, Ep, [C2|Qseq], FM) ->
-	%io:format("Looking for {~p,~p}~n",[C1,C2]),
-	io:format("Range:[~p - ~p]~n",[Sp,Ep]),
-	case se(Sp,not_found,Ep,not_found,C1,C2,FM) of
-		not_found -> {Sp,Ep};
-		{Sp1,Ep1} when Ep1-Sp1 > ?RANGE -> find_match(C2, Sp1, Ep1, Qseq, FM);
-		{Sp1,Ep1} -> {Sp1,Ep1} 
-	end;
-
-find_match(_, Sp, Ep, [], _) -> {Sp,Ep}.
-
-
-se(Sp,found,Ep,found,_,_,FM) -> 
-	{_,_,Sp1,_} = element(Sp,FM),
-	{_,_,Ep1,_} = element(Ep,FM),
-	{Sp1,Ep1};
-se(Sp,State1,Ep,State2,C1,C2,FM) ->
-	case State1 of
-		not_found ->
-			{State11, Sp1} = get_state(Sp,down,C1,C2,FM);
-		found -> State11 = found, Sp1 = Sp
-	end,
-	case State2 of
-		not_found ->
-			{State22, Ep1} = get_state(Ep,up,C1,C2,FM);
-		found -> State22 = found, Ep1 = Ep
-	end,
-	%io:format("(~p,~p), (~p,~p)~n",[Sp1,State11,Ep1,State22]),
-	
-	case Sp1 > Ep1 of
-		true -> not_found;
-		_ -> se(Sp1,State11,Ep1,State22,C1,C2,FM)
-	end. 
-
-
-get_state(P,Dir,C1,C2,FM) ->
-	{F,L,_,_} = element(P,FM),
-	case {F,L} of
-		{C1,C2} -> {found,P};
-		_ ->
-			case Dir of
-				down -> {not_found,P+1};
-				up -> {not_found,P-1}
-			end
-	end.
-
-
-
-% returns a list of SA positions where the matches happened
-get_pos(Acc,Ep,Ep,FM) -> 
-	{_,_,_,SA} = element(Ep,FM),
-	[SA|Acc];
-get_pos(Acc,Sp,Ep,FM) ->
-	{_,_,_,SA} = element(Sp,FM),
-	get_pos([SA|Acc],Sp+1,Ep,FM).
-
-
-
+% returns a position referenced from the end of the query sequence, which is a good pattern for seeds
 get_subseq(Qseq) -> get_subseq(lists:reverse(Qseq), [], 0).
 
-get_subseq(_,Queue,Pos) when length(Queue) == 9 -> Pos;
+get_subseq(_,Queue,Pos) when length(Queue) == 13 -> Pos;
 get_subseq([_],_,_) -> not_found;
+get_subseq([X1,X2|Seq], Queue, Pos) when X1==$C; X1==$G; X2==$C; X2==$G ->
+	get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
 get_subseq([X1,X2|Seq], Queue, Pos) ->
 	%io:format("{~p,~p}, Q: ~p~n",[X1,X2,Queue]),
 	case lists:keyfind({X1,X2},1,Queue) of
