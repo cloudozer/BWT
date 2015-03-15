@@ -14,20 +14,33 @@
 		]).
 
 -define(TRSH,0.8).
+-define(RANGE,10).
 
 
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
+	File = "../bwt_files/human_g1k_v37_decoy.fasta",
 	%"GGCTCTGTTAGAGTAGATAGCTAGCTAGACATGAACAGGAGGGGGAGCTCCTGGAAAAGG",
 	%"GAAAGTCTGTGAAGGCTCACCTGGAGGGACCACCAAAAATGCACATATTAGTAGCATCTC",
 	%"TAGTGCTGGAGTGGATGGGCACTTGTCAATTGTGGTTAGGAGGGAGAAGAGGTACCTACG",
 	%"CAGAAACACCCTAGAACTTCTCTTAAGGTGCCCCAATCGGATGGGCGCGGTGGCTCACGC",
-	Qseq = "CTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGTGGATCATGAGGTCAGGAGATCGAGA",
-	%"CCATCCTGGCTAACAAGGTGAAACCCCGTCTCTACTAAAAATACAAAAAATTAGCCGGGC"
+	%"CTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGTGGATCATGAGGTCAGGAGATCGAGA",
+	Qseq = "CCATCCTGGCTAACAAGGTGAAACCCCGTCTCTACTAAAAATACAAAAAATTAGCCGGGC",
 	FM = get_index(),
-	{Subseq,Pos} = get_subseq(Qseq),
-	[ X+Pos || X<-find_match(Subseq,FM) ].
+	Pos = get_subseq(Qseq),
+	Subseq = lists:sublist(Qseq,length(Qseq)-Pos),
+	io:format("Subseq: ~p, Pos: ~p ~n",[Subseq,Pos]),
+	Seeds = [ X-length(Qseq)+Pos || X<-find_match(Subseq,FM) ],
+	io:format("~p seeds found~n~p~n",[length(Seeds),Seeds]),
+	
+	{Ref_pos,Len} = msw:get_reference_position("21", File),
+	Ref = msw:get_chunk(File,Ref_pos+Len div 2,Len div 10),
+	io:format("~p~n",[Qseq]),
+	io:format("~s~n",[[$-|| _ <- lists:seq(0,60)]]),
+	lists:foreach(fun(P)-> 
+		io:format("~p~n",[lists:sublist(Ref,P,60)])
+				end, Seeds).
 
 	
 make_index() ->
@@ -142,7 +155,7 @@ get_suffs(Acc,_,[],_) -> Acc.
 
 
 %% returns the list of matches of the given Qseq sequence against 
-%% the reference sequence represented as FM index
+%% the reference sequence represented by FM index
 find_match(Qseq, FM) ->
 	[H|Tail] = lists:reverse(Qseq),
 	%initialize_sp_ep(H,1,size(FM),FM)
@@ -153,10 +166,11 @@ find_match(Qseq, FM) ->
 
 find_match(C1, Sp, Ep, [C2|Qseq], FM) ->
 	%io:format("Looking for {~p,~p}~n",[C1,C2]),
-	%io:format("Range:[~p - ~p]~n",[Sp,Ep]),
+	io:format("Range:[~p - ~p]~n",[Sp,Ep]),
 	case se(Sp,not_found,Ep,not_found,C1,C2,FM) of
-		not_found -> no_match;
-		{Sp1,Ep1} -> find_match(C2, Sp1, Ep1, Qseq, FM)
+		not_found -> {Sp,Ep};
+		{Sp1,Ep1} when Ep1-Sp1 > ?RANGE -> find_match(C2, Sp1, Ep1, Qseq, FM);
+		{Sp1,Ep1} -> {Sp1,Ep1} 
 	end;
 
 find_match(_, Sp, Ep, [], _) -> {Sp,Ep}.
@@ -208,11 +222,9 @@ get_pos(Acc,Sp,Ep,FM) ->
 
 
 
-get_subseq(Qseq) -> get_subseq(Qseq, [], 0).
+get_subseq(Qseq) -> get_subseq(lists:reverse(Qseq), [], 0).
 
-get_subseq(_,Queue,Pos) when length(Queue) == 8 -> 
-	[{{H,_},_}|_] = Queue,
-	{[H|[ X || {{_,X},_} <- Queue]],Pos};
+get_subseq(_,Queue,Pos) when length(Queue) == 9 -> Pos;
 get_subseq([_],_,_) -> not_found;
 get_subseq([X1,X2|Seq], Queue, Pos) ->
 	%io:format("{~p,~p}, Q: ~p~n",[X1,X2,Queue]),
@@ -222,6 +234,7 @@ get_subseq([X1,X2|Seq], Queue, Pos) ->
 			{Queue1,Pos1} = remove(X1,X2, lists:reverse([{{X1,X2},1}|Queue]), 1 ),
 			get_subseq([X2|Seq], Queue1, Pos+Pos1)
 	end.
+
 
 remove(X1,X2, [{{X1,X2},1}|Ls], N) -> {lists:reverse(Ls),N};
 remove(X1,X2, [_|Ls], N) -> remove(X1,X2, Ls, N+1).
