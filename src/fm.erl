@@ -1,5 +1,5 @@
 -module(fm).
--export([create/1, read_file/1, element/2, size/1]).
+-export([create/1, read_file/1, element/2, size/1, encode_symbol/1]).
 
 create(T) ->
   Tuples = fm(T),
@@ -12,31 +12,31 @@ create(T, FileName) ->
 %% << <<"T">>/binary, <<"A">>/binary, <<0,18,213,58>>/binary, <<0,0,0,1>>/binary >>.
 element(N, Index) ->
   << FL, I:32, SA:32 >> = binary:part(Index, {(N-1)*9, 9}),
-  io:format("~p ~p ~p~n~p~n", [N, FL bsr 4, FL band 2#1111, erlang:memory()]),
+%%   io:format("~p ~p ~p~n~n", [N, FL bsr 4, FL band 2#1111]),
   {FL bsr 4, FL band 2#1111, I, SA}.
 
 encode_tuples(Tuples) ->
   lists:map(fun encode_tuple/1, Tuples).
 
 encode_tuple({F,L,I,SA}) ->
-  Symbol3Bytes = fun(Symbol) ->
-      case Symbol of
-        $$ -> 0;
-        $A -> 1;
-        $C -> 2;
-        $G -> 3;
-        $T -> 4;
-        $N -> 5
-      end
-    end,
-  Res = << <<((Symbol3Bytes(F) bsl 4) bor Symbol3Bytes(L)):8>>/binary, <<I:32>>/binary, <<SA:32>>/binary >>,
+  Res = << <<((encode_symbol(F) bsl 4) bor encode_symbol(L)):8>>/binary, <<I:32>>/binary, <<SA:32>>/binary >>,
   << FL, _/binary >> = Res,
 %%   io:format("~p ~p~n", [FL bsr 4, FL band 2#1111]),
-  true = (FL bsr 4) == Symbol3Bytes(F),
-  true = (FL band 2#1111) == Symbol3Bytes(L),
+  true = (FL bsr 4) == encode_symbol(F),
+  true = (FL band 2#1111) == encode_symbol(L),
 
 %%       io:format("~p -> ~p~n", [{F,L,I,SA}, Res]),
   Res.
+
+encode_symbol(Symbol) ->
+  case Symbol of
+    $$ -> 0;
+    $A -> 1;
+    $C -> 2;
+    $G -> 3;
+    $T -> 4;
+    $N -> 5
+  end.
 
 read_file(FileName) ->
   {ok,Bin} = file:read_file(FileName),

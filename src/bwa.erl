@@ -23,7 +23,7 @@ find_seeds(Subseq,FM) ->
 		$T -> Sp = Pt, Ep = fm:size(FM)
 	end,
 	io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
-	case find_seeds(H, 1, Sp, Ep, Tail, FM) of
+	case find_seeds(fm:encode_symbol(H), 1, Sp, Ep, Tail, FM) of
 		no_match -> [];
 		{Sp1,Ep1,N} -> 
 			get_pos(N,[],Sp1,Ep1,FM,Sp)
@@ -32,9 +32,9 @@ find_seeds(Subseq,FM) ->
 find_seeds(C1, N, Sp, Ep, [C2|Qseq], FM) ->
 	%io:format("Looking for {~p,~p}~n",[C1,C2]),
 	%io:format("Range:[~p - ~p]~n",[Sp,Ep]),
-	case se(Sp,not_found,Ep,not_found,C1,C2,FM) of
+	case se(Sp,not_found,Ep,not_found,C1,fm:encode_symbol(C2),FM) of
 		not_found -> {Sp,Ep,N};
-		{Sp1,Ep1} when Ep1-Sp1 > ?RANGE -> find_seeds(C2, N+1, Sp1, Ep1, Qseq, FM);
+		{Sp1,Ep1} when Ep1-Sp1 > ?RANGE -> find_seeds(fm:encode_symbol(C2), N+1, Sp1, Ep1, Qseq, FM);
 		{Sp1,Ep1} -> {Sp1,Ep1,N+1} 
 	end;
 find_seeds(_, N, Sp, Ep, [], _) -> {Sp,Ep,N}.
