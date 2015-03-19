@@ -13,7 +13,8 @@
 		index_to_sequence/3,
 		get_3_pointers/1,
 		get_index/0,
-		test/1
+		test/1,
+	        make_binary_index/3
 		]).
 
 %-define(TRSH,0.8).
@@ -30,7 +31,9 @@ test(Qseq) ->
 	%TTTTTCTCACCAATATTTTTGGAGATTTTAAAGATTTTCTTTTTTTTTGACATAGAATCT
 	%TATGGAGGCTGAGAAATAATTTTTTTTCTATTTTATTCTTCAGCCCCAGGTGTTTGCTTT
 	%TGCAGATTCTTGAGCACACTGAGAGCCTCCAAGGCATGGAGTGGGGTGCCTGAAGTTTCA
-	FM = get_index(),
+
+%% 	FM = get_index(),
+	FM = fm:read_file("bwt_files/fm_binary_index"),
 	{Time,Value} = timer:tc(sga,sga,[FM,Qseq]),
 	io:format("time:~pusec~n",[Time]),
 	Value.
@@ -51,6 +54,12 @@ make_index() ->
 	io:format("Chunk len:~p~n",[length(Chunk)]),
 	Bin = term_to_binary(fm(Chunk)),
 	file:write_file("../bwt_files/fm_index",Bin).
+
+make_binary_index(SourceFileName, Chromo, DestFileName) ->
+  {Pos,Len} = msw:get_reference_position(Chromo,SourceFileName),
+
+  Bin = fm:create(msw:get_chunk(SourceFileName,Pos+Len div 2,Len div 10)),
+  file:write_file(DestFileName,Bin).
 
 
 get_index() ->

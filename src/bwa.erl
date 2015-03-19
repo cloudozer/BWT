@@ -20,7 +20,7 @@ find_seeds(Subseq,FM) ->
 		$A -> Sp = 2, Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;
 		$G -> Sp = Pg, Ep = Pt-1;
-		$T -> Sp = Pt, Ep = size(FM)
+		$T -> Sp = Pt, Ep = fm:size(FM)
 	end,
 	io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
 	case find_seeds(H, 1, Sp, Ep, Tail, FM) of
@@ -42,8 +42,8 @@ find_seeds(_, N, Sp, Ep, [], _) -> {Sp,Ep,N}.
 
 
 se(	Sp,found,Ep,found,_,_,FM) -> 
-	{_,_,Sp1,SA1} = element(Sp,FM),
-	{_,_,Ep1,SA2} = element(Ep,FM),
+	{_,_,Sp1,SA1} = fm:element(Sp,FM),
+	{_,_,Ep1,SA2} = fm:element(Ep,FM),
 	%io:format("SA range: ~p,~p~n",[SA1,SA2]),
 	{Sp1,Ep1};
 se(Sp,State1,Ep,State2,C1,C2,FM) ->
@@ -67,7 +67,7 @@ se(Sp,State1,Ep,State2,C1,C2,FM) ->
 
 
 get_state(P,Dir,C1,C2,FM) ->
-	{F,L,_,_} = element(P,FM),
+	{F,L,_,_} = fm:element(P,FM),
 	case {F,L} of
 		{C1,C2} -> {found,P};
 		_ ->
@@ -81,10 +81,10 @@ get_state(P,Dir,C1,C2,FM) ->
 
 % returns a list of SA positions where the matches happened
 get_pos(N,Acc,Ep,Ep,FM,Sp) -> 
-	{_,_,_,SA} = element(Ep,FM),
+	{_,_,_,SA} = fm:element(Ep,FM),
 	{N,Sp,Ep,[SA|Acc]};
 get_pos(N,Acc,Sc,Ep,FM,Sp) ->
-	{_,_,_,SA} = element(Sc,FM),
+	{_,_,_,SA} = fm:element(Sc,FM),
 	get_pos(N,[SA|Acc],Sc+1,Ep,FM,Sp).
 
 
