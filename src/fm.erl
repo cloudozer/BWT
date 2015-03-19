@@ -3,26 +3,19 @@
 -define(ELEMENT_SIZE, 9).
 
 create(T) ->
+  %% Uses Ian's fun fm/1
   Tuples = fm(T),
   encode_tuples(Tuples).
 
 element(N, Index) ->
   << FL, I:32, SA:32 >> = binary:part(Index, {(N-1)*?ELEMENT_SIZE, ?ELEMENT_SIZE}),
-%%   io:format("~p ~p ~p~n~n", [N, FL bsr 4, FL band 2#1111]),
   {FL bsr 4, FL band 2#1111, I, SA}.
 
 encode_tuples(Tuples) ->
   lists:map(fun encode_tuple/1, Tuples).
 
 encode_tuple({F,L,I,SA}) ->
-  Res = << <<((encode_symbol(F) bsl 4) bor encode_symbol(L)):8>>/binary, <<I:32>>/binary, <<SA:32>>/binary >>,
-  << FL, _/binary >> = Res,
-%%   io:format("~p ~p~n", [FL bsr 4, FL band 2#1111]),
-  true = (FL bsr 4) == encode_symbol(F),
-  true = (FL band 2#1111) == encode_symbol(L),
-
-%%       io:format("~p -> ~p~n", [{F,L,I,SA}, Res]),
-  Res.
+  << <<((encode_symbol(F) bsl 4) bor encode_symbol(L)):8>>/binary, <<I:32>>/binary, <<SA:32>>/binary >>.
 
 encode_symbol(Symbol) ->
   case Symbol of
@@ -36,12 +29,15 @@ encode_symbol(Symbol) ->
 
 read_file(FileName) ->
   {ok,Bin} = file:read_file(FileName),
+  Bytes = byte_size(Bin),
+  %% Check size
+  0 = Bytes rem ?ELEMENT_SIZE,
   Bin.
 
 size(Index) ->
-  Bytes = byte_size(Index),
-  0 = Bytes rem ?ELEMENT_SIZE,
-  Bytes div ?ELEMENT_SIZE.
+  byte_size(Index) div ?ELEMENT_SIZE.
+
+%% Ian's code
 
 %% returns an FM index for a given reference sequence
 fm(X) ->
