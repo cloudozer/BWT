@@ -6,7 +6,7 @@
 -module(bwa).
 -export([find_seeds/2]).
 
--define(RANGE,30).
+-define(RANGE,20).
 
 
 
