@@ -9,6 +9,7 @@
 		fm/1,
 		sa/1,
 		make_index/0,
+		get_subseq/1,
 		test/0
 		]).
 
@@ -19,27 +20,26 @@
 
 test() ->
 	%File = "../bwt_files/human_g1k_v37_decoy.fasta",
-	Qseq = "GGCTCTGTTAGAGTAGATAGCTAGCTAGACATGAACAGGAGGGGGAGCTCCTGGAAAAGG",
-	%"GAAAGTCTGTGAAGGCTCACCTGGAGGGACCACCAAAAATGCACATATTAGTAGCATCTC",
-	%"TAGTGCTGGAGTGGATGGGCACTTGTCAATTGTGGTTAGGAGGGAGAAGAGGTACCTACG",
-	%"CAGAAACACCCTAGAACTTCTCTTAAGGTGCCCCAATCGGATGGGCGCGGTGGCTCACGC",
-	%"CTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGTGGATCATGAGGTCAGGAGATCGAGA",
-	%Qseq = "CCATCCTGGCTAACAAGGTGAAACCCCGTCTCTACTAAAAATACAAAAAATTAGCCGGGC",
+	Qseq = "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
+	%TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA
+	%CAATTCACTAGTTTATATAGAAGACTTGGTTTTTGTCTTTGCCCCATTTTATATTTGTAT
+	%TATAACTATGTATCTGGAAAATGGAACAAGTTTTTTCTTCTTCATATGAGGGCTAAGGCT
+	%TTTTTCTCACCAATATTTTTGGAGATTTTAAAGATTTTCTTTTTTTTTGACATAGAATCT
+	%TATGGAGGCTGAGAAATAATTTTTTTTCTATTTTATTCTTCAGCCCCAGGTGTTTGCTTT
+	%TGCAGATTCTTGAGCACACTGAGAGCCTCCAAGGCATGGAGTGGGGTGCCTGAAGTTTCA
 	FM = get_index(),
-	Pos = get_subseq(Qseq),
-	{Subseq,Tail} = lists:split(length(Qseq)-Pos, Qseq),
-	io:format("Subseq: ~p, Pos: ~p ~n",[Subseq,Pos]),
-	{N,Sp,Ep,Seed_positons} = bwa:find_seeds(Subseq,FM).
-	%Seeds = get_seeds(Sp,Ep,)
-
+	sga:sga(FM,Qseq).
+	
 
 	
 	
 make_index() ->
 	File = "../bwt_files/human_g1k_v37_decoy.fasta",
 	{Pos,Len} = msw:get_reference_position("21",File),
-
-	Bin = term_to_binary(fm(msw:get_chunk(File,Pos+Len div 2,Len div 10))),
+	io:format("Pos:~p, Len:~p~n",[Pos,Len]),
+	Chunk = msw:get_chunk(File,Pos+3*(Len div 4),(Len div 4) - 13000),
+	io:format("Chunk len:~p~n",[length(Chunk)]),
+	Bin = term_to_binary(fm(Chunk)),
 	file:write_file("../bwt_files/fm_index",Bin).
 
 
@@ -86,11 +86,6 @@ fm(X) ->
 
 
 fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq) ->
-	%case N of
-		%%%%%%%%%%%  {F,L,SA}
-	%	0 -> Acc1 = [{S,$$,P}|Acc];
-	%	J -> Acc1 = [{S,lists:nth(J,X),J}|Acc]
-	%end,
 	case S of
 		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
 		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
@@ -138,7 +133,8 @@ sa(X) ->
 
 
 get_suffs(X) ->
-	get_suffs([],0,X++"$",$$).
+	X1 = lists:reverse([$$|lists:reverse(X)]),
+	get_suffs([],0,X1,$$).
 
 get_suffs(Acc, N, [H|X],P) ->
 	get_suffs([{[H|X],N,P}|Acc], N+1, X, H);

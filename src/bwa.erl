@@ -33,9 +33,10 @@ find_seeds(_, N, Sp, Ep, [], _) -> {Sp,Ep,N}.
 
 
 
-se(Sp,found,Ep,found,_,_,FM) -> 
-	{_,_,Sp1,_} = element(Sp,FM),
-	{_,_,Ep1,_} = element(Ep,FM),
+se(	Sp,found,Ep,found,_,_,FM) -> 
+	{_,_,Sp1,SA1} = element(Sp,FM),
+	{_,_,Ep1,SA2} = element(Ep,FM),
+	%io:format("SA range: ~p,~p~n",[SA1,SA2]),
 	{Sp1,Ep1};
 se(Sp,State1,Ep,State2,C1,C2,FM) ->
 	case State1 of
