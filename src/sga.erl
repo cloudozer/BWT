@@ -20,9 +20,9 @@ sga(FM, Qseq, Acc, Qty,End) ->
 			io:format("Pos: ~p~n",[Pos]),
 			Subseq = lists:sublist(Qseq,length(Qseq)-Pos-End),
 			{N,Sp,Ep,Seed_positons} = bwa:find_seeds(Subseq,FM),
-			io:format("Substring lenght: ~p~n, Seeds: ~p~n",[N,Seed_positons]),
+			io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
 			L = length(Subseq),
-			sga(FM, Subseq, [ S-L+N || S <- Seed_positons]++Acc, Qty+1, N-5  )
+			sga(FM, Subseq, [ S-L+N || S <- Seed_positons]++Acc, Qty+1, N-3  )
 	end.
 
 

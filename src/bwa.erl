@@ -15,10 +15,18 @@
 find_seeds(Subseq,FM) ->
 	[H|Tail] = lists:reverse(Subseq),
 	%initialize_sp_ep(H,1,size(FM),FM)
-	case find_seeds(H,1,1,size(FM),Tail,FM) of
+	{Pc,Pg,Pt} = {3203297,5961109,8724872},
+	case H of
+		$A -> Sp = 2, Ep = Pc-1;
+		$C -> Sp = Pc, Ep = Pg-1;
+		$G -> Sp = Pg, Ep = Pt-1;
+		$T -> Sp = Pt, Ep = size(FM)
+	end,
+	io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
+	case find_seeds(H, 1, Sp, Ep, Tail, FM) of
 		no_match -> [];
-		{Sp,Se,N} -> 
-			get_pos(N,[],Sp,Se,FM,Sp)
+		{Sp1,Ep1,N} -> 
+			get_pos(N,[],Sp1,Ep1,FM,Sp)
 	end.
 
 find_seeds(C1, N, Sp, Ep, [C2|Qseq], FM) ->

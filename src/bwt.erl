@@ -10,6 +10,9 @@
 		sa/1,
 		make_index/0,
 		get_subseq/1,
+		index_to_sequence/3,
+		get_3_pointers/1,
+		get_index/0,
 		test/1
 		]).
 
@@ -31,7 +34,12 @@ test(Qseq) ->
 	sga:sga(FM,Qseq).
 	
 
-	
+% returns a subsequence of N characters from a reference sequence
+% represented by FM-index starting from a given point <Start> 
+index_to_sequence(Start,FM,N) -> "".
+
+
+
 	
 make_index() ->
 	File = "../bwt_files/human_g1k_v37_decoy.fasta",
@@ -47,6 +55,19 @@ get_index() ->
 	{ok,Bin} = file:read_file("../bwt_files/fm_index"),
 	binary_to_term(Bin).
 
+
+get_3_pointers(FM) ->
+	Pc = find_pointer(FM,$C,2),
+	Pg = find_pointer(FM,$G,Pc+1),
+	Pt = find_pointer(FM,$T,Pg+1),
+	{Pc,Pg,Pt}.
+
+find_pointer(FM,Char,P) ->
+	{F,_,_,_} = element(P,FM),
+	case F of
+		Char -> P;
+		_ -> find_pointer(FM,Char,P+1)
+	end.
 
 
 bwt(X) ->
