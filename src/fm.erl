@@ -1,16 +1,11 @@
 -module(fm).
 -export([create/1, read_file/1, element/2, size/1, encode_symbol/1]).
--define(ELEMENT_SIZE, 10).
+-define(ELEMENT_SIZE, 9).
 
 create(T) ->
   Tuples = fm(T),
   encode_tuples(Tuples).
 
-create(T, FileName) ->
-  throw(unimplemented).
-
-%% Element sample:
-%% << <<"T">>/binary, <<"A">>/binary, <<0,18,213,58>>/binary, <<0,0,0,1>>/binary >>.
 element(N, Index) ->
   << FL, I:32, SA:32 >> = binary:part(Index, {(N-1)*?ELEMENT_SIZE, ?ELEMENT_SIZE}),
 %%   io:format("~p ~p ~p~n~n", [N, FL bsr 4, FL band 2#1111]),
