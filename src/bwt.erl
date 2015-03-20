@@ -211,11 +211,11 @@ get_suffs(Acc,_,[],_) -> Acc.
 % returns a position referenced from the end of the query sequence, which is a good pattern for seeds
 get_subseq(Qseq) -> get_subseq(lists:reverse(Qseq), [], 0).
 
-get_subseq(_,Queue,Pos) when length(Queue) == 11 -> Pos;
+get_subseq(_,Queue,Pos) when length(Queue) == 9 -> Pos;
 get_subseq([_],_,_) -> not_found;
 get_subseq([X1,X2|Seq], Queue, Pos) when X1==$C; X1==$G; X2==$C; X2==$G ->
 	get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
-get_subseq(_,_,Pos) when Pos >= 9 -> 0;
+get_subseq(_,_,Pos) when Pos >= 7 -> 5;
 get_subseq([X1,X2|Seq], Queue, Pos) ->
 	%io:format("{~p,~p}, Q: ~p~n",[X1,X2,Queue]),
 	case lists:keyfind({X1,X2},1,Queue) of
