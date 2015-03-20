@@ -31,7 +31,9 @@ test(Qseq) ->
 	%TATGGAGGCTGAGAAATAATTTTTTTTCTATTTTATTCTTCAGCCCCAGGTGTTTGCTTT
 	%TGCAGATTCTTGAGCACACTGAGAGCCTCCAAGGCATGGAGTGGGGTGCCTGAAGTTTCA
 	FM = get_index(),
-	sga:sga(FM,Qseq).
+	{Time,Value} = timer:tc(sga,sga,[FM,Qseq]),
+	io:format("time:~pusec~n",[Time]),
+	Value.
 	
 
 % returns a subsequence of N characters from a reference sequence
