@@ -19,15 +19,19 @@ sga(FM, Qseq, Acc, Qty,End) ->
 		Pos ->
 			io:format("Pos: ~p~n",[Pos]),
 			Subseq = lists:sublist(Qseq,length(Qseq)-Pos-End),
-			{N,Sp,Ep,Seed_positons} = bwa:find_seeds(Subseq,FM),
-			io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
-			L = length(Subseq),
-			sga(FM, Subseq, [ S-L+N || S <- Seed_positons]++Acc, Qty+1, N-3  )
+			case length(Subseq) =< 11 of
+				true -> get_similar(Qty,Acc);
+				_ ->
+					{N,Sp,Ep,Seed_positons} = bwa:find_seeds(Subseq,FM),
+					io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
+					L = length(Subseq),
+					sga(FM, Subseq, [ S-L+N || S <- Seed_positons]++Acc, Qty+1, N-3  )
+			end
 	end.
 
 
-get_similar(0, Ls) -> [];
-get_similar(1, Ls) -> [];
+get_similar(0, _) -> [];
+get_similar(1, _) -> [];
 get_similar(Qty, Ls) -> 
 	[P1|Ls1] = lists:sort(Ls),
 	get_similar(Qty div 2+1, Ls1, P1, 1, [], ?TOLERANCE).
