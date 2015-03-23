@@ -65,10 +65,10 @@ test(Qseq) ->
 	%TGCAGATTCTTGAGCACACTGAGAGCCTCCAAGGCATGGAGTGGGGTGCCTGAAGTTTCA
 
 %% 	FM = get_index(),
-	FM = fm:read_file("bwt_files/fm_binary_index"),
-	%{Time,Value} = timer:tc(sga,sga,[FM,Qseq]),
-	Value = eflame:apply(sga,sga,[FM,Qseq]),
-	%io:format("time:~pusec~n",[Time]),
+	{ok, FM} = fm:read_file("bwt_files/fm_binary_index"),
+	{Time,Value} = timer:tc(sga,sga,[FM,Qseq]),
+	%Value = eflame:apply(sga,sga,[FM,Qseq]),
+	io:format("time:~pusec~nfm stat:~p~n",[Time, fm:get_st(FM)]),
 	Value.
 	
 

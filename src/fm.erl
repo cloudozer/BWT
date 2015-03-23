@@ -1,15 +1,34 @@
 -module(fm).
--export([create/1, read_file/1, element/2, size/1, encode_symbol/1]).
+-behaviour(gen_server).
+-export([create/1, read_file/1, element/2, size/1, encode_symbol/1, get_st/1]).
+-export([init/1, handle_call/3]).
+-record(state, {bin, st = []}).
 -define(ELEMENT_SIZE, 9).
+
+%% api
+
+read_file(FileName) ->
+  {ok,Bin} = file:read_file(FileName),
+  Bytes = byte_size(Bin),
+  %% Check size
+  0 = Bytes rem ?ELEMENT_SIZE,
+  gen_server:start_link(?MODULE, Bin, []).
+
+element(N, IndexPid) ->
+  gen_server:call(IndexPid, {element, N}).
+
+size(IndexPid) ->
+  gen_server:call(IndexPid, size).
+
+get_st(IndexPid) ->
+  gen_server:call(IndexPid, get_st).
+
+%% make index
 
 create(T) ->
   %% Uses Ian's fun fm/1
   Tuples = fm(T),
   encode_tuples(Tuples).
-
-element(N, Index) ->
-  << FL, I:32, SA:32 >> = binary:part(Index, {(N-1)*?ELEMENT_SIZE, ?ELEMENT_SIZE}),
-  {FL bsr 4, FL band 2#1111, I, SA}.
 
 encode_tuples(Tuples) ->
   lists:map(fun encode_tuple/1, Tuples).
@@ -27,15 +46,24 @@ encode_symbol(Symbol) ->
     $N -> 5
   end.
 
-read_file(FileName) ->
-  {ok,Bin} = file:read_file(FileName),
-  Bytes = byte_size(Bin),
-  %% Check size
-  0 = Bytes rem ?ELEMENT_SIZE,
-  Bin.
+%% gen_server callbacks
 
-size(Index) ->
-  byte_size(Index) div ?ELEMENT_SIZE.
+init(Bin) ->
+  {ok, #state{bin=Bin}}.
+
+handle_call({element, N}, _From, S = #state{st=St, bin=Bin}) ->
+F = fun() ->
+  << FL, I:32, SA:32 >> = binary:part(Bin, {(N-1)*?ELEMENT_SIZE, ?ELEMENT_SIZE}),
+{FL bsr 4, FL band 2#1111, I, SA}
+end,
+{T, V} = timer:tc(F),
+  {reply, V, S#state{st=[T|St]}};
+
+handle_call(size, _From, S = #state{bin=Bin}) ->
+  {reply, byte_size(Bin) div ?ELEMENT_SIZE, S};
+
+handle_call(get_st, _From, S = #state{st=St}) ->
+  {reply, St, S}.
 
 %% Ian's code
 
