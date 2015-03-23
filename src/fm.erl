@@ -1,7 +1,6 @@
 -module(fm).
--behaviour(gen_server).
--export([create/1, read_file/1, element/2, size/1, encode_symbol/1, get_st/1]).
--export([init/1, handle_call/3]).
+-export([create/1, read_file/1, element/3, size/1, encode_symbol/1, get_st/1]).
+-export([loop/1]).
 -record(state, {bin, st = []}).
 -define(ELEMENT_SIZE, 9).
 
@@ -12,16 +11,41 @@ read_file(FileName) ->
   Bytes = byte_size(Bin),
   %% Check size
   0 = Bytes rem ?ELEMENT_SIZE,
-  gen_server:start_link(?MODULE, Bin, []).
+  spawn_link(?MODULE, loop, [#state{bin=Bin}]).
 
-element(N, IndexPid) ->
-  gen_server:call(IndexPid, {element, N}).
+element(N, El, IndexPid) ->
+  call(IndexPid, {element, N, El}).
 
 size(IndexPid) ->
-  gen_server:call(IndexPid, size).
+  call(IndexPid, size).
 
 get_st(IndexPid) ->
-  gen_server:call(IndexPid, get_st).
+  call(IndexPid, get_st).
+
+%% server's private functions
+
+loop(S=#state{st=St, bin=Bin}) ->
+  receive    
+    {{element, N, El}, F} ->
+      << FL, I:32, SA:32 >> = binary:part(Bin, {(N-1)*?ELEMENT_SIZE, ?ELEMENT_SIZE}),
+      Result = case El of
+        f -> FL bsr 4;
+        s -> FL band 2#1111;
+        i -> I;
+        sa -> SA;
+        s_i -> {FL band 2#1111, I}
+      end,
+      F ! Result;
+    {size, F} ->
+      F ! byte_size(Bin) div ?ELEMENT_SIZE, S;
+    {get_st, F} ->
+      F ! St
+  end,
+  loop(S).
+
+call(Pid, Msg) ->
+  Pid ! {Msg, self()},
+  receive Reply -> Reply end.
 
 %% make index
 
@@ -45,25 +69,6 @@ encode_symbol(Symbol) ->
     $T -> 4;
     $N -> 5
   end.
-
-%% gen_server callbacks
-
-init(Bin) ->
-  {ok, #state{bin=Bin}}.
-
-handle_call({element, N}, _From, S = #state{st=St, bin=Bin}) ->
-F = fun() ->
-  << FL, I:32, SA:32 >> = binary:part(Bin, {(N-1)*?ELEMENT_SIZE, ?ELEMENT_SIZE}),
-{FL bsr 4, FL band 2#1111, I, SA}
-end,
-{T, V} = timer:tc(F),
-  {reply, V, S#state{st=[T|St]}};
-
-handle_call(size, _From, S = #state{bin=Bin}) ->
-  {reply, byte_size(Bin) div ?ELEMENT_SIZE, S};
-
-handle_call(get_st, _From, S = #state{st=St}) ->
-  {reply, St, S}.
 
 %% Ian's code
 

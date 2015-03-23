@@ -45,20 +45,20 @@ find_seeds(N, Sp, Ep, [], _) -> {Sp,Ep,N}.
 
 
 se_down(Ep,Ep,C2,FM) -> 
-	{_,L,P,_} = fm:element(Ep,FM),
+	{L,P} = fm:element(Ep,s_i,FM),
 	case L == C2 of
 		true -> P;
 		_ -> not_found
 	end;
 se_down(Sp,Ep,C2,FM) -> 
-	{_,L,P,_} = fm:element(Sp,FM),
+	{L,P} = fm:element(Sp,s_i,FM),
 	case L == C2 of
 		true -> P;
 		_ -> se_down(Sp+1,Ep,C2,FM)
 	end.
 
 se_up(Ep,C2,FM) ->
-	{_,L,P,_} = fm:element(Ep,FM),
+	{L,P} = fm:element(Ep,s_i,FM),
 	case L == C2 of
 		true -> P;
 		_ -> se_up(Ep-1,C2,FM)
@@ -69,10 +69,10 @@ se_up(Ep,C2,FM) ->
 
 % returns a list of SA positions where the matches happened
 get_pos(N,Acc,Ep,Ep,FM,Sp) -> 
-	{_,_,_,SA} = fm:element(Ep,FM),
+	SA = fm:element(Ep,sa,FM),
 	{N,Sp,Ep,[SA|Acc]};
 get_pos(N,Acc,Sc,Ep,FM,Sp) ->
-	{_,_,_,SA} = fm:element(Sc,FM),
+	SA = fm:element(Sc,sa,FM),
 	get_pos(N,[SA|Acc],Sc+1,Ep,FM,Sp).
 
 
