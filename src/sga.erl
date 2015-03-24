@@ -34,7 +34,7 @@ get_similar(0, _) -> [];
 get_similar(1, _) -> [];
 get_similar(Qty, Ls) -> 
 	[P1|Ls1] = lists:sort(Ls),
-	get_similar(Qty div 2+1, Ls1, P1, 1, [], ?TOLERANCE).
+	get_similar(2+Qty div 5, Ls1, P1, 1, [], ?TOLERANCE).
 
 get_similar(N, [P2|Ls], P1, Count, Acc, Tol) when P2-P1 =< Tol ->
 	get_similar(N, Ls, P2, Count+1, Acc, Tol);
