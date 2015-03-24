@@ -13,8 +13,7 @@
 		index_to_sequence/3,
 		get_3_pointers/1,
 		get_index/0,
-		test/0, test/1,
-	        make_binary_index/3
+		test/0, test/1
 		]).
 
 %-define(TRSH,0.8).
@@ -23,8 +22,8 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
+  FM = fm:read_file("bwt_files/fm_binary_index"),
   F = fun()-> 
-    FM = fm:read_file("bwt_files/fm_binary_index"),
     Qs = [
       "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
       "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
@@ -95,11 +94,6 @@ make_index() ->
 	Bin = term_to_binary(fm(Chunk)),
 	file:write_file("../bwt_files/fm_index",Bin).
 
-make_binary_index(SourceFileName, Chromo, DestFileName) ->
-  {Pos,Len} = msw:get_reference_position(Chromo,SourceFileName),
-
-  Bin = fm:create(msw:get_chunk(SourceFileName,Pos+3*(Len div 4),(Len div 4) - 13000)),
-  file:write_file(DestFileName,Bin).
 
 
 get_index() ->

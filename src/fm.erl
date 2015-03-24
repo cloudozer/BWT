@@ -1,7 +1,7 @@
 -module(fm).
--export([create/1, read_file/1, element/3, size/1, encode_symbol/1, get_st/1]).
+-export([make_binary_index/3, read_file/1, element/3, size/1, encode_symbol/1, get_st/1]).
 -export([loop/1]).
--record(state, {bin, st = []}).
+-record(state, {bins, pointers, size=0, st = []}).
 -define(ELEMENT_SIZE, 9).
 
 %% api
@@ -11,7 +11,27 @@ read_file(FileName) ->
   Bytes = byte_size(Bin),
   %% Check size
   0 = Bytes rem ?ELEMENT_SIZE,
-  spawn_link(?MODULE, loop, [#state{bin=Bin}]).
+
+  {4, Pointers} = lists:foldl(fun(I, {Prev, {A,C,G,T}} = Acc) -> 
+    F = binary:at(Bin, I*?ELEMENT_SIZE) bsr 4,
+    case F of
+      Prev -> Acc;
+      1 -> {1, {I*?ELEMENT_SIZE, 0, 0, 0}};
+      2 -> {2, {A, I*?ELEMENT_SIZE, 0, 0}};
+      3 -> {3, {A, C, I*?ELEMENT_SIZE, 0}};
+      4 -> {4, {A, C, G, I*?ELEMENT_SIZE}}
+    end 
+  end, {0, {0,0,0,0}}, lists:seq(0, (Bytes div ?ELEMENT_SIZE)-1)),
+
+  {Ap,Cp,Gp,Tp} = Pointers,
+  Bins = {
+    binary:part(Bin, Ap, Cp-Ap),
+    binary:part(Bin, Cp, Gp-Cp),
+    binary:part(Bin, Gp, Tp-Gp),
+    binary:part(Bin, Tp, Bytes-Tp)
+  },
+io:format("Pointers ~p~n", [Pointers]),
+  spawn_link(?MODULE, loop, [#state{bins=Bins, pointers=Pointers, size=Bytes}]).
 
 element(N, El, IndexPid) ->
   call(IndexPid, {element, N, El}).
@@ -24,10 +44,19 @@ get_st(IndexPid) ->
 
 %% server's private functions
 
-loop(S=#state{st=St, bin=Bin}) ->
+loop(S=#state{st=St, pointers={PA, PC, PG, PT}, bins={BinA,BinC,BinG,BinT}, size=Size}) ->
   receive    
     {{element, N, El}, F} ->
-      << FL, I:32, SA:32 >> = binary:part(Bin, {(N-1)*?ELEMENT_SIZE, ?ELEMENT_SIZE}),
+
+      P = (N-1)*?ELEMENT_SIZE,
+      {Bin, StartP} = 
+        if PA =< P, P < PC -> {BinA, PA};
+           PC =< P, P < PG -> {BinC, PC};
+           PG =< P, P < PT -> {BinG, PG};
+           PT =< P, P < Size -> {BinT, PT}
+        end,
+
+      << FL, I:32, SA:32 >> = binary:part(Bin, {P - StartP, ?ELEMENT_SIZE}),
       Result = case El of
         f -> FL bsr 4;
         s -> FL band 2#1111;
@@ -37,7 +66,7 @@ loop(S=#state{st=St, bin=Bin}) ->
       end,
       F ! Result;
     {size, F} ->
-      F ! byte_size(Bin) div ?ELEMENT_SIZE, S;
+      F ! Size div ?ELEMENT_SIZE, S;
     {get_st, F} ->
       F ! St
   end,
@@ -49,10 +78,11 @@ call(Pid, Msg) ->
 
 %% make index
 
-create(T) ->
-  %% Uses Ian's fun fm/1
-  Tuples = fm(T),
-  encode_tuples(Tuples).
+make_binary_index(SourceFileName, Chromo, DestFileName) ->
+  {Pos,Len} = msw:get_reference_position(Chromo,SourceFileName),
+  Tuples = fm(msw:get_chunk(SourceFileName,Pos+3*(Len div 4),(Len div 4) - 13000)),
+  Bin = encode_tuples(Tuples),
+  file:write_file(DestFileName,Bin).
 
 encode_tuples(Tuples) ->
   lists:map(fun encode_tuple/1, Tuples).
