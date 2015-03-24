@@ -23,8 +23,8 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
+  FM = get_index(),
   F = fun()-> 
-    FM = get_index(),
     Qs = [
       "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
       "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
@@ -55,14 +55,11 @@ test() ->
       "CTTATTTATAAATGGTCTAGATATTTAATGCAAATCTTTTACTTAGCTTAACTTTAAGGT",
       "TAAAAATTACCAAAAGTACTTTGGAAACTATTCTTAGGCAGATTTACTGTAAACAAATTA"
     ],
-    lists:foreach(fun(Qseq) -> spawn_link(sga,sga,[FM,Qseq]) end, Qs),
-    WaitFun = fun This(0) -> ok;
-                  This(N) -> receive Exit -> io:format("n ~p~n", [{Exit,N}]), This(N-1) end end,
-    WaitFun(length(Qs))
+    lists:foreach(fun(Qseq) -> sga:sga(FM,Qseq) end, Qs)
   end,
-  %{T,V} = timer:tc(F),
-  %io:format("tt ~p~n", [T]).
-  eflame:apply(F, []).
+  {T,V} = timer:tc(F),
+  io:format("tt ~p~n", [T]).
+  %eflame:apply(F, []).
 
 test(Qseq) ->
 	%File = "../bwt_files/human_g1k_v37_decoy.fasta",
