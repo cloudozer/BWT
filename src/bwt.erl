@@ -22,8 +22,8 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
+  FM = get_index(),
   F = fun()-> 
-    FM = get_index(),
     Qs = [
       "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
       "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
