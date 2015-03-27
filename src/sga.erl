@@ -22,10 +22,17 @@ sga(FM, Qseq, Acc, Qty,End) ->
 			case length(Subseq) =< 11 of
 				true -> get_similar(Qty,Acc);
 				_ ->
-					{N,Sp,Ep,Seed_positons} = bwa:find_seeds(Subseq,FM),
-					io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
-					L = length(Subseq),
-					sga(FM, Subseq, [ S-L+N || S <- Seed_positons]++Acc, Qty+1, N-3  )
+					case bwa:find_seeds(Subseq,FM) of
+						{N,Sp,Ep,Seed_positons} ->
+							io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
+							L = length(Subseq),
+							Seeds = [ S-L+N || S <- Seed_positons],
+							sga(FM, Subseq, Seeds++Acc, Qty+1, N-3 );
+						not_found ->
+							io:format("Seeds not found~n"),
+							Seeds = [],
+							sga(FM, Subseq, Seeds++Acc, Qty+1, 10  )
+					end	
 			end
 	end.
 
