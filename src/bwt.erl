@@ -13,6 +13,7 @@
 		index_to_sequence/3,
 		get_3_pointers/1,
 		get_index/0,
+		pp/1,
 		test/1,test/0
 		]).
 
@@ -132,53 +133,58 @@ fm(X) ->
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
 	%io:format("Sufs:~p~n",[Ls]),
-	{FM, Dq, Aq, Cq, Gq, Tq} = fm(X,Ls,[],1,[],[],[],[],[]),
+	{FM,Dq,Aq,Cq,Gq,Tq,Nq} = fm(X,Ls,[],1,[],[],[],[],[],[]),
 	{_,T3} = statistics(runtime),
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
-	list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
+	list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq,Nq)).
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
 
 
 
-fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq) ->
+fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq,Nq) ->
 	case S of
-		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
-		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
-		$G -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq);
-		$T -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq]);
-		$$ -> fm(X,Ls,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq)
+		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq,Nq);
+		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq,Nq);
+		$G -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq,Nq);
+		$T -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq],Nq);
+		$N -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,Tq,[K|Nq]);
+		$$ -> fm(X,Ls,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq,Nq)
 	end;
-fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq) -> 
+fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq,Nq) -> 
 	{lists:reverse(Acc),
 	lists:reverse(Dq),
 	lists:reverse(Aq),
 	lists:reverse(Cq),
 	lists:reverse(Gq),
-	lists:reverse(Tq)
+	lists:reverse(Tq),
+	lists:reverse(Nq)
 	}.
 				
 
-add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq) ->
+add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq,Nq) ->
 	case L of
 		$A -> 
 			[I|Aq1] = Aq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq1,Cq,Gq,Tq);
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq1,Cq,Gq,Tq,Nq);
 		$C -> 
 			[I|Cq1] = Cq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq1,Gq,Tq);
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq1,Gq,Tq,Nq);
 		$G -> 
 			[I|Gq1] = Gq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq1,Tq);
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq1,Tq,Nq);
 		$T -> 
 			[I|Tq1] = Tq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq1);
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq1,Nq);
+		$N -> 
+			[I|Nq1] = Nq, 
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq,Nq1);	
 		$$ -> 
 			[I|Dq1] = Dq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq1,Aq,Cq,Gq,Tq)
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq1,Aq,Cq,Gq,Tq,Nq)
 	end;
-add_indices([],Acc,[],[],[],[],[]) -> lists:reverse(Acc).
+add_indices([],Acc,[],[],[],[],[],[]) -> lists:reverse(Acc).
 	
 
 
@@ -221,3 +227,17 @@ get_subseq([X1,X2|Seq], Queue, Pos) ->
 remove(X1,X2, [{{X1,X2},1}|Ls], N) -> {lists:reverse(Ls),N};
 remove(X1,X2, [_|Ls], N) -> remove(X1,X2, Ls, N+1).
 
+
+pp(FM) -> pp(FM, 1, size(FM)).
+
+pp(FM,N,N) -> 
+	{F,L,P,SA} = element(N,FM),
+	io:format("~c ~c\t~p\t~p~n",[F,L,P,SA]);
+pp(FM,J,N) ->
+	{F,L,P,SA} = element(J,FM),
+	case {F,L} of
+		{$N,$N} -> ok;
+		_ ->
+			io:format("~c ~c\t~p\t~p~n",[F,L,P,SA])
+	end,
+	pp(FM,J+1,N).
