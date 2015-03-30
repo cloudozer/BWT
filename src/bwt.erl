@@ -8,7 +8,7 @@
 		get_suffs/1,
 		fm/1,
 		sa/1,
-		make_index/0,
+		make_index/0, make_index/1,
 		get_subseq/1,
 		index_to_sequence/3,
 		get_3_pointers/1,
@@ -93,6 +93,36 @@ make_index() ->
 	file:write_file("../bwt_files/fm_index",Bin).
 
 
+make_index(Chrom) ->
+	File = "../bwt_files/human_g1k_v37_decoy.fasta",
+	{Pos,Len} = msw:get_reference_position(Chrom,File),
+	{Shift,Ref_seq} = msw:get_ref_seq(File,Pos,Len),
+	io:format("Removed ~p 'NNN' in the beginning~n",[Shift]),
+	io:format("Length of the ref genome: ~p~n",[length(Ref_seq)]),
+	statistics(runtime),
+	Ref_seq1 = lists:map(fun($N)->$A;
+							($B)->$C;
+							($D)->$G;
+							($R)->$A;
+							($Y)->$C;
+							($K)->$T;
+							($M)->$A;
+							($S)->$C;
+							($W)->$A;
+							($V)->$A;
+							($A)->$A;
+							($C)->$C;
+							($G)->$G;
+							($T)->$T
+						end, Ref_seq),
+	{_,T1} = statistics(runtime),
+	io:format("Maping takes: ~pms~n",[T1]),
+	io:format("Ref seq:~n~p~n",[Ref_seq1]),
+	Bin = term_to_binary(fm(Ref_seq1)),
+	file:write_file("../bwt_files/"+Chrom+".fm",Bin).
+
+
+
 get_index() ->
 	{ok,Bin} = file:read_file("../bwt_files/fm_index"),
 	binary_to_term(Bin).
@@ -103,6 +133,7 @@ get_3_pointers(FM) ->
 	Pg = find_pointer(FM,$G,Pc+1),
 	Pt = find_pointer(FM,$T,Pg+1),
 	{Pc,Pg,Pt}.
+
 
 find_pointer(FM,Char,P) ->
 	{F,_,_,_} = element(P,FM),
@@ -134,62 +165,67 @@ get_all_permutations(Acc,T,K,N) ->
 %% returns an FM index for a given reference sequence
 fm(X) ->
 	_ = statistics(runtime),
-	Ls = lists:sort(get_suffs(X)),
+	Ls = sort_chuncks(get_suffs(X),100000),
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
 	%io:format("Sufs:~p~n",[Ls]),
-	{FM,Dq,Aq,Cq,Gq,Tq,Nq} = fm(X,Ls,[],1,[],[],[],[],[],[]),
+	{FM,Dq,Aq,Cq,Gq,Tq} = fm(X,Ls,[],1,[],[],[],[],[]),
 	{_,T3} = statistics(runtime),
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
-	list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq,Nq)).
+	list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
 
 
 
-fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq,Nq) ->
+fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq) ->
 	case S of
-		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq,Nq);
-		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq,Nq);
-		$G -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq,Nq);
-		$T -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq],Nq);
-		$N -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,Tq,[K|Nq]);
-		$$ -> fm(X,Ls,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq,Nq)
+		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
+		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
+		$G -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq);
+		$T -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq]);
+		$$ -> fm(X,Ls,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq)
 	end;
-fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq,Nq) -> 
+fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq) -> 
 	{lists:reverse(Acc),
 	lists:reverse(Dq),
 	lists:reverse(Aq),
 	lists:reverse(Cq),
 	lists:reverse(Gq),
-	lists:reverse(Tq),
-	lists:reverse(Nq)
+	lists:reverse(Tq)
 	}.
 				
 
-add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq,Nq) ->
+sort_chuncks(Ls,Size) -> sort_chuncks(Ls,Size,[]).
+sort_chuncks(Ls,Size,Acc) when length(Ls) > Size ->
+	{Chunk,Tail} = lists:split(Size,Ls),
+	io:format("Chunk sorted\t"),
+	sort_chuncks(Tail,Size,[lists:sort(Chunk)|Acc]);
+sort_chuncks(Ls,Size,Acc) ->
+	[lists:sort(Ls)|Acc],
+	lists:merge(Acc).
+
+
+add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq) ->
 	case L of
 		$A -> 
 			[I|Aq1] = Aq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq1,Cq,Gq,Tq,Nq);
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq1,Cq,Gq,Tq);
 		$C -> 
 			[I|Cq1] = Cq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq1,Gq,Tq,Nq);
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq1,Gq,Tq);
 		$G -> 
 			[I|Gq1] = Gq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq1,Tq,Nq);
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq1,Tq);
 		$T -> 
 			[I|Tq1] = Tq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq1,Nq);
-		$N -> 
-			[I|Nq1] = Nq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq,Nq1);	
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq1);
 		$$ -> 
 			[I|Dq1] = Dq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq1,Aq,Cq,Gq,Tq,Nq)
+			add_indices(FM,[{F,L,I,SA}|Acc],Dq1,Aq,Cq,Gq,Tq)
 	end;
-add_indices([],Acc,[],[],[],[],[],[]) -> lists:reverse(Acc).
+add_indices([],Acc,[],[],[],[],[]) -> lists:reverse(Acc).
 	
 
 
@@ -206,7 +242,9 @@ get_suffs(X) ->
 
 get_suffs(Acc, N, [H|X],P) ->
 	get_suffs([{[H|X],N,P}|Acc], N+1, X, H);
-get_suffs(Acc,_,[],_) -> Acc.
+get_suffs(Acc,_,[],_) -> 
+	%io:format("Suffices:~n~p~n",[Acc]),
+	Acc.
 
 
 

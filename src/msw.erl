@@ -5,7 +5,8 @@
 
 -module(msw).
 -export([main/4,main_serial/4,
-		worker/5, get_reference_position/2, get_chunk/3]).
+		worker/5, get_reference_position/2, get_chunk/3,
+		get_ref_seq/3]).
 
 -include("bwt.hrl").
 
@@ -102,6 +103,26 @@ get_chunk(File,Pos,Len) ->
 			io:format("file: '~s' cannot be opened~n~p~n",[File,Reason]),
 			error
 	end.
+
+
+get_ref_seq(File,Pos,Len) ->
+	{ok,Dev} = file:open(File,read),
+	{ok,Chunk} = file:pread(Dev, Pos, Len),
+	file:close(Dev),
+	% remove all NNN...NN from right
+	{_,Chunk1} = ltrim_N(lists:reverse(Chunk)),
+	{Shift,Chunk2} = ltrim_N(lists:reverse(Chunk1)),
+	{Shift, lists:filter(fun(10)->false;(13)->false;(_)->true end, Chunk2)}.
+
+
+
+ltrim_N(Ls) -> ltrim_N(Ls,0).
+
+ltrim_N([$N|Ls],J) -> ltrim_N(Ls,J+1);
+ltrim_N([10|Ls],J) -> ltrim_N(Ls,J);
+ltrim_N([13|Ls],J) -> ltrim_N(Ls,J);
+ltrim_N(Ls,J) -> {J,Ls}.
+
 
 
 
