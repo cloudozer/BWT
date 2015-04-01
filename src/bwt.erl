@@ -12,7 +12,7 @@
 		get_subseq/1,
 		index_to_sequence/3,
 		get_3_pointers/1,
-		get_index/0,
+		get_index/0, get_index/1,
 		pp/1,
 		test/1,test/0
 		]).
@@ -120,6 +120,10 @@ make_index(Chrom) ->
 
 get_index() ->
 	{ok,Bin} = file:read_file("../bwt_files/fm_index"),
+	binary_to_term(Bin).
+
+get_index(FileName) ->
+	{ok,Bin} = file:read_file(FileName),
 	binary_to_term(Bin).
 
 
