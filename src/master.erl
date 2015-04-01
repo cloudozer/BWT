@@ -1,143 +1,99 @@
 -module(master).
--behaviour(gen_fsm).
+-behaviour(gen_server).
 
--export([
-  test_cluster/0,
-  test_local/0
-]).
+-export([start_link/1, register_workers/2]).
+-export([test/0]).
+-export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
 
--export([start_link/0, run/2, send_result/2, send_done_seq/2, send_done/1]).
--export([init/1, idle/3, terminate/3, busy/2]).
+%% api
 
--record(state, {client, partititons, seq_match = [], seq_chunk = [], nodes, nodes_done_count = 0, start_time}).
+start_link(Args) ->
+  gen_server:start_link(?MODULE, Args, []).
 
--include("bwt.hrl").
+register_workers(MasterPid, Pids) ->
+  gen_server:call(MasterPid, {register_workers, Pids}).
 
-test_cluster() ->
+%% test
+
+test() ->
   lager:start(),
-  Nodes = gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes),
-lager:info("Nodes ~p", [Nodes]),
-%%   Nodes = lists:sublist(gen_server:call({cluster_manager, 'gc@104.131.46.157'}, get_nodes), 25),
-  io:format("Genome sequence matching Demo~n"),
-  io:format("Erlang cluster: ~b nodes~n", [length(Nodes)]),
-  io:format("Node RAM: 512Mb~n"),
-  {ok, Master} = ?MODULE:start_link(),
-  RefFile = "human_g1k_v37_decoy.fasta",
-  IndexFile = "human_g1k_v37_decoy.fasta.index",
-  SeqFile = "SRR770176_1.fastq",
-  MasterPath = "bwt_files",
-  WorkerPath = "/home/drc/bwt_files",
-  ChunkSize = 2000,
-  Args = {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize},  
-  ?MODULE:run(Master, Args).
-%  ok = gen_fsm:send_event(Pid, {run, 20, "ATGTGACACAGATCACTGCGGCCTTGACCTCCCAGGCTCCAGGTGGTTCTT","21","/home/drc/bwt_files/human_g1k_v37_decoy.fasta", Nodes}).
 
-test_local() ->
-  lager:start(),
-  {ok, WorkerSrv} = worker_bio:start_link(),
-  Nodes = [node(WorkerSrv)],
-  {ok, Master} = ?MODULE:start_link(),
-  RefFile = "human_g1k_v37_decoy.fasta",
-  IndexFile = "human_g1k_v37_decoy.fasta.index",
-  SeqFile = "SRR770176_1.fastq",
-  MasterPath = "bwt_files",
-  WorkerPath = MasterPath, % "/home/drc/bwt_files",
-  ChunkSize = 2000,
-  Args = {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize},  
-  ?MODULE:run(Master, Args).
+  %% Create a master process
+  {ok, MPid} = ?MODULE:start_link([]),
+  %% Create worker processes
+  {ok, WPid1} = worker_bwt:start_link(),
+  {ok, WPid2} = worker_bwt:start_link(),
+  {ok, WPid3} = worker_bwt:start_link(),
+  {ok, WPid4} = worker_bwt:start_link(),
+  {ok, WPid5} = worker_bwt:start_link(),
+  %% Associate them with the master
+  ok = master:register_workers(MPid, [WPid1, WPid2, WPid3, WPid4, WPid5]),
+  %% Tell the master to run
+  SeqFileName = "bwt_files/SRR770176_1.fastq",
+  %SeqNum = fastq:size("bwt_files/SRR770176_1.fastq"),
+  ok = gen_server:call(MPid, {run, SeqFileName}, infinity).
 
-start_link() ->
-  gen_fsm:start_link(?MODULE, {}, []).
+%% gen_server callbacks
 
-run(Pid, Args) ->
-  ok = gen_fsm:sync_send_event(Pid, {run, Args}, infinity).
-
-send_result(Pid, Matches) ->
-  ok = gen_fsm:send_event(Pid, {result, Matches}).
-
-send_done_seq(Pid, SeqName) ->
-  ok = gen_fsm:send_event(Pid, {done_seq, SeqName}).
-
-send_done(Pid) ->
-  ok = gen_fsm:send_event(Pid, done).
-
-
-
-%% Callbacks
+-record(state, {running=false, workers=[], tasks=[], fastq}).
 
 init(_Args) ->
-  {ok, idle, #state{}}.
+  lager:info("Started master"),
+  {ok, #state{}}.
 
-terminate(normal, busy, _S) ->
-  ok.
+terminate(Reason, State) ->
+  lager:info("Master terminated: ~p", [{Reason, State}]).
 
-idle({run, {RefFile,IndexFile,SeqFile, MasterPath,WorkerPath, Nodes, ChunkSize}}, _From, State) -> 
-  NodesNbr = length(Nodes),
-  {Workload,Partitions} = schedule:get_workload_and_index(filename:absname_join(MasterPath, IndexFile), ChunkSize, NodesNbr),
-  Schedule = schedule:get_schedule(Workload, Partitions, ChunkSize), 
-  {Nodes1,_} = lists:split(NodesNbr, Nodes),
+%% It's ok
+handle_info({'DOWN',_Ref,process,_Pid,normal}, State) ->
+  {noreply, State}.
 
-  MasterPid = self(),
-  lists:foreach(fun({NodeName,Workload}) ->
-    Worker = {worker_bio, NodeName},
-    %Pid = spawn_link(NodeName, ?MODULE, run_on_worker, [N,Seq,Ref_seq_name,File,ReturnPid,J]),
-    Args = {
-      RefFile,IndexFile,SeqFile,WorkerPath,
-      Workload,
-      MasterPid,
-      1000
-    },
-    %spawn_link(fun() ->
-      ok = worker_bio:run(Worker, Args),
-      lager:info("started ~p~n", [Worker])
-    %end)
-  end, lists:zip(Nodes1, Schedule)),
-  {reply, ok, busy, State#state{partititons=Partitions, nodes = Nodes, start_time = now()}}.
+handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
+  %% monitor new workers
+  lists:foreach(fun(Pid)->monitor(process, Pid) end, Pids),
+  S1 = S#state{workers=Pids++Workers},
+  S2 = if S#state.running == true ->
+    %% assing tasks to the workers
+    schedule(S1);
+    true -> S1
+  end,
+  {reply, ok, S2};
+handle_call({run, FastqFileName}, _From, S=#state{running=false, workers=Workers}) when length(Workers) > 0 ->
+  {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
+  S1 = schedule(S#state{fastq={FastqFileName, FastqDev}, running=true}),
+  {reply, ok, S1};
+  
+handle_call({results, Results}, _From={Pid,_}, S=#state{running=true, workers=Workers}) ->
+  lager:info("master got results ~p", [Results]),
+  gen_server:cast(self(), schedule),
+  {reply, ok, S#state{workers=[Pid|Workers]}}.
 
-busy({result, {{SeqName, SeqData}, Matches}}, S=#state{partititons=Partitions, seq_match = SeqMatch}) when is_list(Matches) ->
-  lists:foreach(fun({Quality, Pos, {Up,Lines,Down}}) ->
-    QualityPers = (Quality / length(SeqData)) * 50,
+handle_cast(schedule, State) ->
+  {noreply, schedule(State)}.
 
-    {Chromo_name, Pos_in_part} = schedule:get_genome_part_name(Partitions, Pos),
-    io:format("Accuracy: ~.1f%   Seq: ~p   Genome part: ~p   Pos: ~p~n", [QualityPers, SeqName, Chromo_name,Pos_in_part]),
+%% private
 
-    Trim = fun(L) ->
-      Limit = 70,
-      lists:sublist(L, Limit)
-    end,
+schedule(S=#state{workers=Workers, fastq={FqFile, FqDev}}) ->
+  Workers1 = assign(Workers, FqDev),
+  S#state{workers=Workers1}.
 
-    io:format("~s ...~n", [Trim(Up)]),
-    io:format("~s ...~n", [Trim(Lines)]),
-    io:format("~s ...~n~n", [Trim(Down)])
-  end, Matches),
-  {next_state, busy, S#state{seq_match = [{SeqName, Matches} | SeqMatch]}};
+assign([], _Dev) ->
+  [];
+assign([Pid|Workers], Dev) ->
+  N = 777,
+  case fastq:read_seq(Dev, N) of
+    {ok, SeqList} when is_list(SeqList) ->
+      FmIndex = {fmindex, {file, "fm_binary_index"}},
+      SeqList1 = lists:map(fun({_,Seq}) -> Seq end, SeqList),
+      Workload = {FmIndex, {fastq, SeqList1}},
+      ok = worker_bwt:execute(Pid, Workload, self()),
+      assign(Workers, Dev)
+  end.
 
-busy({done_seq, SeqName}, S=#state{seq_match = SeqMatch, seq_chunk = SeqChunk, nodes = Nodes}) ->
-  case proplists:get_value(SeqName, SeqChunk, 0) of
-    NumChunksDone when NumChunksDone == length(Nodes) - 1 ->
-      case proplists:append_values(SeqName, SeqMatch) of
-        [] -> io:format("Sequence ~s no match found.~n~n", [SeqName]);
-        [_] -> io:format("~s : one match found.~n~n", [SeqName]);
-        MatchesList -> io:format("~s : ~b matches found~n~n", [SeqName, length(MatchesList)])
-      end,
-      {next_state, busy, S};
-    0 ->
-%%       lager:info("Seq ~s done 1 node", [SeqName]),
-      {next_state, busy, S#state{seq_chunk = [{SeqName,1} | SeqChunk]}};
-    NumChunksDone ->
-      NumNodesDone1 = NumChunksDone + 1,
-%%       lager:info("Seq ~s done ~b nodes", [SeqName, NumNodesDone1]),
-      SeqNode1 = lists:keyreplace(SeqName, 1, SeqChunk, {SeqName, NumNodesDone1}),
-      {next_state, busy, S#state{seq_chunk = SeqNode1}}
-  end;
+split(Number, ChunksNum) ->
+  split_inner(lists:seq(1,Number,Number div ChunksNum), []).
 
-busy(done, S=#state{nodes_done_count = DoneCount, nodes = Nodes, start_time = StartNow}) when DoneCount == length(Nodes) - 1 ->
-  lager:info("all done in ~.1f seconds", [timer:now_diff(now(), StartNow) / 1000000]),
-  {next_state, busy, S#state{nodes_done_count = DoneCount+1}};
-
-busy(done, S=#state{nodes_done_count = DoneCount}) ->
-  DoneCount1 = DoneCount + 1,
-  lager:info("~b nodes done", [DoneCount1]),
-  {next_state, busy, S#state{nodes_done_count = DoneCount1}}.
-
-
+split_inner([From, To], Acc) -> 
+  [{From, To}|Acc];
+split_inner([From | [To | _] = Rest], Acc) ->
+  split_inner(Rest, [{From, To}|Acc]).
