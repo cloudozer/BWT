@@ -27,7 +27,8 @@ read_seq(Dev, 0, Acc) ->
 read_seq(Dev, N, Acc) ->
   case read_seq(Dev) of
     {ok, Seq} ->
-      read_seq(Dev, N-1, [Seq|Acc])
+      read_seq(Dev, N-1, [Seq|Acc]);
+    Err -> Err
   end.
 
 

@@ -17,6 +17,8 @@
 		test/1,test/0
 		]).
 
+-include("bwt.hrl").
+
 %-define(TRSH,0.8).
 
 
@@ -118,7 +120,7 @@ make_index(Chrom) ->
 
 
 get_index(Chrom) ->
-	{ok,Bin} = file:read_file("../bwt_files/"++Chrom++".fm"),
+	{ok,Bin} = file:read_file(filename:join(?BWT_FILES, Chrom++".fm")),
 	binary_to_term(Bin).
 
 

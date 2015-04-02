@@ -20,9 +20,10 @@ find_seeds(Subseq,FM) ->
 		$A -> Sp = 2, Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;
 		$G -> Sp = Pg, Ep = Pt-1;
-		$T -> Sp = Pt, Ep = size(FM)
+		$T -> Sp = Pt, Ep = size(FM);
+                _ ->  Sp = 2, Ep = Pc-1
 	end,
-	io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
+	%io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
 	case find_seeds(1, Sp, Ep, Tail, FM) of
 		not_found -> not_found;
 		{Sp1,Ep1,N} -> 

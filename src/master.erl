@@ -21,13 +21,14 @@ test() ->
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  {ok, WPid1} = worker_bwt:start_link(),
-  {ok, WPid2} = worker_bwt:start_link(),
-  {ok, WPid3} = worker_bwt:start_link(),
-  {ok, WPid4} = worker_bwt:start_link(),
-  {ok, WPid5} = worker_bwt:start_link(),
+  {ok, WPid1} = worker_bwt:start_link("GL000192.1"),
+  {ok, WPid2} = worker_bwt:start_link("GL000192.1"),
+  {ok, WPid3} = worker_bwt:start_link("GL000192.1"),
+  {ok, WPid4} = worker_bwt:start_link("GL000192.1"),
+  {ok, WPid5} = worker_bwt:start_link("GL000192.1"),
+  {ok, WPid6} = worker_bwt:start_link("GL000192.1"),
   %% Associate them with the master
-  ok = master:register_workers(MPid, [WPid1, WPid2, WPid3, WPid4, WPid5]),
+  ok = master:register_workers(MPid, [WPid1, WPid2, WPid3, WPid4, WPid5, WPid6]),
   %% Tell the master to run
   SeqFileName = "bwt_files/SRR770176_1.fastq",
   ok = gen_server:call(MPid, {run, SeqFileName}, infinity).
@@ -79,14 +80,17 @@ schedule(S=#state{workers=Workers, fastq={FqFile, FqDev}}) ->
 assign([], _Dev) ->
   [];
 assign([Pid|Workers], Dev) ->
-  N = 777,
+  N = 10000,
   case fastq:read_seq(Dev, N) of
     {ok, SeqList} when is_list(SeqList) ->
-      FmIndex = {fmindex, {chromosome, "GL000192.1"}},
+     % FmIndex = {fmindex, {chromosome, "GL000192.1"}},
       SeqList1 = lists:map(fun({_,Seq}) -> Seq end, SeqList),
-      Workload = {FmIndex, {fastq, SeqList1}},
+      Workload = {fastq, SeqList1},
       ok = worker_bwt:execute(Pid, Workload, self()),
-      assign(Workers, Dev)
+      assign(Workers, Dev);
+    eof ->
+      io:format("End of fastq file~n"),
+      [Pid|Workers]
   end.
 
 split(Number, ChunksNum) ->
