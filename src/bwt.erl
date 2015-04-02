@@ -12,7 +12,7 @@
 		get_subseq/1,
 		index_to_sequence/3,
 		get_3_pointers/1,
-		get_index/0, get_index/1,
+		get_index/1,
 		pp/1,
 		test/1,test/0
 		]).
@@ -23,7 +23,7 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
-  FM = get_index(),
+  FM = get_index("GL000192.1"),
   Qs = [
     "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
     "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
@@ -65,7 +65,7 @@ test(Qseq) ->
 	%TTTTTCTCACCAATATTTTTGGAGATTTTAAAGATTTTCTTTTTTTTTGACATAGAATCT
 	%TATGGAGGCTGAGAAATAATTTTTTTTCTATTTTATTCTTCAGCCCCAGGTGTTTGCTTT
 	%TGCAGATTCTTGAGCACACTGAGAGCCTCCAAGGCATGGAGTGGGGTGCCTGAAGTTTCA
-	FM = get_index(),
+	FM = get_index("GL000192.1"),
 	{Time,Value} = timer:tc(sga,sga,[FM,Qseq]),
 	io:format("time:~pusec~n",[Time]),
 	Value.
@@ -112,18 +112,13 @@ make_index(Chrom) ->
 						end, Ref_seq),
 	{_,T1} = statistics(runtime),
 	io:format("Maping takes: ~pms~n",[T1]),
-	io:format("Ref seq:~n~p~n",[Ref_seq1]),
 	Bin = term_to_binary(fm(Ref_seq1)),
-	file:write_file("../bwt_files/"+Chrom+".fm",Bin).
+	file:write_file("../bwt_files/"++Chrom++".fm",Bin).
 
 
 
-get_index() ->
-	{ok,Bin} = file:read_file("../bwt_files/fm_index"),
-	binary_to_term(Bin).
-
-get_index(FileName) ->
-	{ok,Bin} = file:read_file(FileName),
+get_index(Chrom) ->
+	{ok,Bin} = file:read_file("../bwt_files/"++Chrom++".fm"),
 	binary_to_term(Bin).
 
 
@@ -201,9 +196,7 @@ sort_chuncks(Ls,Size,Acc) when length(Ls) > Size ->
 	{Chunk,Tail} = lists:split(Size,Ls),
 	io:format("Chunk sorted\t"),
 	sort_chuncks(Tail,Size,[lists:sort(Chunk)|Acc]);
-sort_chuncks(Ls,Size,Acc) ->
-	[lists:sort(Ls)|Acc],
-	lists:merge(Acc).
+sort_chuncks(Ls,_,Acc) -> lists:merge([lists:sort(Ls)|Acc]).
 
 
 add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq) ->

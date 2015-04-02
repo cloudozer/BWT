@@ -30,7 +30,6 @@ test() ->
   ok = master:register_workers(MPid, [WPid1, WPid2, WPid3, WPid4, WPid5]),
   %% Tell the master to run
   SeqFileName = "bwt_files/SRR770176_1.fastq",
-  %SeqNum = fastq:size("bwt_files/SRR770176_1.fastq"),
   ok = gen_server:call(MPid, {run, SeqFileName}, infinity).
 
 %% gen_server callbacks
@@ -83,7 +82,7 @@ assign([Pid|Workers], Dev) ->
   N = 777,
   case fastq:read_seq(Dev, N) of
     {ok, SeqList} when is_list(SeqList) ->
-      FmIndex = {fmindex, {file, "fm_binary_index"}},
+      FmIndex = {fmindex, {chromosome, "GL000192.1"}},
       SeqList1 = lists:map(fun({_,Seq}) -> Seq end, SeqList),
       Workload = {FmIndex, {fastq, SeqList1}},
       ok = worker_bwt:execute(Pid, Workload, self()),

@@ -15,7 +15,7 @@
 find_seeds(Subseq,FM) ->
 	[H|Tail] = lists:reverse(Subseq),
 	%initialize_sp_ep(H,1,size(FM),FM)
-	{Pc,Pg,Pt} = {3203297,5961109,8724872},
+	{Pc,Pg,Pt} = {163080,275810,390251},
 	case H of
 		$A -> Sp = 2, Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;

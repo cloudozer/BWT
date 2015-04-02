@@ -25,9 +25,9 @@ handle_info({'DOWN',Ref,process,_Pid,normal}, S=#state{slave=Ref}) ->
   {noreply, S}.
 
 handle_call({execute, Workload, MasterPid}, _From, S=#state{busy=false}) ->
-  {{fmindex, {file, FmFileName}}, {fastq, QseqList}} = Workload,
-  lager:info("Worker ~p got workload ~p", [self(), length(QseqList)]),
-  FM = fm:read_file(filename:join(?BWT_FILES, FmFileName)),
+  {{fmindex, {chromosome, ChromoName}}, {fastq, QseqList}} = Workload,
+  lager:info("Worker ~p got workload ~p", [self(), QseqList]),
+  FM = bwt:get_index(ChromoName),
   lager:info("Worker have read the FM-index"),
   WorkerPid = self(),
   SlavePid = spawn_link(fun() ->
