@@ -15,7 +15,7 @@ execute(Pid, Workload, MasterPid) ->
 
 %% callbacks
 
--record(state, {busy=false, master, slave, fm}).
+-record(state, {busy=false, master, slave, fm, workload}).
 
 init(ChromoName) ->
   FM = bwt:get_index(ChromoName),
@@ -30,15 +30,27 @@ handle_call({execute, Workload, MasterPid}, _From, S=#state{busy=false, fm=FM}) 
   %{{fmindex, {chromosome, ChromoName}}, {fastq, QseqList}} = Workload,
   {fastq, QseqList} = Workload,
   lager:info("Worker ~p got workload ~p", [self(), length(QseqList)]),
+  SlaveRef = spawn_slave(FM, QseqList),
+  {reply, ok, S#state{busy=true, master=MasterPid, slave=SlaveRef}}.
+
+handle_cast({results, _Results} = Msg, S = #state{busy=true, master=MasterPid, workload = Workload, fm=FM}) ->
+  ok = gen_server:call(MasterPid, Msg, infinity),
+  S1 = case Workload of
+    undefined ->
+      S#state{busy=false};
+    {fastq, QseqList} ->
+      SlaveRef = spawn_slave(FM, QseqList),
+      S#state{busy=true, slave=SlaveRef}
+  end,
+  {noreply, S1}.
+
+%% private
+
+spawn_slave(FM, QseqList) ->
   WorkerPid = self(),
   SlavePid = spawn_link(fun() ->
     Results = lists:foldl(fun(Qseq,Acc) -> case sga:sga(FM,Qseq) of [] -> Acc; R -> [R|Acc] end end, [], QseqList),
     lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
     gen_server:cast(WorkerPid, {results, Results})
   end),
-  SlaveRef = erlang:monitor(process, SlavePid),
-  {reply, ok, S#state{busy=true, master=MasterPid, slave=SlaveRef}}.
-
-handle_cast({results, Results}=Msg, S=#state{busy=true, master=MasterPid}) ->
-  ok = gen_server:call(MasterPid, Msg, infinity),
-  {noreply, S#state{busy=false}}.
+  erlang:monitor(process, SlavePid).

@@ -22,7 +22,7 @@ read_seq(Dev) ->
 read_seq(Dev, N) ->
   read_seq(Dev, N, []).
 
-read_seq(Dev, 0, Acc) ->
+read_seq(_Dev, 0, Acc) ->
   {ok, Acc};
 read_seq(Dev, N, Acc) ->
   case read_seq(Dev) of

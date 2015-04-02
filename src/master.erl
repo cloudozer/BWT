@@ -31,11 +31,13 @@ test() ->
   ok = master:register_workers(MPid, [WPid1, WPid2, WPid3, WPid4, WPid5, WPid6]),
   %% Tell the master to run
   SeqFileName = "bwt_files/SRR770176_1.fastq",
+%%   Size = fastq:fold(fun(_,A) -> A+1 end, 0, SeqFileName),
+%%   lager:info("FasqQ size ~p", [Size]),
   ok = gen_server:call(MPid, {run, SeqFileName}, infinity).
 
 %% gen_server callbacks
 
--record(state, {running=false, workers=[], tasks=[], fastq}).
+-record(state, {running=false, workers=[], tasks=[], fastq, result_size=0}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -63,17 +65,17 @@ handle_call({run, FastqFileName}, _From, S=#state{running=false, workers=Workers
   S1 = schedule(S#state{fastq={FastqFileName, FastqDev}, running=true}),
   {reply, ok, S1};
   
-handle_call({results, Results}, _From={Pid,_}, S=#state{running=true, workers=Workers}) ->
-  lager:info("master got results ~p", [Results]),
+handle_call({results, Results}, _From={Pid,_}, S=#state{running=true, workers=Workers, result_size = ResSize}) ->
+  lager:info("master got results ~p. total: ~p", [Results, ResSize + length(Results)]),
   gen_server:cast(self(), schedule),
-  {reply, ok, S#state{workers=[Pid|Workers]}}.
+  {reply, ok, S#state{workers=[Pid|Workers], result_size = ResSize + length(Results)}}.
 
 handle_cast(schedule, State) ->
   {noreply, schedule(State)}.
 
 %% private
 
-schedule(S=#state{workers=Workers, fastq={FqFile, FqDev}}) ->
+schedule(S=#state{workers=Workers, fastq={_, FqDev}}) ->
   Workers1 = assign(Workers, FqDev),
   S#state{workers=Workers1}.
 
