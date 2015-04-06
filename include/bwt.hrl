@@ -1,2 +1,2 @@
 -define(THRESHOLD, 20).
--define(BWT_FILES, "bwt_files").
+-define(BWT_FILES, "~/bwt_files").
