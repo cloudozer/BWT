@@ -18,7 +18,6 @@ execute(Pid, Workload, MasterPid) ->
 -record(state, {busy=false, master, slave, fms=[], workload}).
 
 init(_) ->
-  lager:info("Worker have read the FM-index"),
   {ok, #state{}}.
 
 %% The slave is finished
@@ -31,6 +30,7 @@ handle_call({execute, Workload, MasterPid}, _From, S=#state{busy=false, fms=FMs}
     case proplists:get_value(ChromoName, FMs) of
       undefined ->
         FM = bwt:get_index(ChromoName),
+  	lager:info("Worker is read the FM-index"),
         {FM, [{ChromoName, FM}]};
       FM ->
         {FM, FMs}

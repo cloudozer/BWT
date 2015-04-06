@@ -91,7 +91,7 @@ make_index() ->
 
 
 make_index(Chrom) ->
-	File = "../bwt_files/human_g1k_v37_decoy.fasta",
+	File = filename:join(?BWT_FILES, "human_g1k_v37_decoy.fasta"),
 	{Pos,Len} = msw:get_reference_position(Chrom,File),
 	{Shift,Ref_seq} = msw:get_ref_seq(File,Pos,Len),
 	io:format("Removed ~p 'NNN' in the beginning~n",[Shift]),
@@ -114,8 +114,10 @@ make_index(Chrom) ->
 						end, Ref_seq),
 	{_,T1} = statistics(runtime),
 	io:format("Maping takes: ~pms~n",[T1]),
-	Bin = term_to_binary(fm(Ref_seq1)),
-	file:write_file("../bwt_files/"++Chrom++".fm",Bin).
+	FM = fm(Ref_seq1),
+	Meta = [{pointers, get_3_pointers(FM)}],
+	Bin = term_to_binary({Meta,FM}),
+	file:write_file(filename:join(?BWT_FILES,Chrom++".fm"),Bin).
 
 
 
