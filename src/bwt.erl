@@ -81,6 +81,7 @@ index_to_sequence(Start,FM,N) -> "".
 
 	
 make_index() ->
+	ok = application:start(bwt),
 	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
 	File = filename:join(BwtFiles, "human_g1k_v37_decoy.fasta"),
 	{Pos,Len} = msw:get_reference_position("21",File),
@@ -94,6 +95,7 @@ make_index() ->
 
 
 make_index(Chrom) ->
+	ok = application:start(bwt),
 	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
 	File = filename:join(BwtFiles, "human_g1k_v37_decoy.fasta"),
 	{Pos,Len} = msw:get_reference_position(Chrom,File),
@@ -121,7 +123,7 @@ make_index(Chrom) ->
 	FM = fm(Ref_seq1),
 	Meta = [{pointers, get_3_pointers(FM)}],
 	Bin = term_to_binary({Meta,FM}),
-	fileles:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
+	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
 
 
 
