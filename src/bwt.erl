@@ -81,17 +81,21 @@ index_to_sequence(Start,FM,N) -> "".
 
 	
 make_index() ->
-	File = "../bwt_files/human_g1k_v37_decoy.fasta",
+	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	File = filename:join(BwtFiles, "human_g1k_v37_decoy.fasta"),
 	{Pos,Len} = msw:get_reference_position("21",File),
 	io:format("Pos:~p, Len:~p~n",[Pos,Len]),
 	Chunk = msw:get_chunk(File,Pos+3*(Len div 4),(Len div 4) - 13000),
 	io:format("Chunk len:~p~n",[length(Chunk)]),
-	Bin = term_to_binary(fm(Chunk)),
-	file:write_file("../bwt_files/fm_index",Bin).
+	FM = fm(Chunk),
+	Meta = [{pointers, get_3_pointers(FM)}],
+	Bin = term_to_binary({Meta,FM}),
+	file:write_file(filename:join(BwtFiles, "fm_index"),Bin).
 
 
 make_index(Chrom) ->
-	File = filename:join(?BWT_FILES, "human_g1k_v37_decoy.fasta"),
+	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	File = filename:join(BwtFiles, "human_g1k_v37_decoy.fasta"),
 	{Pos,Len} = msw:get_reference_position(Chrom,File),
 	{Shift,Ref_seq} = msw:get_ref_seq(File,Pos,Len),
 	io:format("Removed ~p 'NNN' in the beginning~n",[Shift]),
@@ -117,12 +121,13 @@ make_index(Chrom) ->
 	FM = fm(Ref_seq1),
 	Meta = [{pointers, get_3_pointers(FM)}],
 	Bin = term_to_binary({Meta,FM}),
-	file:write_file(filename:join(?BWT_FILES,Chrom++".fm"),Bin).
+	fileles:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
 
 
 
 get_index(Chrom) ->
-	{ok,Bin} = file:read_file(filename:join(?BWT_FILES, Chrom++".fm")),
+	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	{ok,Bin} = file:read_file(filename:join(BwtFiles, Chrom++".fm")),
 	binary_to_term(Bin).
 
 

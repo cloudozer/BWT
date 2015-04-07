@@ -15,11 +15,12 @@ register_workers(MasterPid, Pids) ->
 
 test() ->
   lager:start(),
+  ok = application:start(bwt),
 
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  WorkersNum = 5,
+  WorkersNum = 6,
   Pids = lists:map(fun(_) -> {ok, WPid} = worker_bwt:start_link(), WPid end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
   ok = master:register_workers(MPid, Pids),
