@@ -10,6 +10,11 @@
 start_link() ->
   gen_server:start_link(?MODULE, {}, []).
 
+start_link(MasterPid) ->
+  {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
+  ok = master:register_workers(MasterPid, [Pid]),
+  {ok, Pid}.
+
 execute(Pid, Workload, MasterPid) ->
   gen_server:call(Pid, {execute, Workload, MasterPid}, infinity).
 

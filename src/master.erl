@@ -75,7 +75,7 @@ schedule(S=#state{workers=Workers, fastq={_, FqDev}}) ->
 assign([], _Dev) ->
   [];
 assign([Pid|Workers], Dev) ->
-  N = 10000,
+  N = 1000,
   case fastq:read_seq(Dev, N) of
     {ok, SeqList} when is_list(SeqList) ->
       FmIndex = {fmindex, {chromosome, "GL000192.1"}},
