@@ -1,7 +1,7 @@
 -module(worker_bwt).
 -behaviour(gen_server).
 
--export([start_link/0, execute/3]).
+-export([start_link/0, start_link/1, execute/3]).
 -export([init/1, handle_info/2, handle_call/3, handle_cast/2]).
 
 -include("bwt.hrl").
