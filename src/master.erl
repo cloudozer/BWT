@@ -56,15 +56,17 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
 handle_call({run, FastqFileName}, _From, S=#state{running=false, workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   S1 = schedule(S#state{fastq={FastqFileName, FastqDev}, running=true}),
-  {reply, ok, S1};
-  
-handle_call({results, Results}, _From={Pid,_}, S=#state{running=true, workers=Workers, result_size = ResSize}) ->
-  lager:info("master got results ~p. total: ~p", [Results, ResSize + length(Results)]),
-  gen_server:cast(self(), schedule),
-  {reply, ok, S#state{workers=[Pid|Workers], result_size = ResSize + length(Results)}}.
+  {reply, ok, S1}.
 
 handle_cast(schedule, State) ->
-  {noreply, schedule(State)}.
+  {noreply, schedule(State)};
+handle_cast({get_workload, Pid}, S = #state{fastq={_, FqDev}}) ->
+  assign([Pid], FqDev),
+  {noreply, S};
+handle_cast({results, Results, Pid}, S=#state{running=true, workers=Workers, result_size = ResSize}) ->
+  lager:info("master got results ~p. total: ~p", [Results, ResSize + length(Results)]),
+  gen_server:cast(self(), schedule),
+  {noreply, S#state{workers=[Pid|Workers], result_size = ResSize + length(Results)}}.
 
 %% private
 
@@ -84,6 +86,6 @@ assign([Pid|Workers], Dev) ->
       ok = worker_bwt:execute(Pid, Workload, self()),
       assign(Workers, Dev);
     eof ->
-      io:format("End of fastq file~n"),
+      lager:info("End of fastq file~n"),
       [Pid|Workers]
   end.
