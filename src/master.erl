@@ -47,6 +47,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
   lists:foreach(fun(Pid)->monitor(process, Pid) end, Pids),
   S1 = S#state{workers=Pids++Workers},
+  lager:info("Worker got ~b workers", [length(S1#state.workers)]),
   %S2 = if S#state.running == true ->
   %  %% assing tasks to the workers
   %  schedule(S1);
