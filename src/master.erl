@@ -61,11 +61,15 @@ handle_call({run, FastqFileName}, _From, S=#state{running=false, workers=Workers
   {reply, ok, S1};
 handle_call(get_workload, _From, S = #state{fastq={_, FqDev}}) ->
   N = 1000,
-  {_, SeqList} = fastq:read_seq(FqDev, N),
-  FmIndex = {fmindex, {chromosome, "GL000192.1"}},
-  Queries = lists:map(fun({_,Q}) -> Q end, SeqList),
-  Workload = {FmIndex, {fastq, Queries}},
-  {reply, {ok, Workload}, S}.
+  case fastq:read_seq(FqDev, N) of
+    {_, SeqList} ->
+      FmIndex = {fmindex, {chromosome, "GL000192.1"}},
+      Queries = lists:map(fun({_,Q}) -> Q end, SeqList),
+      Workload = {FmIndex, {fastq, Queries}},
+      {reply, {ok, Workload}, S};
+    eof ->
+      {reply, eof, S}
+  end.
 
 handle_cast(schedule, State) ->
   {noreply, schedule(State)};
@@ -82,18 +86,3 @@ schedule(S=#state{workers=Workers}) ->
   lists:foreach(fun(Pid) -> gen_server:cast(Pid, {run, self()}) end, Workers),
   S#state{workers=[]}.
 
-assign([], _Dev) ->
-  [];
-assign([Pid|Workers], Dev) ->
-  N = 1000,
-  case fastq:read_seq(Dev, N) of
-    {ok, SeqList} when is_list(SeqList) ->
-      FmIndex = {fmindex, {chromosome, "GL000192.1"}},
-      SeqList1 = lists:map(fun({_,Seq}) -> Seq end, SeqList),
-      Workload = {FmIndex, {fastq, SeqList1}},
-      ok = worker_bwt:execute(Pid, Workload, self()),
-      assign(Workers, Dev);
-    eof ->
-      lager:info("End of fastq file"),
-      [Pid|Workers]
-  end.

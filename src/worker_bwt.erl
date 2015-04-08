@@ -3,7 +3,7 @@
 
 -export([start_link/0, start_link/1]).
 -export([init/1, terminate/2, handle_info/2, handle_cast/2]).
--export([workload_supplier_loop/3]).
+-export([workload_supplier_loop/4]).
 
 -include("bwt.hrl").
 
@@ -31,7 +31,7 @@ handle_info({'DOWN',_Ref,process,_Pid,normal}, S=#state{}) ->
   {noreply, S}.
 
 handle_cast({run, MasterPid}, S=#state{busy=false, fms=FMs, supplier=undefined, waterline=Waterline}) ->
-  SuppilerPid = spawn_link(?MODULE, workload_supplier_loop, [MasterPid, Waterline, []]),
+  SuppilerPid = spawn_link(?MODULE, workload_supplier_loop, [MasterPid, Waterline, [], false]),
   {ok, Workload} = get_workload(SuppilerPid),
   FMs1 = run_workload(Workload, FMs),
   {noreply, S#state{busy = true, master = MasterPid, fms = FMs1, supplier = SuppilerPid}};
@@ -41,9 +41,13 @@ handle_cast({results, Results}, S = #state{busy = true, master=MasterPid, fms = 
   %% retranslate the results to the master
   gen_server:cast(MasterPid, {results, Results, self()}),
   %% start next workload
-  {ok, Workload} = get_workload(SuppilerPid),
-  FMs1 = run_workload(Workload, FMs),
-  {noreply, S#state{fms = FMs1}}.
+  case get_workload(SuppilerPid) of
+    {ok, Workload} ->
+      FMs1 = run_workload(Workload, FMs),
+      {noreply, S#state{fms = FMs1}};
+    eof ->
+      {noreply, #state{}}
+  end.
 
 %% private
 
@@ -74,17 +78,31 @@ spawn_slave(FM, QseqList) ->
     gen_server:cast(WorkerPid, {results, Results})
   end),
   erlang:monitor(process, SlavePid).
+
 %% TODO several at time
-workload_supplier_loop(MasterPid, Waterline, WorkloadList) when Waterline > length(WorkloadList) ->
-  {ok, Workload} = gen_server:call(MasterPid, get_workload),
-  workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList]);
-workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList]) ->
+workload_supplier_loop(MasterPid, Waterline, WorkloadList, false) when Waterline > length(WorkloadList) ->
+  case gen_server:call(MasterPid, get_workload) of
+    {ok, Workload} ->
+      workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList], false);
+    eof ->
+      workload_supplier_loop(MasterPid, Waterline, WorkloadList, eof)
+  end;
+workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList], EOF) ->
   receive
     {get_workload, Pid} ->
       Pid ! {ok, Workload},
-      workload_supplier_loop(MasterPid, Waterline, WorkloadList)
+      workload_supplier_loop(MasterPid, Waterline, WorkloadList, EOF)
+  end;
+workload_supplier_loop(MasterPid, Waterline, [], eof) ->
+  receive
+    {get_workload, Pid} ->
+      Pid ! eof,
+      workload_supplier_loop(MasterPid, Waterline, [], eof)
   end.
 
 get_workload(SupplierPid) ->
   SupplierPid ! {get_workload, self()},
-  receive {ok, W} -> {ok, W} end.
+  receive
+    {ok, W} -> {ok, W};
+    eof -> eof
+  end.
