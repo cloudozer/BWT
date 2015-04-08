@@ -29,7 +29,10 @@ read_seq(Dev, N, Acc) ->
     {ok, Seq} ->
       read_seq(Dev, N-1, [Seq|Acc]);
     eof -> 
-      {eof, Acc};
+      if (Acc == []) ->
+        eof;
+      true -> {eof, Acc}
+      end;
     Err -> Err
   end.
 
