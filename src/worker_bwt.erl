@@ -1,8 +1,9 @@
 -module(worker_bwt).
 -behaviour(gen_server).
 
--export([start_link/0, start_link/1, execute/3]).
--export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
+-export([start_link/0, start_link/1]).
+-export([init/1, terminate/2, handle_info/2, handle_cast/2]).
+-export([workload_supplier_loop/3]).
 
 -include("bwt.hrl").
 
@@ -15,12 +16,9 @@ start_link(MasterPid) ->
   ok = master:register_workers(MasterPid, [Pid]),
   {ok, Pid}.
 
-execute(Pid, Workload, MasterPid) ->
-  gen_server:call(Pid, {execute, Workload, MasterPid}, infinity).
-
 %% callbacks
 
--record(state, {busy=false, master, workloads=[], fms=[]}).
+-record(state, {busy=false, master, fms=[], supplier, waterline=5}).
 
 init(_) ->
   {ok, #state{}}.
@@ -32,34 +30,20 @@ terminate(Reason, State) ->
 handle_info({'DOWN',_Ref,process,_Pid,normal}, S=#state{}) ->
   {noreply, S}.
 
-handle_call({execute, Workload, MasterPid}, _From, S=#state{busy=false, fms=FMs, workloads = Workloads}) ->
-%%   lager:info("Worker got workload1"),
+handle_cast({run, MasterPid}, S=#state{busy=false, fms=FMs, supplier=undefined, waterline=Waterline}) ->
+  SuppilerPid = spawn_link(?MODULE, workload_supplier_loop, [MasterPid, Waterline, []]),
+  {ok, Workload} = get_workload(SuppilerPid),
   FMs1 = run_workload(Workload, FMs),
-%%   if (length(Workloads < 10)) ->
-    gen_server:cast(MasterPid, {get_workload, self()}),
-%%     true -> ok
-%%   end,
-  {reply, ok, S#state{busy = true, master = MasterPid, fms = FMs1}};
-handle_call({execute, Workload, MasterPid}, _From, S=#state{busy = true, workloads = Workloads, master = MasterPid}) ->
-%%   lager:info("Worker got workload2 ~p", [length([Workload|Workloads])]),
-  {reply, ok, S#state{workloads = [Workload|Workloads]}}.
+  {noreply, S#state{busy = true, master = MasterPid, fms = FMs1, supplier = SuppilerPid}};
 
 %% a cast from the slave
-handle_cast({results, Results}, S = #state{busy = true, master=MasterPid, workloads = [Workload|Workloads], fms = FMs}) ->
+handle_cast({results, Results}, S = #state{busy = true, master=MasterPid, fms = FMs, supplier = SuppilerPid}) ->
   %% retranslate the results to the master
-%%   lager:info("Worker results1"),
   gen_server:cast(MasterPid, {results, Results, self()}),
-  %% start buffered workload
+  %% start next workload
+  {ok, Workload} = get_workload(SuppilerPid),
   FMs1 = run_workload(Workload, FMs),
-  {noreply, S#state{busy = true, fms = FMs1, workloads = Workloads}};
-handle_cast({results, Results}, S = #state{busy = true, master=MasterPid, workloads = [], fms = FMs}) ->
-  %% retranslate the results to the master
-%%   lager:info("Worker results2"),
-  gen_server:cast(MasterPid, {results, Results, self()}),
-  {noreply, S#state{busy=false}};
-handle_cast(get_workload, S = #state{busy=true, master=MasterPid}) ->
-  gen_server:cast(MasterPid, {get_workload, self()}),
-  {noreply, S}.
+  {noreply, S#state{fms = FMs1}}.
 
 %% private
 
@@ -90,3 +74,17 @@ spawn_slave(FM, QseqList) ->
     gen_server:cast(WorkerPid, {results, Results})
   end),
   erlang:monitor(process, SlavePid).
+%% TODO several at time
+workload_supplier_loop(MasterPid, Waterline, WorkloadList) when Waterline > length(WorkloadList) ->
+  {ok, Workload} = gen_server:call(MasterPid, get_workload),
+  workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList]);
+workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList]) ->
+  receive
+    {get_workload, Pid} ->
+      Pid ! {ok, Workload},
+      workload_supplier_loop(MasterPid, Waterline, WorkloadList)
+  end.
+
+get_workload(SupplierPid) ->
+  SupplierPid ! {get_workload, self()},
+  receive {ok, W} -> {ok, W} end.

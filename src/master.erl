@@ -47,32 +47,39 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
   lists:foreach(fun(Pid)->monitor(process, Pid) end, Pids),
   S1 = S#state{workers=Pids++Workers},
-  S2 = if S#state.running == true ->
-    %% assing tasks to the workers
-    schedule(S1);
-    true -> S1
-  end,
+  %S2 = if S#state.running == true ->
+  %  %% assing tasks to the workers
+  %  schedule(S1);
+  %  true -> S1
+  %end,
+  S2 = S1,
   {reply, ok, S2};
 handle_call({run, FastqFileName}, _From, S=#state{running=false, workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   S1 = schedule(S#state{fastq={FastqFileName, FastqDev}, running=true}),
-  {reply, ok, S1}.
+  {reply, ok, S1};
+handle_call(get_workload, _From, S = #state{fastq={_, FqDev}}) ->
+  N = 1000,
+  {ok, SeqList} = fastq:read_seq(FqDev, N),
+  FmIndex = {fmindex, {chromosome, "GL000192.1"}},
+  Queries = lists:map(fun({_,Q}) -> Q end, SeqList),
+  Workload = {FmIndex, {fastq, Queries}},
+  {reply, {ok, Workload}, S}.
 
 handle_cast(schedule, State) ->
   {noreply, schedule(State)};
-handle_cast({get_workload, Pid}, S = #state{fastq={_, FqDev}}) ->
-  assign([Pid], FqDev),
-  {noreply, S};
-handle_cast({results, Results, Pid}, S=#state{running=true, workers=Workers, result_size = ResSize}) ->
+handle_cast({results, Results, Pid}, S=#state{running=true, result_size = ResSize}) ->
   lager:info("master got results ~p. total: ~p", [Results, ResSize + length(Results)]),
   gen_server:cast(self(), schedule),
-  {noreply, S#state{workers=[Pid|Workers], result_size = ResSize + length(Results)}}.
+  {noreply, S#state{result_size = ResSize + length(Results)}}.
 
 %% private
 
-schedule(S=#state{workers=Workers, fastq={_, FqDev}}) ->
-  Workers1 = assign(Workers, FqDev),
-  S#state{workers=Workers1}.
+schedule(S=#state{workers=[]}) ->
+  S#state{workers=[]};
+schedule(S=#state{workers=Workers}) ->
+  lists:foreach(fun(Pid) -> gen_server:cast(Pid, {run, self()}) end, Workers),
+  S#state{workers=[]}.
 
 assign([], _Dev) ->
   [];
@@ -86,6 +93,6 @@ assign([Pid|Workers], Dev) ->
       ok = worker_bwt:execute(Pid, Workload, self()),
       assign(Workers, Dev);
     eof ->
-      lager:info("End of fastq file~n"),
+      lager:info("End of fastq file"),
       [Pid|Workers]
   end.
