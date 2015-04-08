@@ -60,7 +60,7 @@ handle_call({run, FastqFileName}, _From, S=#state{running=false, workers=Workers
   {reply, ok, S1};
 handle_call(get_workload, _From, S = #state{fastq={_, FqDev}}) ->
   N = 1000,
-  {ok, SeqList} = fastq:read_seq(FqDev, N),
+  {_, SeqList} = fastq:read_seq(FqDev, N),
   FmIndex = {fmindex, {chromosome, "GL000192.1"}},
   Queries = lists:map(fun({_,Q}) -> Q end, SeqList),
   Workload = {FmIndex, {fastq, Queries}},
