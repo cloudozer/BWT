@@ -77,7 +77,14 @@ sais(Str) ->
 	Inv = inverse_index(SA),
 	io:format("Inverse index: ~p~n",[Inv]),
 	Lms_sorted = sort_lms(LmsIndices,Inv),
-	io:format("Sorted lms indices: ~p~n",[Lms_sorted]).
+	io:format("Sorted lms indices: ~p~n",[Lms_sorted]),
+	Bkts3 = bucket(Lms_sorted,Tup),
+	io:format(" Step6. Buckets: ~p~n",[Bkts3]),
+	Bkts4 = lr_scan7(Tup,Bkts3),
+	io:format(" Step7:~p~n",[Bkts4]),
+	Bkts5 = rl_scan8(Tup,Bkts4),
+	io:format(" Step8:~p~n",[Bkts5]).
+	
 
 
 	
@@ -248,8 +255,90 @@ inverse_index([],_,Arr) -> array:to_list(Arr).
 
 
 sort_lms(LmsIndices,Inv) -> sort_lms(LmsIndices,Inv,array:new(length(LmsIndices))).
-sort_lms([J|Lms],[Ind|Inv],Arr) -> sort_lms(Lms,Inv,array:set(Ind,J,Arr));
+sort_lms([J|Lms],[Ind|Inv],Arr) -> sort_lms(Lms,Inv,array:set(Ind-1,J,Arr));
 sort_lms([],[],Arr) -> array:to_list(Arr).
 
 
+bucket(Lms,Tup) -> bucket(Lms,Tup,[]).
+bucket([J|Lms],Tup,Bkts) -> 
+	Key = element(J,Tup),
+	bucket(Lms,Tup,add_ind(Bkts,Key,J));
+bucket([],_,Bkts) -> Bkts.
+
+
+
+% scans buckets from left to right and modifies them (Step 7)
+lr_scan7(Tup,[{Key,Lbkt,Sbkt}|Buckets]) -> 
+	lr_scan7(Tup,Key,Lbkt,Sbkt,[],[],Buckets,[]).
+
+lr_scan7(Tup,Key,[1|Lbkt],Sbkt,Acc,Buckets,Nb) ->
+	lr_scan7(Tup,Key,Lbkt,Sbkt,[1|Acc],Buckets,Nb);
+lr_scan7(Tup,Key,[Ind|Lbkt],Sbkt,Acc,Buckets,Nb) ->
+	%io:format("Ind:~p ltype~n",[Ind]),
+	Key1 = element(Ind-1,Tup),
+	case Key1 >= element(Ind,Tup) of
+		true -> 
+			case Key1 == Key of
+				true -> lr_scan7(Tup,Key,Lbkt,[Ind-1|Sbkt],[Ind|Acc],Buckets,Nb);
+				_ -> lr_scan7(Tup,Key,Lbkt,Sbkt,[Ind|Acc],add2ltype(Buckets,Key1,Ind-1),Nb)
+			end;
+		_ -> lr_scan7(Tup,Key,Lbkt,Sbkt,[Ind|Acc],Buckets,Nb)
+	end;  
+lr_scan7(Tup,Key,[],Sbkt,AccL,Buckets,Nb) -> lr_scan7(Tup,Key,[],Sbkt,[],AccL,Buckets,Nb).
+
+lr_scan7(Tup,Key,[],[1|Sbkt],Acc,AccL,Buckets,Nb) ->
+	lr_scan7(Tup,Key,[],Sbkt,[1|Acc],AccL,Buckets,Nb);
+lr_scan7(Tup,Key,[],[Ind|Sbkt],Acc,AccL,Buckets,Nb) ->
+	%io:format("Ind:~p stype~n",[Ind]),
+	case (Key1=element(Ind-1,Tup)) >= element(Ind,Tup) of
+		true -> 
+			case Key1 == Key of
+				true -> lr_scan7(Tup,Key,[],[Ind-1|Sbkt],Acc,AccL,Buckets,Nb);
+				_ -> lr_scan7(Tup,Key,[],Sbkt,Acc,AccL,add2ltype(Buckets,Key1,Ind-1),Nb)
+			end;
+		_ -> lr_scan7(Tup,Key,[],Sbkt,[Ind|Acc],AccL,Buckets,Nb)
+	end;  
+lr_scan7(Tup,Key,[],[],AccS,AccL,[{Key1,Lbkt1,Sbkt1}|Buckets],Nb) -> 
+	io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Lbkt1),Sbkt1}]),
+	lr_scan7(Tup,Key1,lists:reverse(Lbkt1),Sbkt1,[],Buckets,[{Key,lists:reverse(AccL),AccS}|Nb]);
+lr_scan7(_,Key,[],[],AccS,AccL,[],Nb) -> lists:reverse([{Key,lists:reverse(AccL),AccS}|Nb]).
+
+
+
+% scans buckets from right to left and modifies them (Step 8)
+rl_scan8(Tup,Buckets) -> 
+	[{Key,Ltype,Stype}|Rev_bkt] = lists:reverse(Buckets),
+	rl_scan8(Tup,Rev_bkt,Ltype,Key,stype,lists:reverse(Stype),[],[]).
+
+rl_scan(Tup,Buckets,Ltype,Key,stype,[1|Stype],Acc,Nb) ->
+	rl_scan(Tup,add2stype(Buckets,$$,size(Tup)),Ltype,Key,stype,Stype,Acc,Nb);
+rl_scan(Tup,Buckets,Ltype,Key,stype,[Ind|Stype],Acc,Nb) ->
+	%io:format("Ind:~p stype~n",[Ind]),
+	case (Key1=element(Ind-1,Tup)) =< element(Ind,Tup) of
+		true ->
+			case Key1 == Key of
+				true -> rl_scan(Tup,Buckets,Ltype,Key,stype,append(Ind-1,Stype),Acc,Nb);
+				_ -> rl_scan(Tup,add2stype(Buckets,Key1,Ind-1),Ltype,Key,stype,Stype,Acc,Nb)
+			end;
+		_ -> rl_scan(Tup,Buckets,Ltype,Key,stype,Stype,[Ind|Acc],Nb)
+	end;
+rl_scan(Tup,Buckets,Ltype,Key,stype,[],Acc,Nb) -> 
+	rl_scan(Tup,Buckets,Acc,lists:reverse(Ltype),Key,ltype,[],Nb);
+
+rl_scan(Tup,Buckets,Stype,[1|Ltype],Key,ltype,Acc,Nb) ->
+	rl_scan(Tup,add2stype(Buckets,$$,size(Tup)),Stype,Ltype,Key,ltype,Acc,Nb);
+rl_scan(Tup,Buckets,Stype,[Ind|Ltype],Key,ltype,Acc,Nb) ->
+	case (Key1=element(Ind-1,Tup)) =< element(Ind,Tup) of
+		true ->
+			case Key1 == Key of
+				true -> rl_scan(Tup,Buckets,Stype,Key,append(Ind-1,Ltype),ltype,Acc,Nb);
+				_ -> rl_scan(Tup,add2stype(Buckets,Key1,Ind-1),Stype,Ltype,Key,ltype,Acc,Nb)
+			end;
+		_ -> rl_scan(Tup,Buckets,Stype,Ltype,Key,ltype,[Ind|Acc],Nb)
+	end;
+rl_scan(Tup,[{Key1,Ltype1,Stype1}|Buckets],Stype,[],Key,ltype,Ltype,Nb) -> 
+	io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Ltype1),Stype1}]),
+	rl_scan(Tup,Buckets,Ltype1,Key1,stype,lists:reverse(Stype1),[],[{Key,Ltype,Stype}|Nb]);
+rl_scan(_,[],Stype,[],Key,ltype,Ltype,Nb) ->
+	[{Key,Ltype,Stype}|Nb].
 
