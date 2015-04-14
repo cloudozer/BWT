@@ -7,7 +7,7 @@
 -module(osaca).
 -export([t/0,
 		t1/0,
-		t2/0,
+		t2/0, t2/1,
 		t3/0,
 		sais/1,
 		sa/1,
@@ -57,17 +57,17 @@ t() ->
 
 t2() ->
 	Tests = [
-		%"GL000207.1"
-		%% "GL000226.1",
-		%"GL000229.1"
-		%% "GL000231.1"
-		%"GL000210.1",
-		%"GL000239.1",
-		%"GL000235.1",
-		"GL000201.1"
-		%"GL000247.1",
-		%"GL000245.1",
-		%"GL000197.1"
+		"GL000207.1",
+		"GL000226.1",
+		"GL000229.1",
+		"GL000231.1",
+		"GL000210.1",
+		"GL000239.1",
+		"GL000235.1",
+		"GL000201.1",
+		"GL000247.1",
+		"GL000245.1",
+		"GL000197.1"
 	],
 	t2(Tests).
 
@@ -79,11 +79,11 @@ t2([Chrom|Tests]) ->
 	io:format("~nCromosome:~p, Length:~p~n",[Chrom,length(Ref_seq)]),
 	Str = append($$,Ref_seq),
 
-	io:format("~nCromosome:~p - ",[Chrom]),
+	%io:format("~nCromosome:~p - ",[Chrom]),
 	statistics(runtime),
 	SAIS = sais(Str),
 	{_,T1} = statistics(runtime),
-	io:format(" SAIS: ~pms~n",[T1]),
+	io:format("~n SAIS: ~pms~n",[T1]),
 	SA = sa(Str),
 	{_,T2} = statistics(runtime),
 	io:format(" SA: ~pms~n",[T2]),
@@ -119,12 +119,13 @@ t1() ->
 % where is_unique is True if all characters of Str1 is unique. Otherwise is False.
 sais(Str) -> 
 	{LmsStrs,Bkts,LmsIndices} = lms(Str),
-	io:format(" Step 1. LMS indices: ~p~n",[LmsIndices]),
+	%io:format(" Step 1. LMS indices: ~p~n",[LmsIndices]),
 	Tup = list_to_tuple(Str),
 	Bkts1 = lr_scan(Tup,Bkts),
-	io:format(" Step2:~p~n",[Bkts1]),
+	io:format(" ~p ",[length(Bkts1)]),
+	%io:format(" Step2:~p~n",[Bkts1]),
 	Bkts2 = rl_scan(Tup,Bkts1),
-	io:format(" Step3:~p~n",[Bkts2]),
+	%io:format(" Step3:~p~n",[Bkts2]),
 	
 	SA = 
 	case rename(Bkts2,LmsStrs) of
@@ -132,42 +133,41 @@ sais(Str) ->
 			%Sf = get_str(Ls,LmsIndices),
 			%M = length(Sf)+1,
 			%[ M-X || X <- Sf ];
+			io:format("unique string of ~p characters~n",[length(Ls)]),
 			sa(get_str(Ls,LmsIndices));
 
 
 		{false,Ls} -> 
 			Str1 = get_str(Ls,LmsIndices),
-			io:format("~nNew recursion. String: ~p~n",[Str1]),
+			%io:format("~nNew recursion. String: ~p~n",[Str1]),
 			sais(Str1)
 	end,
-	io:format(" Step5: SA = ~p~n",[SA]),
-	io:format(" Golden SA = ~p~n",[sa(get_str(Ls,LmsIndices))]),
-	Inv = inverse_index(SA),
-	io:format("Inverse index: ~p~n",[Inv]),
-	Lms_sorted = sort_lms(LmsIndices,Inv),
-	io:format("Sorted lms indices: ~p~n",[Lms_sorted]),
+	%io:format(" Step5: SA = ~p~n",[SA]),
+	%io:format(" Golden SA = ~p~n",[sa(get_str(Ls,LmsIndices))]),
+	Lms_sorted = sort_lms(LmsIndices,inverse_index(SA)),
+	%io:format("Sorted lms indices: ~p~n",[Lms_sorted]),
 	Bkts3 = bucket(Lms_sorted,Tup),
-	io:format(" Step6. Buckets: ~p~n",[Bkts3]),
+	%io:format(" Step6. Buckets: ~p~n",[Bkts3]),
 	Bkts4 = lr_scan7(Tup,Bkts3),
-	io:format(" Step7:~p~n",[Bkts4]),
+	%io:format(" Step7:~p~n",[Bkts4]),
 	Bkts5 = rl_scan8(Tup,Bkts4),
-	io:format(" Step8:~p~n",[Bkts5]),
+	%io:format(" Step8:~p~n",[Bkts5]),
 	%io:format("Index: ~p~n",[flatten(Bkts5)]),
 	%[7,6,1,2,4,3,5].
-	Index = flatten(Bkts5),
-	Golden = sa(Str),
-	case Index == Golden of
-		true -> Index;
-		false->
+	flatten(Bkts5).
+	%%Golden = sa(Str),
+	%%case Index == Golden of
+	%%	true -> Index;
+	%%	false->
 			%io:format(" Step5: SA = ~p~n",[SA]),
 			%io:format("Inverse index: ~p~n",[Inv]),
 			%io:format(" Step6. Buckets: ~p~n",[Bkts3]),
 			%io:format(" Step7:~p~n",[Bkts4]),
 			%io:format(" Step8:~p~n",[Bkts5]),
-			io:format("Index: ~p~n",[Index]),
-			io:format("Golden:~p~n~n>>>~n~n",[Golden]),
-			throw(error)
-	end.
+	%%		io:format("Index: ~p~n",[Index]),
+	%%		io:format("Golden:~p~n~n>>>~n~n",[Golden]),
+	%%		throw(error)
+	%%end.
 	
 	
 
@@ -194,7 +194,7 @@ lms([S1|Str],J,[S1|LMS],Type,Dict,Acc,Ls) ->
 	lms(Str,J-1,[S1,S1|LMS],Type,Dict,Acc,Ls);
 lms([S2|Str],J,[S1|LMS],_,Dict,Acc,Ls) ->
 	lms(Str,J-1,[S2,S1|LMS],stype,Dict,Acc,Ls);
-lms([],1,_,_,Dict,Acc,Ls) -> {Dict,lists:sort(Acc),Ls}.
+lms([],1,_,_,Dict,Acc,Ls) -> {Dict,lists:keysort(1,Acc),Ls}.
 
 
 add_ind(Acc,S1,J) ->
@@ -236,8 +236,8 @@ lr_scan(Tup,Key,[],[Ind|Sbkt],Acc,AccL,Buckets,Nb) ->
 			end;
 		_ -> lr_scan(Tup,Key,[],Sbkt,[Ind|Acc],AccL,Buckets,Nb)
 	end;  
-lr_scan(Tup,Key,[],[],AccS,AccL,[{Key1,Lbkt1,Sbkt1}|Buckets],Nb) -> 
-	io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Lbkt1),Sbkt1}]),
+lr_scan(Tup,Key,[],[],AccS,AccL,[{Key1,Lbkt1,Sbkt1}|Buckets],Nb) ->
+	%io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Lbkt1),Sbkt1}]),
 	lr_scan(Tup,Key1,lists:reverse(Lbkt1),Sbkt1,[],Buckets,[{Key,lists:reverse(AccL),lists:reverse(AccS)}|Nb]);
 lr_scan(_,Key,[],[],AccS,AccL,[],Nb) -> lists:reverse([{Key,lists:reverse(AccL),lists:reverse(AccS)}|Nb]).
 
@@ -250,7 +250,7 @@ lr_scan(_,Key,[],[],AccS,AccL,[],Nb) -> lists:reverse([{Key,lists:reverse(AccL),
 add2ltype(Buckets,Key,J) ->
 	case lists:keyfind(Key,1,Buckets) of
 		{Key,Ltype,Stype} -> lists:keyreplace(Key,1,Buckets,{Key,[J|Ltype],Stype});
-		false -> lists:sort([{Key,[J],[]}|Buckets])
+		false -> lists:keysort(1,[{Key,[J],[]}|Buckets])
 	end.
 
 
@@ -289,7 +289,7 @@ rl_scan(Tup,Buckets,Key,[Ind|Ltype],[],Acc,AccS,Nb) ->
 		_ -> rl_scan(Tup,Buckets,Key,Ltype,[],[Ind|Acc],AccS,Nb)
 	end;
 rl_scan(Tup,[{Key1,Ltype1,Stype1}|Buckets],Key,[],[],AccL,AccS,Nb) -> 
-	io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Ltype1),Stype1}]),
+	%io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Ltype1),Stype1}]),
 	rl_scan(Tup,Buckets,Key1,Ltype1,lists:reverse(Stype1),[],[{Key,AccL,AccS}|Nb]);
 rl_scan(_,[],Key,[],[],AccL,AccS,Nb) ->
 	[{Key,AccL,AccS}|Nb].
@@ -301,7 +301,7 @@ append(Ind,Ls) -> lists:reverse([Ind|lists:reverse(Ls)]).
 add2stype(Buckets,Key,J) ->
 	case lists:keyfind(Key,1,Buckets) of
 		{Key,Ltype,Stype} -> lists:keyreplace(Key,1,Buckets,{Key,Ltype,[J|Stype]});
-		false -> lists:sort(fun(A,B)-> A>B end, [{Key,[],[J]}|Buckets])
+		false -> lists:sort(fun({A,_,_},{B,_,_})-> A>B end, [{Key,[],[J]}|Buckets])
 	end.
 
 
@@ -359,7 +359,7 @@ bucket(Lms,Tup) -> bucket(lists:reverse(Lms),Tup,[]).
 bucket([J|Lms],Tup,Bkts) -> 
 	Key = element(J,Tup),
 	bucket(Lms,Tup,add_ind(Bkts,Key,J));
-bucket([],_,Bkts) -> lists:sort(Bkts).
+bucket([],_,Bkts) -> lists:keysort(1,Bkts).
 
 
 
@@ -396,7 +396,7 @@ lr_scan7(Tup,Key,[],[Ind|Sbkt],Acc,AccL,Buckets,Nb) ->
 		_ -> lr_scan7(Tup,Key,[],Sbkt,[Ind|Acc],AccL,Buckets,Nb)
 	end;  
 lr_scan7(Tup,Key,[],[],AccS,AccL,[{Key1,Lbkt1,Sbkt1}|Buckets],Nb) -> 
-	io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Lbkt1),Sbkt1}]),
+	%io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Lbkt1),Sbkt1}]),
 	lr_scan7(Tup,Key1,lists:reverse(Lbkt1),Sbkt1,[],Buckets,[{Key,lists:reverse(AccL),lists:reverse(AccS)}|Nb]);
 lr_scan7(_,Key,[],[],AccS,AccL,[],Nb) -> lists:reverse([{Key,lists:reverse(AccL),lists:reverse(AccS)}|Nb]).
 
@@ -440,7 +440,7 @@ rl_scan8(Tup,Buckets,Key,[Ind|Ltype],[],Acc,AccS,Nb) ->
 		_ -> rl_scan8(Tup,Buckets,Key,Ltype,[],[Ind|Acc],AccS,Nb)
 	end;
 rl_scan8(Tup,[{Key1,Ltype1,Stype1}|Buckets],Key,[],[],AccL,AccS,Nb) -> 
-	io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Ltype1),Stype1}]),
+	%io:format("Bucket finished. New bucket: ~p~n",[{Key1,lists:reverse(Ltype1),Stype1}]),
 	rl_scan8(Tup,Buckets,Key1,Ltype1,lists:reverse(Stype1),[],[{Key,AccL,AccS}|Nb]);
 rl_scan8(_,[],Key,[],[],AccL,AccS,Nb) ->
 	[{Key,AccL,AccS}|Nb].
