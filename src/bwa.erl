@@ -12,17 +12,19 @@
 
 %% returns the list of matches of the given Qseq sequence against 
 %% the reference sequence represented by FM index
-find_seeds(Subseq,FM) ->
+find_seeds(Subseq,{FmMeta, FM}) ->
 	[H|Tail] = lists:reverse(Subseq),
 	%initialize_sp_ep(H,1,size(FM),FM)
-	{Pc,Pg,Pt} = {3203297,5961109,8724872},
+	{Pc,Pg,Pt} = proplists:get_value(pointers, FmMeta),
 	case H of
 		$A -> Sp = 2, Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;
 		$G -> Sp = Pg, Ep = Pt-1;
-		$T -> Sp = Pt, Ep = size(FM)
+		$T -> Sp = Pt, Ep = size(FM);
+		%% TODO: handle N symbols
+		$N ->  Sp = 2, Ep = Pc-1
 	end,
-	io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
+	%io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
 	case find_seeds(1, Sp, Ep, Tail, FM) of
 		not_found -> not_found;
 		{Sp1,Ep1,N} -> 
