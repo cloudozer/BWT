@@ -16,23 +16,19 @@
 
 t() ->
 	File = "../bwt_files/human_g1k_v37_decoy.fasta",
-	Chrom = "GL000192.1",
+	Chrom = "21",
 	%Chrom = "21",
 	{Pos,Len} = msw:get_reference_position(Chrom,File),
 	statistics(runtime),
 	{Shift,Ref_seq} = msw:get_ref_seq(File,Pos,Len),
 	{_,T0} = statistics(runtime),
-	io:format("~nCromosome:~p, Length:~p~n",[Chrom,length(Ref_seq)]),
+	io:format("~nChromosome:~p, Length:~p~n",[Chrom,length(Ref_seq)]),
 	io:format("Reading from file:~ps~n",[T0/1000]),
 	
 	%Bin = list_to_binary("AGTGTACGTGACCTAAATAGTAAACTTGCGCAG$"),
 	Bin = list_to_binary(append($$,Ref_seq)),
-	Bin_index = fun(N) -> 
-		J = N-1,
-		<<_:J/bytes,Y:1/bytes,_/binary>> = Bin,
-		Y
-				end,
-
+	Bin_index = fun(N) -> binary:at(Bin, N-1) end,
+	
 	F = fun(F,X1,X2) -> 
 		Vx = Bin_index(X1),
 		Vy = Bin_index(X2),
@@ -45,13 +41,13 @@ t() ->
 	Compare = fun(X1,X2) -> F(F,X1,X2) end,
 
 	statistics(runtime),
-	SA = lists:sort(Compare,lists:seq(1,size(Bin))),
-	{_,T1} = statistics(runtime),
-	io:format("Suffix array built for ~pms~n",[T1]),
-	bwt:sa(Ref_seq),
-	{_,T2} = statistics(runtime),
-	io:format("Simple algo took: ~pms~n",[T2]),
-	SA.
+	lists:sort(Compare,lists:seq(1,size(Bin))).
+	%%{_,T1} = statistics(runtime),
+	%%io:format("Suffix array built for ~pms~n",[T1]),
+	%%bwt:sa(Ref_seq),
+	%%{_,T2} = statistics(runtime),
+	%%io:format("Simple algo took: ~pms~n",[T2]),
+	%%SA.
 	
 	
 
