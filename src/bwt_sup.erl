@@ -24,6 +24,6 @@ start_link() ->
 
 init([]) ->
     {ok, { {one_for_one, 5, 10}, [
-      {worker_bwt, {worker_bwt, start_link, [{master, 'master@erlangonxen.org'}]}, permanent, 5000, worker, [worker_bwt]}
+%      {worker_bwt, {worker_bwt, start_link, [{master, 'master@erlangonxen.org'}]}, permanent, 5000, worker, [worker_bwt]}
     ]} }.
 
