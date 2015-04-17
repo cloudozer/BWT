@@ -9,8 +9,8 @@
 		fm/1,
 		sa/1,
 		make_index/0, make_index/1,
+		get_ref/3,
 		get_subseq/1,
-		index_to_sequence/3,
 		get_3_pointers/1,
 		get_index/1,
 		pp/1,
@@ -56,7 +56,7 @@ test() ->
     "CTTATTTATAAATGGTCTAGATATTTAATGCAAATCTTTTACTTAGCTTAACTTTAAGGT",
     "TAAAAATTACCAAAAGTACTTTGGAAACTATTCTTAGGCAGATTTACTGTAAACAAATTA"
   ],
-  lists:foreach(fun(Qseq) -> {T,V}=timer:tc(sga,sga,[FM,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
+  lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
 
 test(Qseq) ->
 	%File = "../bwt_files/human_g1k_v37_decoy.fasta",
@@ -72,10 +72,6 @@ test(Qseq) ->
 	io:format("time:~pusec~n",[Time]),
 	Value.
 	
-
-% returns a subsequence of N characters from a reference sequence
-% represented by FM-index starting from a given point <Start> 
-index_to_sequence(Start,FM,N) -> "".
 
 
 
@@ -120,6 +116,8 @@ make_index(Chrom) ->
 						end, Ref_seq),
 	{_,T1} = statistics(runtime),
 	io:format("Maping takes: ~pms~n",[T1]),
+	file:write_file(filename:join(BwtFiles,Chrom++".ref"),term_to_binary(Ref_seq1)),
+
 	FM = fm(Ref_seq1),
 	Meta = [{pointers, get_3_pointers(FM)}],
 	Bin = term_to_binary({Meta,FM}),
@@ -131,6 +129,15 @@ get_index(Chrom) ->
 	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
 	{ok,Bin} = file:read_file(filename:join(BwtFiles, Chrom++".fm")),
 	binary_to_term(Bin).
+
+
+get_ref(Chrom,Pos,Len) ->
+	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	File = filename:join(BwtFiles, Chrom++".ref"),
+	{ok,Dev} = file:open(File,read),
+	{ok,Ref} = file:pread(Dev, Pos, Len),
+	binary_to_term(Ref).
+
 
 
 get_3_pointers(FM) ->
