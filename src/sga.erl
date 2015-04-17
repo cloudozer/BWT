@@ -26,8 +26,8 @@ sga(FM, Qseq, Acc, Qty,End) ->
 						{N,Sp,Ep,Seed_positons} ->
 							%io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
 							L = length(Subseq),
-							Seeds = [ S-L+N || S <- Seed_positons],
-							sga(FM, Subseq, Seeds++Acc, Qty+1, N-3 );
+							%Seeds = [ S-L+N || S <- Seed_positons],
+							sga(FM, Subseq, add_seeds(Seed_positons,Acc,L,N), Qty+1, N-3 );
 						not_found ->
 							%io:format("Seeds not found~n"),
 							Seeds = [],
@@ -35,6 +35,11 @@ sga(FM, Qseq, Acc, Qty,End) ->
 					end	
 			end
 	end.
+
+
+add_seeds(Seeds, Acc0,L,N) -> 
+	lists:foldl(fun(S,Acc) -> [S-L+N |Acc]
+				end,Acc0,Seeds).
 
 
 get_similar(0, _) -> [];
