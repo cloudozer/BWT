@@ -4,46 +4,44 @@
 %
 
 -module(bwa).
--export([find_seeds/2]).
+-export([find_seeds/5]).
 
--define(RANGE,20).
+-define(MAX_RANGE,25).
+%-define(MIN_LEN,9). % a minimal length of the string that should be matched
+-define(MAX_LEN,13). % a maximal length of the string after which the range should be less than MAX_RANGE
 
 
 
-%% returns the list of matches of the given Qseq sequence against 
+%% returns the list of matches of the given Subsequence against 
 %% the reference sequence represented by FM index
-find_seeds(Subseq,{FmMeta, FM}) ->
+
+find_seeds(_,Sp,Ep,_,?MAX_LEN) when Ep-Sp > ?MAX_RANGE -> too_many_seeds;
+find_seeds(FM,Sp,Ep,_,?MAX_LEN) -> sga:get_seed_ends(FM,Sp,Ep,?MAX_LEN); 
+find_seeds(FM,Sp,Ep,[C2|Qseq],N) ->
+	%io:format("Looking for {~p,~p}~n",[C1,C2]),
+	%io:format("Range:[~p - ~p]~n",[Sp,Ep]),
+	case se_down(Sp,Ep,C2,FM) of
+		not_found -> sga:get_seed_ends(FM,Sp,Ep,N);
+		Sp1 ->
+			Ep1 = se_up(Ep,C2,FM),
+			find_seeds(FM, Sp1, Ep1, Qseq, N+1)
+	end;
+find_seeds(_,Sp,Ep,[],_) when Ep-Sp > ?MAX_RANGE -> too_many_seeds;
+find_seeds(FM,Sp,Ep,[],N) -> sga:get_seed_ends(FM,Sp,Ep,N);
+
+find_seeds(FM, Pc,Pg,Pt, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 	[H|Tail] = lists:reverse(Subseq),
 	%initialize_sp_ep(H,1,size(FM),FM)
-	{Pc,Pg,Pt} = proplists:get_value(pointers, FmMeta),
 	case H of
 		$A -> Sp = 2, Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;
 		$G -> Sp = Pg, Ep = Pt-1;
-		$T -> Sp = Pt, Ep = size(FM);
+		$T -> Sp = Pt, Ep = size(FM)
 		%% TODO: handle N symbols
-		$N ->  Sp = 2, Ep = Pc-1
+		%$N ->  Sp = 2, Ep = Pc-1
 	end,
-	%io:format("Sp:~p, Ep:~p~n",[Sp,Ep]),
-	case find_seeds(1, Sp, Ep, Tail, FM) of
-		not_found -> not_found;
-		{Sp1,Ep1,N} -> 
-			get_pos(N,[],Sp1,Ep1,FM,Sp)
-	end.
+	find_seeds(FM, Sp,Ep, Tail, 1).
 
-find_seeds(N, Sp, Ep, [C2|Qseq], FM) ->
-	%io:format("Looking for {~p,~p}~n",[C1,C2]),
-	%io:format("Range:[~p - ~p]~n",[Sp,Ep]),
-	case se_down(Sp,Ep,C2,FM) of
-		not_found -> not_found;
-		Sp1 ->
-			Ep1 = se_up(Ep,C2,FM),
-			case Ep1-Sp1 > ?RANGE of
-				true -> find_seeds(N+1, Sp1, Ep1, Qseq, FM);
-				_ -> {Sp1,Ep1,N+1}
-			end
-	end;
-find_seeds(N, Sp, Ep, [], _) -> {Sp,Ep,N}.
 
 
 se_down(Ep,Ep,C2,FM) -> 
@@ -68,14 +66,5 @@ se_up(Ep,C2,FM) ->
 	end.
 
 
-
-
-% returns a list of SA positions where the matches happened
-get_pos(N,Acc,Ep,Ep,FM,Sp) -> 
-	{_,_,_,SA} = element(Ep,FM),
-	{N,Sp,Ep,[SA|Acc]};
-get_pos(N,Acc,Sc,Ep,FM,Sp) ->
-	{_,_,_,SA} = element(Sc,FM),
-	get_pos(N,[SA|Acc],Sc+1,Ep,FM,Sp).
 
 

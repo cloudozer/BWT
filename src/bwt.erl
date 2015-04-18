@@ -8,13 +8,11 @@
 		get_suffs/1,
 		fm/1,
 		sa/1,
-		make_index/0, make_index/1,
+		make_index/1,
 		get_ref/3,
-		get_subseq/1,
-		get_3_pointers/1,
 		get_index/1,
 		pp/1,
-		test/1,test/0
+		test/0
 		]).
 
 -include("bwt.hrl").
@@ -25,7 +23,8 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
-  FM = get_index("GL000192.1"),
+  {Meta,FM} = get_index("GL000192.1"),
+  {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
   Qs = [
     "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
     "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
@@ -56,38 +55,9 @@ test() ->
     "CTTATTTATAAATGGTCTAGATATTTAATGCAAATCTTTTACTTAGCTTAACTTTAAGGT",
     "TAAAAATTACCAAAAGTACTTTGGAAACTATTCTTAGGCAGATTTACTGTAAACAAATTA"
   ],
-  lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
 
-test(Qseq) ->
-	%File = "../bwt_files/human_g1k_v37_decoy.fasta",
-	%"CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
-	%"TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
-	%CAATTCACTAGTTTATATAGAAGACTTGGTTTTTGTCTTTGCCCCATTTTATATTTGTAT
-	%TATAACTATGTATCTGGAAAATGGAACAAGTTTTTTCTTCTTCATATGAGGGCTAAGGCT
-	%TTTTTCTCACCAATATTTTTGGAGATTTTAAAGATTTTCTTTTTTTTTGACATAGAATCT
-	%TATGGAGGCTGAGAAATAATTTTTTTTCTATTTTATTCTTCAGCCCCAGGTGTTTGCTTT
-	%TGCAGATTCTTGAGCACACTGAGAGCCTCCAAGGCATGGAGTGGGGTGCCTGAAGTTTCA
-	FM = get_index("GL000192.1"),
-	{Time,Value} = timer:tc(sga,sga,[FM,Qseq]),
-	io:format("time:~pusec~n",[Time]),
-	Value.
-	
+  lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Pc,Pg,Pt,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
 
-
-
-	
-make_index() ->
-	ok = application:start(bwt),
-	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
-	File = filename:join(BwtFiles, "human_g1k_v37_decoy.fasta"),
-	{Pos,Len} = msw:get_reference_position("21",File),
-	io:format("Pos:~p, Len:~p~n",[Pos,Len]),
-	Chunk = msw:get_chunk(File,Pos+3*(Len div 4),(Len div 4) - 13000),
-	io:format("Chunk len:~p~n",[length(Chunk)]),
-	FM = fm(Chunk),
-	Meta = [{pointers, get_3_pointers(FM)}],
-	Bin = term_to_binary({Meta,FM}),
-	file:write_file(filename:join(BwtFiles, "fm_index"),Bin).
 
 
 make_index(Chrom) ->
@@ -256,29 +226,6 @@ get_suffs(Acc,_,[],_) ->
 	%io:format("Suffices:~n~p~n",[Acc]),
 	Acc.
 
-
-
-
-% returns a position referenced from the end of the query sequence, which is a good pattern for seeds
-get_subseq(Qseq) -> get_subseq(lists:reverse(Qseq), [], 0).
-
-get_subseq(_,Queue,Pos) when length(Queue) == 7 -> Pos;
-get_subseq([_],_,_) -> not_found;
-get_subseq([X1,X2|Seq], Queue, Pos) when X1=:=$C; X1=:=$G; X2=:=$C; X2=:=$G ->
-	get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
-get_subseq(_,_,Pos) when Pos >= 7 -> 1;
-get_subseq([X1,X2|Seq], Queue, Pos) ->
-	%io:format("{~p,~p}, Q: ~p~n",[X1,X2,Queue]),
-	case lists:keyfind({X1,X2},1,Queue) of
-		false -> get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
-		_ -> 
-			{Queue1,Pos1} = remove(X1,X2, lists:reverse([{{X1,X2},1}|Queue]), 1 ),
-			get_subseq([X2|Seq], Queue1, Pos+Pos1)
-	end.
-
-
-remove(X1,X2, [{{X1,X2},1}|Ls], N) -> {lists:reverse(Ls),N};
-remove(X1,X2, [_|Ls], N) -> remove(X1,X2, Ls, N+1).
 
 
 pp(FM) -> pp(FM, 1, size(FM)).

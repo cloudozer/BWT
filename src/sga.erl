@@ -4,42 +4,50 @@
 %
 
 -module(sga).
--export([sga/2]).
+-export([
+		sga/5,
+		get_seed_ends/4
+		]).
 
 -define(TOLERANCE,10).
+-define(MIN_LEN,9). % a minimal length of the string that should be matched
 
 
 
 % performs sw algorithm for a sequence Seq against reference sequence represented by FM-index
-sga(FM,Qseq) -> sga(FM,Qseq,[],0,0).
-sga(FM, Qseq, Acc, Qty,End) ->
-	case bwt:get_subseq(lists:sublist(Qseq,length(Qseq)-End)) of
-		not_found -> 
-			get_similar(Qty,Acc);
-		Pos ->
+sga(FM,Pc,Pg,Pt,Qseq) -> sga(FM,Pc,Pg,Pt,Qseq,[],0,0).
+sga(_,_,_,_,Qseq,Acc,Qty,_) when length(Qseq) < ?MIN_LEN -> get_similar(Qty,Acc);
+sga(FM,Pc,Pg,Pt,Qseq,Acc,Qty,End) -> 
+	case get_subseq(lists:sublist(Qseq,length(Qseq)-End)) of
+		no_more ->  get_similar(Qty,Acc);
+		Start ->
 			%io:format("Pos: ~p~n",[Pos]),
-			Subseq = lists:sublist(Qseq,length(Qseq)-Pos-End),
-			case length(Subseq) =< 11 of
+			Qlen = length(Qseq),
+			Subseq = lists:sublist(Qseq,Qlen-Start-End),
+			L = Qlen - Start-End,
+			L = length(Subseq),
+			case L < ?MIN_LEN of
 				true -> get_similar(Qty,Acc);
 				_ ->
-					case bwa:find_seeds(Subseq,FM) of
-						{N,Sp,Ep,Seed_positons} ->
-							%io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
-							L = length(Subseq),
-							%Seeds = [ S-L+N || S <- Seed_positons],
-							sga(FM, Subseq, add_seeds(Seed_positons,Acc,L,N), Qty+1, N-3 );
-						not_found ->
+					case bwa:find_seeds(FM,Pc,Pg,Pt,Subseq) of
+						no_seeds ->
 							%io:format("Seeds not found~n"),
-							Seeds = [],
-							sga(FM, Subseq, Seeds++Acc, Qty+1, 10  )
+							sga(FM,Pc,Pg,Pt,Subseq, Acc, Qty, End+Start+?MIN_LEN );
+						too_many_seeds ->
+							io:format("Got too many seeds for a subseq: ~p~n",[Subseq]),
+							sga(FM,Pc,Pg,Pt,Subseq, Acc, Qty, End+?MIN_LEN );
+						Seed_ends ->
+							%io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
+							%Seeds = [ S-L+N || S <- Seed_positons],
+							sga(FM,Pc,Pg,Pt,Subseq, add_seeds(Seed_ends,Acc,Start+End), Qty+1, End+Start+?MIN_LEN )					
 					end	
 			end
 	end.
 
 
-add_seeds(Seeds, Acc0,L,N) -> 
-	lists:foldl(fun(S,Acc) -> [S-L+N |Acc]
-				end,Acc0,Seeds).
+add_seeds(Seed_ends, Acc0,Shift) -> 
+	lists:foldl(fun(S,Acc) -> [ S+Shift |Acc]
+				end,Acc0,Seed_ends).
 
 
 get_similar(0, _) -> [];
@@ -59,6 +67,45 @@ get_similar(N, [], P1, Count, Acc,_) when Count >= N ->
 	%io:format("Qty:~p~n",[Count]),
 	[P1|Acc];
 get_similar(_,[],_,_,Acc,_) -> Acc.
+
+
+
+
+% returns a position referenced from the end of the query sequence, which is a good pattern for seeds
+get_subseq(Qseq) -> get_subseq(lists:reverse(Qseq), [], 0).
+
+get_subseq(_,Queue,Pos) when length(Queue) == ?MIN_LEN -> Pos;
+get_subseq([_],_,_) -> no_more;
+get_subseq([X1,X2|Seq], Queue, Pos) when X1=:=$C; X1=:=$G; X2=:=$C; X2=:=$G ->
+	get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
+%get_subseq(_,_,Pos) when Pos >= 7 -> 1;
+get_subseq([X1,X2|Seq], Queue, Pos) ->
+	%io:format("{~p,~p}, Q: ~p~n",[X1,X2,Queue]),
+	case lists:keyfind({X1,X2},1,Queue) of
+		false -> get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
+		_ -> 
+			{Queue1,Pos1} = remove(X1,X2, lists:reverse([{{X1,X2},1}|Queue]), 1 ),
+			get_subseq([X2|Seq], Queue1, Pos+Pos1)
+	end.
+
+
+remove(X1,X2, [{{X1,X2},1}|Ls], N) -> {lists:reverse(Ls),N};
+remove(X1,X2, [_|Ls], N) -> remove(X1,X2, Ls, N+1).
+
+
+
+% returns a list of SA positions where the matches happened
+get_seed_ends(_,_,_,N) when N < ?MIN_LEN -> no_seeds; 
+get_seed_ends(FM,Sp,Ep,N) -> get_seed_ends(FM,Sp,Ep,N,[]).
+
+get_seed_ends(FM,Ep,Ep,N,Acc) -> 
+	{_,_,_,SA} = element(Ep,FM),
+	[SA+N|Acc];
+get_seed_ends(FM,Sp,Ep,N,Acc) -> 
+	{_,_,_,SA} = element(Sp,FM),
+	get_seed_ends(FM,Sp+1,Ep,N,[SA+N|Acc]).
+
+
 
 
 

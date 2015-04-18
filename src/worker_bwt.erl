@@ -1,3 +1,11 @@
+% An implementation of worker that finds seeds using
+% BWT (burrows-wheeler transform) 
+%
+% Cloudozer(c), 2015
+%
+
+
+
 -module(worker_bwt).
 -behaviour(gen_server).
 
@@ -64,12 +72,14 @@ run_workload(Workload, FMs) ->
   _SlaveRef = spawn_slave(FM, QseqList),
   FMs1.
 
-spawn_slave(FM, QseqList) ->
+spawn_slave({Meta,FM}, QseqList) ->
   WorkerPid = self(),
+  {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
+  
   SlavePid = spawn_link(fun() ->
     Results = lists:foldl(
       fun(Qseq,Acc) ->
-        case sga:sga(FM,Qseq) of
+        case sga:sga(FM,Pc,Pg,Pt,Qseq) of
           [] -> Acc;
           R -> [R|Acc]
         end
