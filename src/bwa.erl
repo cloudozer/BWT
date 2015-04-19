@@ -36,9 +36,9 @@ find_seeds(FM, Pc,Pg,Pt, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 		$A -> Sp = 2, Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;
 		$G -> Sp = Pg, Ep = Pt-1;
-		$T -> Sp = Pt, Ep = size(FM)
+		$T -> Sp = Pt, Ep = size(FM);
 		%% TODO: handle N symbols
-		%$N ->  Sp = 2, Ep = Pc-1
+		$N ->  Sp = 2, Ep = Pc-1
 	end,
 	find_seeds(FM, Sp,Ep, Tail, 1).
 

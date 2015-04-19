@@ -10,13 +10,14 @@
 		]).
 
 -define(TOLERANCE,10).
--define(MIN_LEN,9). % a minimal length of the string that should be matched
+-define(MIN_LEN,11). % a minimal length of the string that should be matched
 
 
 
 % performs sw algorithm for a sequence Seq against reference sequence represented by FM-index
 sga(FM,Pc,Pg,Pt,Qseq) -> sga(FM,Pc,Pg,Pt,Qseq,[],0,0).
-sga(_,_,_,_,Qseq,Acc,Qty,_) when length(Qseq) < ?MIN_LEN -> get_similar(Qty,Acc);
+sga(_,_,_,_,Qseq,Acc,Qty,End) when length(Qseq) < ?MIN_LEN; length(Qseq) =< End -> 
+	get_similar(Qty,Acc);
 sga(FM,Pc,Pg,Pt,Qseq,Acc,Qty,End) -> 
 	case get_subseq(lists:sublist(Qseq,length(Qseq)-End)) of
 		no_more ->  get_similar(Qty,Acc);
@@ -25,20 +26,19 @@ sga(FM,Pc,Pg,Pt,Qseq,Acc,Qty,End) ->
 			Qlen = length(Qseq),
 			Subseq = lists:sublist(Qseq,Qlen-Start-End),
 			L = Qlen - Start-End,
-			L = length(Subseq),
+			%L = length(Subseq),
 			case L < ?MIN_LEN of
 				true -> get_similar(Qty,Acc);
 				_ ->
 					case bwa:find_seeds(FM,Pc,Pg,Pt,Subseq) of
 						no_seeds ->
 							%io:format("Seeds not found~n"),
-							sga(FM,Pc,Pg,Pt,Subseq, Acc, Qty, End+Start+?MIN_LEN );
+							sga(FM,Pc,Pg,Pt,Subseq, Acc, Qty, Start+?MIN_LEN );
 						too_many_seeds ->
-							io:format("Got too many seeds for a subseq: ~p~n",[Subseq]),
+							%io:format("Got too many seeds for a subseq: ~p~n",[Subseq]),
 							sga(FM,Pc,Pg,Pt,Subseq, Acc, Qty, End+?MIN_LEN );
 						Seed_ends ->
-							%io:format("Substring lenght: ~p~nSp:~p,Ep~p~n, Seeds: ~p~n",[N,Sp,Ep,Seed_positons]),
-							%Seeds = [ S-L+N || S <- Seed_positons],
+							%io:format("~p seeds found~n",[length(Seed_ends)]),
 							sga(FM,Pc,Pg,Pt,Subseq, add_seeds(Seed_ends,Acc,Start+End), Qty+1, End+Start+?MIN_LEN )					
 					end	
 			end
@@ -66,7 +66,10 @@ get_similar(N, [P2|Ls],_,_,Acc,Tol) ->
 get_similar(N, [], P1, Count, Acc,_) when Count >= N -> 
 	%io:format("Qty:~p~n",[Count]),
 	[P1|Acc];
-get_similar(_,[],_,_,Acc,_) -> Acc.
+get_similar(_,[],_,_,[],_) -> [];
+get_similar(_,[],_,_,Acc,_) -> 
+	io:format("Similar: ~p~n",[Acc]),
+	Acc.
 
 
 
