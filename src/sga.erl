@@ -10,37 +10,29 @@
 		]).
 
 -define(TOLERANCE,10).
--define(MIN_LEN,9). % a minimal length of the string that should be matched
+-define(MIN_LEN,8). % a minimal length of the string that should be matched
 
 
 
 % performs sw algorithm for a sequence Seq against reference sequence represented by FM-index
 sga(FM,Pc,Pg,Pt,Qseq) -> sga(FM,Pc,Pg,Pt,Qseq,[],0,0).
-sga(_,_,_,_,Qseq,Acc,Qty,End) when length(Qseq) < ?MIN_LEN; length(Qseq) =< End -> 
-	get_similar(Qty,Acc);
-sga(FM,Pc,Pg,Pt,Qseq,Acc,Qty,End) -> 
-	case get_subseq(lists:sublist(Qseq,length(Qseq)-End)) of
-		no_more ->  get_similar(Qty,Acc);
-		Start ->
-			%io:format("Pos: ~p~n",[Pos]),
-			Qlen = length(Qseq),
-			Subseq = lists:sublist(Qseq,Qlen-Start-End),
-			L = Qlen - Start-End,
-			%L = length(Subseq),
-			case L < ?MIN_LEN of
-				true -> get_similar(Qty,Acc);
-				_ ->
-					case bwa:find_seeds(FM,Pc,Pg,Pt,Subseq) of
-						no_seeds ->
-							%io:format("Seeds not found~n"),
-							sga(FM,Pc,Pg,Pt,Subseq, Acc, Qty, Start+?MIN_LEN );
-						too_many_seeds ->
-							%io:format("Got too many seeds for a subseq: ~p~n",[Subseq]),
-							sga(FM,Pc,Pg,Pt,Subseq, Acc, Qty, End+?MIN_LEN );
-						Seed_ends ->
-							%io:format("~p seeds found~n",[length(Seed_ends)]),
-							sga(FM,Pc,Pg,Pt,Subseq, add_seeds(Seed_ends,Acc,Start+End), Qty+1, End+Start+?MIN_LEN )					
-					end	
+sga(FM,Pc,Pg,Pt,Qseq,Acc,Qty,Shift) -> 
+	Qlen = length(Qseq),
+	case Qlen < ?MIN_LEN of
+		true ->
+			%io:format("Seeds: ~p~n",[Acc]),  
+			get_similar(Qty,Acc);
+		_ ->
+			case bwa:find_seeds(FM,Pc,Pg,Pt,Qseq) of
+				no_seeds ->
+					%io:format("Seeds not found~n"),
+					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq,Qlen-?MIN_LEN), Acc, Qty,Shift+?MIN_LEN);
+				too_many_seeds ->
+					%io:format("Got too many seeds for a subseq: ~p~n",[Qseq]),
+					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq,Qlen-?MIN_LEN),Acc,Qty,Shift+?MIN_LEN);
+				Seed_ends ->
+					%io:format("~p seeds found: ~p~n",[length(Seed_ends),[S+Shift||S<-Seed_ends]]),
+					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq,Qlen-?MIN_LEN),add_seeds(Seed_ends,Acc,Shift),Qty+1,Shift+?MIN_LEN)					
 			end
 	end.
 
@@ -54,7 +46,7 @@ get_similar(0, _) -> [];
 get_similar(1, _) -> [];
 get_similar(Qty, Ls) -> 
 	[P1|Ls1] = lists:sort(Ls),
-	get_similar(2+Qty div 5, Ls1, P1, 1, 0,[], ?TOLERANCE).
+	get_similar(2+(Qty div 5), Ls1, P1, 1, 0,[], ?TOLERANCE).
 
 get_similar(N, [P2|Ls], P1, Count, Dist, Acc, Tol) when P2-P1 =< Tol ->
 	get_similar(N, Ls, P2, Count+1, Dist+P2-P1, Acc, Tol);
@@ -65,6 +57,7 @@ get_similar(N, [P2|Ls],_,_,_,Acc,Tol) ->
 	get_similar(N, Ls, P2, 1, 0, Acc, Tol);
 get_similar(N, [], P1, Count, Dist, Acc,_) when Count >= N -> 
 	%io:format("Qty:~p~n",[Count]),
+	io:format("Similar: ~p~n",[[{P1,Dist}|Acc]]),
 	[{P1,Dist}|Acc];
 get_similar(_,[],_,_,_,[],_) -> [];
 get_similar(_,[],_,_,_,Acc,_) -> 

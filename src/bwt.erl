@@ -23,9 +23,11 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
-  {Meta,FM} = get_index("GL000192.1"),
+  %{Meta,FM} = get_index("GL000192.1"),
+  {Meta,FM} = get_index("GL000207.1"),
   {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
   Qs = [
+  	"ACCCCACGTTTTTGGAGTTATATGTTGGCACTGATACTGGCCATAGAATTCCCTATGGTA",
     "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
     "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
     "CAATTCACTAGTTTATATAGAAGACTTGGTTTTTGTCTTTGCCCCATTTTATATTTGTAT",
@@ -86,7 +88,7 @@ make_index(Chrom) ->
 						end, Ref_seq),
 	{_,T1} = statistics(runtime),
 	io:format("Maping takes: ~pms~n",[T1]),
-	file:write_file(filename:join(BwtFiles,Chrom++".ref"),term_to_binary(Ref_seq1)),
+	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
 	FM = fm(Ref_seq1),
 	Meta = [{pointers, get_3_pointers(FM)}],

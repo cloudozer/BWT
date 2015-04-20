@@ -8,7 +8,7 @@
 
 -define(MAX_RANGE,25).
 %-define(MIN_LEN,9). % a minimal length of the string that should be matched
--define(MAX_LEN,12). % a maximal length of the string after which the range should be less than MAX_RANGE
+-define(MAX_LEN,13). % a maximal length of the string after which the range should be less than MAX_RANGE
 
 
 
