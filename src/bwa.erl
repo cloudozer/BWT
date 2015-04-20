@@ -8,7 +8,7 @@
 
 -define(MAX_RANGE,25).
 %-define(MIN_LEN,9). % a minimal length of the string that should be matched
--define(MAX_LEN,13). % a maximal length of the string after which the range should be less than MAX_RANGE
+-define(MAX_LEN,12). % a maximal length of the string after which the range should be less than MAX_RANGE
 
 
 
@@ -38,7 +38,9 @@ find_seeds(FM, Pc,Pg,Pt, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 		$G -> Sp = Pg, Ep = Pt-1;
 		$T -> Sp = Pt, Ep = size(FM);
 		%% TODO: handle N symbols
-		$N ->  Sp = 2, Ep = Pc-1
+		$N ->
+			io:format("N found in fasq seq~n"),  
+			Sp = 2, Ep = Pc-1
 	end,
 	find_seeds(FM, Sp,Ep, Tail, 1).
 

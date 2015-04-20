@@ -18,14 +18,13 @@
 
 -define(UNDEF,1).
 
--define(THRESHOLD, 20).
 
 t_e() ->
 	eflame:apply(?MODULE, t, [100]).
 
 t(0) -> ok;
 t(N) ->
-	CIGAR = sw(55,100+?THRESHOLD),
+	CIGAR = sw(55,120),
 	case CIGAR of
 		no_match -> ok;
 		_ -> io:format("~p~n",[CIGAR])
@@ -47,17 +46,15 @@ rand_seq(Acc,N) ->
 
 
 
-sw([_|_]=Qseq,[_|_]=Ref) when length(Qseq) > length(Ref) -> no_match;
 sw([_|_]=Qseq,[_|_]=Ref) ->
 	%io:format("Seq: ~p~n",[Qseq]),
 	%io:format("Ref: ~p~n",[Ref]),
-	
+	Lq = length(Qseq),
+
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	case build_tab(Tab0,Ref,Qseq,0,0) of
-		low_score -> no_match;
-		CIGAR -> CIGAR
-	end;
+	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 2));
+
 
 sw(N1,N2) when N1 =< N2 -> 
 	random:seed(),
@@ -67,16 +64,15 @@ sw(_,_) -> no_match.
 
 
 
-build_tab(_,_,_,V1max,Vpmax) when Vpmax-V1max >= ?THRESHOLD -> low_score;
-build_tab(Tab,Ref,[S|Qseq],_,Vpmax) -> % Vs1, Vs2 - starting scores for the previous and curr rows
-	%io:format("Vm:~p, Vpmax:~p~n",[V1max,Vpmax]),
-	[[{V,Dir}|FirstCol]|Tab1] = Tab,
-	V1 = case Vpmax of
-		0 -> V+?GAP_PENALTY;
+build_tab(_,_,_,V1max,Vthr) when V1max < Vthr -> no_match;
+build_tab([[{V,Dir}|FirstCol]|Tab1],Ref,[S|Qseq],_,Vthr) -> % Vs1, Vs2 - starting scores for the previous and curr rows
+	V1 = case FirstCol of
+		[] -> V+?GAP_PENALTY;
 		_ -> V+?GAP_EXT_PENALTY
 	end,
 	{V2max,Tab2} = add_row2tab(Tab1,Ref,S,[[{V1,up},{V,Dir}|FirstCol]], V1), % Gap = Insertion
-	build_tab(Tab2,Ref,Qseq,V2max,Vpmax+?MATCH);
+	
+	build_tab(Tab2,Ref,Qseq,V2max,Vthr+?MATCH);
 build_tab(Tab,_,[],Vmax,_) -> 
 	%io:format("Tab:~n~p~n",[Tab]),
 	get_CIGAR(Tab,Vmax).

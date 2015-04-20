@@ -10,7 +10,7 @@
 		]).
 
 -define(TOLERANCE,10).
--define(MIN_LEN,11). % a minimal length of the string that should be matched
+-define(MIN_LEN,9). % a minimal length of the string that should be matched
 
 
 
@@ -54,20 +54,20 @@ get_similar(0, _) -> [];
 get_similar(1, _) -> [];
 get_similar(Qty, Ls) -> 
 	[P1|Ls1] = lists:sort(Ls),
-	get_similar(2+Qty div 5, Ls1, P1, 1, [], ?TOLERANCE).
+	get_similar(2+Qty div 5, Ls1, P1, 1, 0,[], ?TOLERANCE).
 
-get_similar(N, [P2|Ls], P1, Count, Acc, Tol) when P2-P1 =< Tol ->
-	get_similar(N, Ls, P2, Count+1, Acc, Tol);
-get_similar(N, [P2|Ls], P1, Count, Acc, Tol) when Count >= N ->
+get_similar(N, [P2|Ls], P1, Count, Dist, Acc, Tol) when P2-P1 =< Tol ->
+	get_similar(N, Ls, P2, Count+1, Dist+P2-P1, Acc, Tol);
+get_similar(N, [P2|Ls], P1, Count, Dist, Acc, Tol) when Count >= N ->
+	%io:format("Seed distance:~p~n",[Dist]),
+	get_similar(N, Ls, P2, 1, 0, [{P1,Dist}|Acc], Tol);
+get_similar(N, [P2|Ls],_,_,_,Acc,Tol) ->
+	get_similar(N, Ls, P2, 1, 0, Acc, Tol);
+get_similar(N, [], P1, Count, Dist, Acc,_) when Count >= N -> 
 	%io:format("Qty:~p~n",[Count]),
-	get_similar(N, Ls, P2, 1, [P1|Acc], Tol);
-get_similar(N, [P2|Ls],_,_,Acc,Tol) ->
-	get_similar(N, Ls, P2, 1, Acc, Tol);
-get_similar(N, [], P1, Count, Acc,_) when Count >= N -> 
-	%io:format("Qty:~p~n",[Count]),
-	[P1|Acc];
-get_similar(_,[],_,_,[],_) -> [];
-get_similar(_,[],_,_,Acc,_) -> 
+	[{P1,Dist}|Acc];
+get_similar(_,[],_,_,_,[],_) -> [];
+get_similar(_,[],_,_,_,Acc,_) -> 
 	io:format("Similar: ~p~n",[Acc]),
 	Acc.
 
