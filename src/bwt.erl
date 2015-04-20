@@ -107,6 +107,7 @@ get_ref(Chrom,Pos,Len) ->
 	File = filename:join(BwtFiles, Chrom++".ref"),
 	{ok,Dev} = file:open(File,read),
 	{ok,Ref} = file:pread(Dev, Pos, Len),
+	ok = file:close(Dev),
 	binary_to_term(Ref).
 
 
