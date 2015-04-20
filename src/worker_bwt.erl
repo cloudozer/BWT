@@ -7,107 +7,99 @@
 
 
 -module(worker_bwt).
--behaviour(gen_server).
+-behaviour(gen_fsm).
+%% State names: idle, seeding, aligning
 
--export([start_link/0, start_link/1]).
--export([init/1, terminate/2, handle_info/2, handle_cast/2]).
--export([workload_supplier_loop/4]).
+-export([start_link/0, start_link/1, run_seeding/2]).
+-export([init/1, terminate/3, handle_info/3, idle/2]).
+-export([workload_buffer_loop/4, seeder_loop/5]).
 
 -include("bwt.hrl").
 
 %% api
+
 start_link() ->
-  gen_server:start_link(?MODULE, {}, []).
+  gen_fsm:start_link(?MODULE, {}, []).
 
 start_link(MasterPid) ->
-  {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
+  {ok, Pid} = gen_fms:start_link(?MODULE, {}, []),
   ok = master:register_workers(MasterPid, [Pid]),
   {ok, Pid}.
 
+run_seeding(Pid, MasterPid) ->
+  gen_fsm:send_event(Pid, {run_seeding, MasterPid}).
+
 %% callbacks
 
--record(state, {busy=false, master, fms=[], supplier, waterline=5}).
+-record(state, {master, slave}).
 
 init(_) ->
-  {ok, #state{}}.
+  {ok, idle, #state{}}.
 
-terminate(Reason, State) ->
-  lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
+terminate(Reason, State, State) ->
+  lager:error("A worker is terminated: ~p ~p~n~p", [State, Reason, State]).
 
-%% The slave is finished
-handle_info({'DOWN',_Ref,process,_Pid,normal}, S=#state{}) ->
-  {noreply, S}.
+handle_info({'DOWN', _Ref, process, SlavePid, normal}, _StateName, #state{slave = SlavePid}) ->
+  {next_state, init, #state{}}.
 
-handle_cast({run, MasterPid}, S=#state{busy=false, fms=FMs, supplier=undefined, waterline=Waterline}) ->
-  SuppilerPid = spawn_link(?MODULE, workload_supplier_loop, [MasterPid, Waterline, [], false]),
-  {ok, Workload} = get_workload(SuppilerPid),
-  FMs1 = run_workload(Workload, FMs),
-  {noreply, S#state{busy = true, master = MasterPid, fms = FMs1, supplier = SuppilerPid}};
-
-%% a cast from the slave
-handle_cast({results, Results}, S = #state{busy = true, master=MasterPid, fms = FMs, supplier = SuppilerPid}) ->
-  %% retranslate the results to the master
-  gen_server:cast(MasterPid, {results, Results, self()}),
-  %% start next workload
-  case get_workload(SuppilerPid) of
-    {ok, Workload} ->
-      FMs1 = run_workload(Workload, FMs),
-      {noreply, S#state{fms = FMs1}};
-    eof ->
-      {noreply, #state{}}
-  end.
+idle({run_seeding, MasterPid}, S=#state{slave = undefined}) ->
+  BufferWaterline = 5,
+  WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, BufferWaterline, [], false]),
+  {ok, Workload} = get_workload(WorkloadBufPid),
+  SlavePid = spawn_link(?MODULE, seeder_loop, [MasterPid, self(), WorkloadBufPid, Workload, []]),
+  erlang:monitor(process, SlavePid),
+  {next_state, seeding, S#state{master = MasterPid, slave = SlavePid}}.
 
 %% private
 
-run_workload(Workload, FMs) ->
+seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload, FMs) ->
   {{fmindex, {chromosome, ChromoName}}, {fastq, QseqList}} = Workload,
-  {FM, FMs1} =
+  {{Meta, FM}, FMs1} =
     case proplists:get_value(ChromoName, FMs) of
       undefined ->
-        FM = bwt:get_index(ChromoName),
-        {FM, [{ChromoName, FM}]};
-      FM ->
-        {FM, FMs}
+        MetaFM = bwt:get_index(ChromoName),
+        {MetaFM, [{ChromoName, MetaFM}]};
+      MetaFM ->
+        {MetaFM, FMs}
     end,
-  _SlaveRef = spawn_slave(FM, QseqList),
-  FMs1.
 
-spawn_slave({Meta,FM}, QseqList) ->
-  WorkerPid = self(),
   {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
-  
-  SlavePid = spawn_link(fun() ->
-    Results = lists:foldl(
-      fun(Qseq,Acc) ->
-        case sga:sga(FM,Pc,Pg,Pt,Qseq) of
-          [] -> Acc;
-          R -> [R|Acc]
-        end
-      end, [], QseqList),
-    lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
-    gen_server:cast(WorkerPid, {results, Results})
-  end),
-  erlang:monitor(process, SlavePid).
 
-%% TODO several at time
-workload_supplier_loop(MasterPid, Waterline, WorkloadList, false) when Waterline > length(WorkloadList) ->
+  Results = lists:foldl(
+    fun(Qseq,Acc) ->
+      case sga:sga(FM,Pc,Pg,Pt,Qseq) of
+        [] -> Acc;
+        R -> [R|Acc]
+      end
+    end, [], QseqList),
+  lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
+  gen_server:cast(MasterPid, {results, Results, WorkerPid}),
+
+  case get_workload(WorkloadBufPid) of
+    {ok, Workload1} ->
+      seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs1);
+    eof ->
+      stop
+  end.
+
+workload_buffer_loop(MasterPid, Waterline, WorkloadList, false) when Waterline > length(WorkloadList) ->
   case gen_server:call(MasterPid, get_workload) of
     {ok, Workload} ->
-      workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList], false);
+      workload_buffer_loop(MasterPid, Waterline, [Workload | WorkloadList], false);
     eof ->
-      workload_supplier_loop(MasterPid, Waterline, WorkloadList, eof)
+      workload_buffer_loop(MasterPid, Waterline, WorkloadList, eof)
   end;
-workload_supplier_loop(MasterPid, Waterline, [Workload | WorkloadList], EOF) ->
+workload_buffer_loop(MasterPid, Waterline, [Workload | WorkloadList], EOF) ->
   receive
     {get_workload, Pid} ->
       Pid ! {ok, Workload},
-      workload_supplier_loop(MasterPid, Waterline, WorkloadList, EOF)
+      workload_buffer_loop(MasterPid, Waterline, WorkloadList, EOF)
   end;
-workload_supplier_loop(MasterPid, Waterline, [], eof) ->
+workload_buffer_loop(_MasterPid, _Waterline, [], eof) ->
   receive
     {get_workload, Pid} ->
       Pid ! eof,
-      workload_supplier_loop(MasterPid, Waterline, [], eof)
+      stop
   end.
 
 get_workload(SupplierPid) ->

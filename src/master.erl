@@ -1,7 +1,7 @@
 -module(master).
 -behaviour(gen_server).
 
--export([start_link/1, register_workers/2]).
+-export([start_link/1, register_workers/2, run/2]).
 -export([test/0]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
 
@@ -12,6 +12,11 @@ start_link(Args) ->
 
 register_workers(MasterPid, Pids) ->
   gen_server:call(MasterPid, {register_workers, Pids}).
+
+run(Pid, SeqFileName) ->
+  gen_server:call(Pid, {run, SeqFileName}, infinity).
+
+%% test
 
 test() ->
   lager:start(),
@@ -26,7 +31,7 @@ test() ->
   ok = master:register_workers(MPid, Pids),
   %% Tell the master to run
   SeqFileName = "bwt_files/SRR770176_1.fastq",
-  ok = gen_server:call(MPid, {run, SeqFileName}, infinity).
+  ok = ?MODULE:run(MPid, SeqFileName).
 
 %% gen_server callbacks
 
@@ -47,7 +52,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
   lists:foreach(fun(Pid)->monitor(process, Pid) end, Pids),
   S1 = S#state{workers=Pids++Workers},
-  lager:info("Worker got ~b workers", [length(S1#state.workers)]),
+  lager:info("The master got ~b workers", [length(S1#state.workers)]),
   %S2 = if S#state.running == true ->
   %  %% assing tasks to the workers
   %  schedule(S1);
@@ -74,7 +79,7 @@ handle_call(get_workload, _From, S = #state{fastq={_, FqDev}}) ->
 handle_cast(schedule, State) ->
   {noreply, schedule(State)};
 handle_cast({results, Results, Pid}, S=#state{running=true, result_size = ResSize}) ->
-  lager:info("master got results ~p. total: ~p", [Results, ResSize + length(Results)]),
+  lager:info("The master got results ~p. total: ~p", [Results, ResSize + length(Results)]),
   gen_server:cast(self(), schedule),
   {noreply, S#state{result_size = ResSize + length(Results)}}.
 
@@ -83,6 +88,6 @@ handle_cast({results, Results, Pid}, S=#state{running=true, result_size = ResSiz
 schedule(S=#state{workers=[]}) ->
   S#state{workers=[]};
 schedule(S=#state{workers=Workers}) ->
-  lists:foreach(fun(Pid) -> gen_server:cast(Pid, {run, self()}) end, Workers),
+  lists:foreach(fun(Pid) -> worker_bwt:run_seeding(Pid, self()) end, Workers),
   S#state{workers=[]}.
 
