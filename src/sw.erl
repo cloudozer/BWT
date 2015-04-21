@@ -12,6 +12,7 @@
 		rand_seq/1]).
 
 -define(MATCH,2).
+-define(UNKNOWN,1).
 -define(MISMATCH,-1).
 -define(GAP_PENALTY,-2).
 -define(GAP_EXT_PENALTY,0).
@@ -156,8 +157,10 @@ get_str(N,Dir) ->
  
 
 
-sigma(S,S) -> ?MATCH;
-sigma(_,$N) -> ?MATCH;
+sigma($N,$N)-> ?UNKNOWN;
+sigma(S,S)  -> ?MATCH;
+sigma($N,_) -> ?UNKNOWN;
+sigma(_,$N) -> ?UNKNOWN;
 
 sigma($A,$R) -> ?MATCH;
 sigma($G,$R) -> ?MATCH;
