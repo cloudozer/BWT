@@ -80,7 +80,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, ChromoN
       stop
   end;
 
-slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}}, {fastq, undefined}, {seeds, Seeds}}, FMs, Refs) ->
+slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}}, {seeds, Seeds}}, FMs, Refs) ->
 
   {Ref_bin, Refs1} =
     case proplists:get_value(Chromosome, Refs) of
@@ -92,12 +92,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}
         {Ref_bin, Refs}
     end,
 
-  Seeds1 = lists:merge(Seeds),
-
-  lists:foreach(fun({SeqName, Seeds2}) ->
-
-%%     Qsec = fastq:get_value(SeqName, "bwt_files/SRR770176_1.fastq"),
-    Qsec = "GGAAGAGAGGGAGACACAGGAGAAGAGAGGTCAGTCGTCAGATCGGAAGAGCACACGTCTGAACTCCAGTCACCGATGTATCTCGTATGCCGTCTTCTGCTTGAAAAAAAAAAACAAAACCACACACACACACACTCACCCTTCCCCCTTA",
+  lists:foreach(fun({{SeqName, Qsec}, Seeds1}) ->
 
     lists:foreach(fun({S,D}) ->
 
@@ -110,7 +105,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}
 %%       lager:info("Reference: ~p",[Ref]),
 %%       lager:info("Query seq: ~p",[Qsec]),
 
-      Cigar = no_match, % = sw:sw(Qsec,Ref),
+      Cigar = sw:sw(Qsec,Ref),
 
 %%       lager:info("Cigar: ~p", [Cigar]),
 
@@ -119,9 +114,9 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}
         true -> ok
       end
 
-    end, Seeds2)
+    end, Seeds1)
 
-  end, Seeds1),
+  end, Seeds),
 
   case get_workload(WorkloadBufPid) of
     {ok, Workload1} ->
