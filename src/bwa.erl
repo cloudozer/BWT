@@ -39,7 +39,7 @@ find_seeds(FM, Pc,Pg,Pt, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 		$T -> Sp = Pt, Ep = size(FM);
 		%% TODO: handle N symbols
 		$N ->
-			io:format("N found in fasq seq~n"),  
+%% 			io:format("N found in fasq seq~n"),
 			Sp = 2, Ep = Pc-1
 	end,
 	find_seeds(FM, Sp,Ep, Tail, 1).

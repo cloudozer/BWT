@@ -1,5 +1,5 @@
 -module(fastq).
--export([read_seq/1, read_seq/2, fold/3, size/1]).
+-export([read_seq/1, read_seq/2, fold/3, size/1, get_value/2]).
 
 size(FileName) ->
   fastq:fold(fun(_,Acc) -> 1+Acc end, 0, FileName).
@@ -47,4 +47,18 @@ fold_inner(Dev, Fun, Acc) ->
   case fastq:read_seq(Dev) of
     {ok, Seq} -> fold_inner(Dev, Fun, Fun(Seq, Acc));
     eof -> Acc
+  end.
+
+get_value(SeqName, FileName) ->
+  {ok, Dev} = file:open(FileName, [read, raw, read_ahead]),
+  Result = get_value_inner(SeqName, Dev),
+  ok = file:close(Dev),
+  Result.
+
+get_value_inner(SeqName, Dev) ->
+  case read_seq(Dev) of
+    {ok, {SeqName1, SeqValue}} when SeqName1 == SeqName ->
+      SeqValue;
+    {ok, _} ->
+      get_value_inner(SeqName, Dev)
   end.

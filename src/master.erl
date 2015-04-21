@@ -35,7 +35,7 @@ test() ->
 
 %% gen_server callbacks
 
--record(state, {running=false, workers=[], tasks=[], fastq, result_size=0}).
+-record(state, {running=false, workers=[], tasks=[], fastq, result_size=0, seeds = []}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -64,24 +64,37 @@ handle_call({run, FastqFileName}, _From, S=#state{running=false, workers=Workers
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   S1 = schedule(S#state{fastq={FastqFileName, FastqDev}, running=true}),
   {reply, ok, S1};
-handle_call(get_workload, _From, S = #state{fastq={_, FqDev}}) ->
-  N = 1000,
-  case fastq:read_seq(FqDev, N) of
-    {_, SeqList} ->
-      FmIndex = {fmindex, {chromosome, "GL000192.1"}},
-      Queries = lists:map(fun({_,Q}) -> Q end, SeqList),
-      Workload = {FmIndex, {fastq, Queries}},
-      {reply, {ok, Workload}, S};
-    eof ->
-      {reply, eof, S}
+handle_call({get_workload, Pid}, _From, S = #state{fastq = {_, FqDev}, seeds = SeedsList}) ->
+  %% Refactor this
+  Chromosome = "GL000192.1",
+  case proplists:get_all_values(Pid, SeedsList) of
+    [] ->
+      N = 1000,
+      case fastq:read_seq(FqDev, N) of
+        {_, SeqList} ->
+          FmIndex = {fmindex, {chromosome, Chromosome}},
+          Workload = {FmIndex, {fastq, SeqList}},
+          {reply, {ok, Workload}, S};
+        eof ->
+          %% Change this
+          {reply, eof, S}
+      end;
+    Seeds ->
+      Workload = {{ref, {chromosome, Chromosome}}, {seeds, Seeds}},
+      {reply, {ok, Workload}, S#state{seeds = proplists:delete(Pid, SeedsList)}}
   end.
 
 handle_cast(schedule, State) ->
   {noreply, schedule(State)};
-handle_cast({results, Results, Pid}, S=#state{running=true, result_size = ResSize}) ->
+
+handle_cast({results, Results, Pid}, S=#state{running=true, seeds = SeedsList, result_size = ResSize}) ->
   lager:info("The master got results ~p. total: ~p", [Results, ResSize + length(Results)]),
   gen_server:cast(self(), schedule),
-  {noreply, S#state{result_size = ResSize + length(Results)}}.
+  {noreply, S#state{seeds = [{Pid, Results} | SeedsList], result_size = ResSize + length(Results)}};
+
+handle_cast({cigar, SeqName, Cigar}, State) ->
+  lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
+  {noreply, State}.
 
 %% private
 
