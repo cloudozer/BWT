@@ -7,52 +7,50 @@
 
 
 -module(worker_bwt).
--behaviour(gen_fsm).
-%% State names: idle, seeding, aligning
+-behaviour(gen_server).
 
--export([start_link/0, start_link/1, run_seeding/2]).
--export([init/1, terminate/3, handle_info/3, idle/2]).
--export([workload_buffer_loop/5, seeder_loop/5]).
+-export([start_link/0, start_link/1, run/2]).
+-export([init/1, terminate/2, handle_info/2, handle_cast/2]).
+-export([workload_buffer_loop/5, slave_loop/6]).
 
 -include("bwt.hrl").
 
 %% api
 
 start_link() ->
-  gen_fsm:start_link(?MODULE, {}, []).
+  gen_server:start_link(?MODULE, {}, []).
 
 start_link(MasterPid) ->
-  {ok, Pid} = gen_fms:start_link(?MODULE, {}, []),
+  {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
   ok = master:register_workers(MasterPid, [Pid]),
   {ok, Pid}.
 
-run_seeding(Pid, MasterPid) ->
-  gen_fsm:send_event(Pid, {run_seeding, MasterPid}).
+run(Pid, MasterPid) ->
+  gen_server:cast(Pid, {run, MasterPid}).
 
 %% callbacks
 
 -record(state, {master, slave}).
 
 init(_) ->
-  {ok, idle, #state{}}.
+  {ok, #state{}}.
 
-terminate(Reason, State, State) ->
-  lager:error("A worker is terminated: ~p ~p~n~p", [State, Reason, State]).
+terminate(Reason, State) ->
+  lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
-handle_info({'DOWN', _Ref, process, SlavePid, normal}, _StateName, #state{slave = SlavePid}) ->
-  {next_state, init, #state{}}.
+handle_info({'DOWN', _Ref, process, SlavePid, normal}, #state{slave = SlavePid}) ->
+  {noreply, #state{}}.
 
-idle({run_seeding, MasterPid}, S=#state{slave = undefined}) ->
-  BufferWaterline = 5,
-  WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), BufferWaterline, [], false]),
+handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
+  WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), 5, [], beg_forever]),
   {ok, Workload} = get_workload(WorkloadBufPid),
-  SlavePid = spawn_link(?MODULE, seeder_loop, [MasterPid, self(), WorkloadBufPid, Workload, []]),
+  SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), WorkloadBufPid, Workload, [], []]),
   erlang:monitor(process, SlavePid),
-  {next_state, seeding, S#state{master = MasterPid, slave = SlavePid}}.
+  {noreply, S#state{master = MasterPid, slave = SlavePid}}.
 
 %% private
 
-seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, ChromoName}}, {fastq, QseqList}}, FMs) ->
+slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, ChromoName}}, {fastq, QseqList}}, FMs, Refs) ->
   {{Meta, FM}, FMs1} =
     case proplists:get_value(ChromoName, FMs) of
       undefined ->
@@ -64,7 +62,7 @@ seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, Chromo
 
   {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
 
-  Results = lists:foldl(
+  Seeds = lists:foldl(
     fun({QSeqName,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Qseq) of
         [] -> Acc;
@@ -72,40 +70,49 @@ seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, Chromo
       end
     end, [], QseqList),
   lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
-  gen_server:cast(MasterPid, {results, Results, WorkerPid}),
+  gen_server:cast(MasterPid, {seeds, Seeds}),
 
   case get_workload(WorkloadBufPid) of
     {ok, Workload1} ->
-      seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs1);
-    eof ->
+      slave_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs1, Refs);
+    %% TODO: change
+    stop ->
       stop
   end;
 
-seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}}, {seeds, Seeds}}, FMs) ->
+slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}}, {fastq, undefined}, {seeds, Seeds}}, FMs, Refs) ->
 
-  Ref_bin = bwt:get_ref("GL000192.1", 0, 547496),
-  %% Fix this
-  SeqFileName = "bwt_files/SRR770176_1.fastq",
+  {Ref_bin, Refs1} =
+    case proplists:get_value(Chromosome, Refs) of
+      undefined ->
+        {ok, BwtFiles} = application:get_env(bwt,bwt_files),
+        {ok, Ref_bin} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
+        {Ref_bin, [{Chromosome,Ref_bin}|Refs]};
+      Ref_bin ->
+        {Ref_bin, Refs}
+    end,
 
   Seeds1 = lists:merge(Seeds),
 
   lists:foreach(fun({SeqName, Seeds2}) ->
-    Qsec = fastq:get_value(SeqName, SeqFileName),
+
+%%     Qsec = fastq:get_value(SeqName, "bwt_files/SRR770176_1.fastq"),
+    Qsec = "GGAAGAGAGGGAGACACAGGAGAAGAGAGGTCAGTCGTCAGATCGGAAGAGCACACGTCTGAACTCCAGTCACCGATGTATCTCGTATGCCGTCTTCTGCTTGAAAAAAAAAAACAAAACCACACACACACACACTCACCCTTCCCCCTTA",
 
     lists:foreach(fun({S,D}) ->
 
       Ref_len = length(Qsec) + D,
       Start_pos = (S - Ref_len) bsl 3,
-      lager:info("Start pos: ~p~nRef_len: ~p",[Start_pos,Ref_len]),
+%%       lager:info("Start pos: ~p~nRef_len: ~p",[Start_pos,Ref_len]),
 
       <<_:Start_pos,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin,
       Ref = binary_to_list(Ref_seq),
-      lager:info("Reference: ~p",[Ref]),
-      lager:info("Query seq: ~p",[Qsec]),
+%%       lager:info("Reference: ~p",[Ref]),
+%%       lager:info("Query seq: ~p",[Qsec]),
 
-      Cigar = sw:sw(Ref,Qsec),
+      Cigar = no_match, % = sw:sw(Qsec,Ref),
 
-      lager:info("Cigar: ~p", [Cigar]),
+%%       lager:info("Cigar: ~p", [Cigar]),
 
       if Cigar =/= no_match ->
         gen_server:cast(MasterPid, {cigar, SeqName, Cigar});
@@ -118,28 +125,30 @@ seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome
 
   case get_workload(WorkloadBufPid) of
     {ok, Workload1} ->
-      seeder_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs);
-    eof ->
+      slave_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs, Refs1);
+    %% TODO: change
+    stop ->
       stop
   end.
 
-workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, false) when Waterline > length(WorkloadList) ->
-  case gen_server:call(MasterPid, {get_workload, WorkerPid}) of
+workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever) when Waterline > length(WorkloadList) ->
+  case gen_server:call(MasterPid, get_workload) of
     {ok, Workload} ->
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], false);
-    eof ->
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, eof)
+      workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], beg_forever);
+    undefined ->
+      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever)
   end;
-workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], EOF) ->
+workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], NextAction) ->
   receive
     {get_workload, Pid} ->
       Pid ! {ok, Workload},
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, EOF)
+      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, NextAction)
   end;
-workload_buffer_loop(_MasterPid, _WorkerPid, _Waterline, [], eof) ->
+workload_buffer_loop(_MasterPid, _WorkerPid, _Waterline, [], stop) ->
   receive
     {get_workload, Pid} ->
-      Pid ! eof,
+      Pid ! stop,
+      %% TODO: wait for stop signal from the master
       stop
   end.
 
@@ -147,5 +156,5 @@ get_workload(SupplierPid) ->
   SupplierPid ! {get_workload, self()},
   receive
     {ok, W} -> {ok, W};
-    eof -> eof
+    Error -> Error
   end.
