@@ -17,7 +17,7 @@ test(SeqFileName, Chromosome) ->
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  WorkersNum = 2,
+  WorkersNum = 6,
   Pids = lists:map(fun(_) -> {ok, WPid} = worker_bwt:start_link(), WPid end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
   ok = master:register_workers(MPid, Pids),
@@ -74,12 +74,14 @@ handle_call(get_workload, _From, S = #state{fastq = {_, FqDev}, chromosome = Chr
         {reply, undefined, S}
     end;
 
-handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={_, FastqDev}}) ->
+handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}) ->
   {Seeds1, Seeds2} = lists:split(length(Seeds) div length(Workers), Seeds),
 %%   Seeds1 = Seeds,
   Seeds3 = lists:map(fun({SeqName, SeqPos, L}) ->
-    {ok, SeqPos} = file:position(FastqDev, SeqPos),
-    {ok, {SeqName, SeqData}} = fastq:read_seq(FastqDev),
+    {ok, Dev} = file:open(FileName, [read, raw, read_ahead]), 
+    {ok, SeqPos} = file:position(Dev, SeqPos),
+    {ok, {SeqName, SeqData}} = fastq:read_seq(Dev),
+    ok = file:close(Dev),
     {{SeqName, SeqData}, L}
   end, Seeds1),
 %%   lager:info("master sent sw workload: ~p", [Seeds3]),
