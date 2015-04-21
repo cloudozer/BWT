@@ -50,7 +50,7 @@ handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
 
 %% private
 
-slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, ChromoName}}, {fastq, QseqList}}, FMs, Refs) ->
+slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, FMs, Refs) ->
   {{Meta, FM}, FMs1} =
     case proplists:get_value(ChromoName, FMs) of
       undefined ->
@@ -63,10 +63,10 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, ChromoN
   {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
 
   Seeds = lists:foldl(
-    fun({QSeqName,Qseq},Acc) ->
+    fun({QSeqName,QPos,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Qseq) of
         [] -> Acc;
-        ResultsList -> [{QSeqName,ResultsList}|Acc]
+        ResultsList -> [{QSeqName,QPos,ResultsList}|Acc]
       end
     end, [], QseqList),
   lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
@@ -80,7 +80,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{fmindex, {chromosome, ChromoN
       stop
   end;
 
-slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {{ref, {chromosome, Chromosome}}, {seeds, Seeds}}, FMs, Refs) ->
+slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, Refs) ->
 
   {Ref_bin, Refs1} =
     case proplists:get_value(Chromosome, Refs) of

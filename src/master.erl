@@ -68,19 +68,22 @@ handle_call(get_workload, _From, S = #state{fastq = {_, FqDev}, chromosome = Chr
   when length(Workers) > length(Seeds) ->
     case fastq:read_seq(FqDev, SeedWorkPkgSize) of
       {_, SeqList} ->
-        FmIndex = {fmindex, {chromosome, Chromosome}},
-        Workload = {FmIndex, {fastq, SeqList}},
+        Workload = {seed, Chromosome, SeqList},
         {reply, {ok, Workload}, S};
       eof ->
         {reply, undefined, S}
     end;
 
-handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FastqFileName, _}}) ->
+handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={_, FastqDev}}) ->
   {Seeds1, Seeds2} = lists:split(length(Seeds) div length(Workers), Seeds),
 %%   Seeds1 = Seeds,
-  Seeds3 = lists:map(fun({SeqName, L}) -> {{SeqName, fastq:get_value(SeqName, FastqFileName)}, L} end, Seeds1),
-  lager:info("master sent sw workload: ~p", [Seeds3]),
-  Workload = {{ref, {chromosome, Chromosome}}, {seeds, Seeds3}},
+  Seeds3 = lists:map(fun({SeqName, SeqPos, L}) ->
+    {ok, SeqPos} = file:position(FastqDev, SeqPos),
+    {ok, {SeqName, SeqData}} = fastq:read_seq(FastqDev),
+    {{SeqName, SeqData}, L}
+  end, Seeds1),
+%%   lager:info("master sent sw workload: ~p", [Seeds3]),
+  Workload = {sw, Chromosome, Seeds3},
 %%   {reply, {ok, Workload}, S#state{seeds = []}}.
   {reply, {ok, Workload}, S#state{seeds = Seeds2}}.
 
