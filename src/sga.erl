@@ -6,7 +6,8 @@
 -module(sga).
 -export([
 		sga/5,
-		get_seed_ends/4
+		get_seed_ends/4,
+		skip_Ns/1
 		]).
 
 -define(TOLERANCE,10).
@@ -17,22 +18,20 @@
 % performs sw algorithm for a sequence Seq against reference sequence represented by FM-index
 sga(FM,Pc,Pg,Pt,Qseq) -> sga(FM,Pc,Pg,Pt,Qseq,[],0,0).
 sga(FM,Pc,Pg,Pt,Qseq,Acc,Qty,Shift) -> 
-	Qlen = length(Qseq),
-	case Qlen < ?MIN_LEN of
-		true ->
-			%io:format("Seeds: ~p~n",[Acc]),  
-			get_similar(Qty,Acc);
-		_ ->
-			case bwa:find_seeds(FM,Pc,Pg,Pt,Qseq) of
+	case skip_Ns(Qseq) of
+		no_more_subseqs -> get_similar(Qty,Acc);
+		{Skip,Qseq1} ->
+			Qlen = length(Qseq1),
+			case bwa:find_seeds(FM,Pc,Pg,Pt,Qseq1) of
 				no_seeds ->
 					%io:format("Seeds not found~n"),
-					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq,Qlen-?MIN_LEN), Acc, Qty,Shift+?MIN_LEN);
+					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq1,Qlen-?MIN_LEN), Acc, Qty,Shift+?MIN_LEN+Skip);
 				too_many_seeds ->
 					%io:format("Got too many seeds for a subseq: ~p~n",[Qseq]),
-					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq,Qlen-?MIN_LEN),Acc,Qty,Shift+?MIN_LEN);
+					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq1,Qlen-?MIN_LEN),Acc,Qty,Shift+?MIN_LEN+Skip);
 				Seed_ends ->
 					%io:format("~p seeds found: ~p~n",[length(Seed_ends),[S+Shift||S<-Seed_ends]]),
-					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq,Qlen-?MIN_LEN),add_seeds(Seed_ends,Acc,Shift),Qty+1,Shift+?MIN_LEN)					
+					sga(FM,Pc,Pg,Pt,lists:sublist(Qseq1,Qlen-?MIN_LEN),add_seeds(Seed_ends,Acc,Shift+Skip),Qty+1,Shift+?MIN_LEN+Skip)					
 			end
 	end.
 
@@ -65,6 +64,15 @@ get_similar(_,[],_,_,_,Acc,_) ->
 	Acc.
 
 
+% scans from the end. If finds N, cuts the Qseq up to the N and repeats again
+% returns new Subseq of len at least MIN_LEN 
+skip_Ns(Qseq) -> skip_Ns(Qseq,lists:reverse(Qseq),1,0).
+
+skip_Ns(Qseq,_,?MIN_LEN,0) -> {0,Qseq};
+skip_Ns(Qseq,_,?MIN_LEN,Skipped) -> {Skipped,lists:sublist(Qseq,length(Qseq)-Skipped)};
+skip_Ns(Qseq,[$N|Ls],J,Skipped) -> skip_Ns(Qseq,Ls,1,Skipped+J);
+skip_Ns(Qseq,[_|Ls],J,Skipped) -> skip_Ns(Qseq,Ls,J+1,Skipped);
+skip_Ns(_,[],_,_) -> no_more_subseqs.
 
 
 % returns a position referenced from the end of the query sequence, which is a good pattern for seeds
