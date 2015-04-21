@@ -17,6 +17,9 @@
 
 find_seeds(_,Sp,Ep,_,?MAX_LEN) when Ep-Sp > ?MAX_RANGE -> too_many_seeds;
 find_seeds(FM,Sp,Ep,_,?MAX_LEN) -> sga:get_seed_ends(FM,Sp,Ep,?MAX_LEN); 
+find_seeds(FM,Sp,Ep,[$N|Qseq],N) -> 
+	%io:format("N found inside Qseq~n"),
+	find_seeds(FM,Sp,Ep,[$A|Qseq],N);
 find_seeds(FM,Sp,Ep,[C2|Qseq],N) ->
 	%io:format("Looking for {~p,~p}~n",[C1,C2]),
 	%io:format("Range:[~p - ~p]~n",[Sp,Ep]),
@@ -39,7 +42,7 @@ find_seeds(FM, Pc,Pg,Pt, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 		$T -> Sp = Pt, Ep = size(FM);
 		%% TODO: handle N symbols
 		$N ->
-			io:format("N found in fasq seq~n"),  
+			%io:format("N found in fasq seq~n"),  
 			Sp = 2, Ep = Pc-1
 	end,
 	find_seeds(FM, Sp,Ep, Tail, 1).
