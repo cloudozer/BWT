@@ -110,7 +110,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 %%       lager:info("Cigar: ~p", [Cigar]),
 
       if Cigar =/= no_match ->
-        gen_server:cast(MasterPid, {cigar, SeqName, Cigar});
+        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar});
         true -> ok
       end
 
@@ -131,7 +131,7 @@ workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever)
     {ok, Workload} ->
       workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], beg_forever);
     undefined ->
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever)
+      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, stop)
   end;
 workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], NextAction) ->
   receive

@@ -8,16 +8,18 @@
 %% test
 
 test() ->
-  test("bwt_files/SRR770176_1.fastq", "GL000192.1").
+%%   test("bwt_files/SRR770176_1.fastq", "GL000192.1").
+  test("bwt_files/SRR770176_1.fastq", "GL000193.1").
 
 test(SeqFileName, Chromosome) ->
   lager:start(),
+  lager:set_loglevel(lager_console_backend, error),
   ok = application:start(bwt),
 
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  WorkersNum = 6,
+  WorkersNum = 3,
   Pids = lists:map(fun(_) -> {ok, WPid} = worker_bwt:start_link(), WPid end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
   ok = master:register_workers(MPid, Pids),
@@ -99,6 +101,7 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
   gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
-handle_cast({cigar, SeqName, Cigar}, State) ->
+handle_cast({cigar, {SeqName, SeqValue}, Cigar = {_, CigarValue}}, State = #state{chromosome = Chromosome}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
+  io:format("~s      ~s      ~s      ~s~n", [SeqName, Chromosome, CigarValue, SeqValue]),
   {noreply, State}.
