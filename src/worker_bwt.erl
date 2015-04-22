@@ -94,7 +94,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 
   lists:foreach(fun({{SeqName, Qsec}, Seeds1}) ->
 
-    lists:foreach(fun({S,D}) ->
+    Cigars = lists:foldl(fun({S,D}, Acc) ->
 
       Ref_len = length(Qsec) + D,
       Start_pos = (S - Ref_len) bsl 3,
@@ -109,12 +109,21 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 
 %%       lager:info("Cigar: ~p", [Cigar]),
 
-      if Cigar =/= no_match ->
-        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar, S - Ref_len});
-        true -> ok
+      case Cigar of
+        no_match -> Acc;
+        C -> [{C,S - Ref_len} | Acc]
       end
 
-    end, Seeds1)
+    end, [],  Seeds1),
+
+  case Cigars of
+    [] -> ok;
+    [{Cigar,P}] ->
+      gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar, P});
+    _ ->
+      [{TopCigar,P} | _] = lists:sort(fun({{R1,_},_}, {{R2,_},_}) -> R1 > R2 end, Cigars), 
+      gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, TopCigar, P})
+  end
 
   end, Seeds),
 
