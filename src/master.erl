@@ -19,7 +19,7 @@ test(SeqFileName, Chromosome) ->
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  WorkersNum = 3,
+  WorkersNum = 6,
   Pids = lists:map(fun(_) -> {ok, WPid} = worker_bwt:start_link(), WPid end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
   ok = master:register_workers(MPid, Pids),
@@ -101,7 +101,7 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
   gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
-handle_cast({cigar, {SeqName, SeqValue}, Cigar = {_, CigarValue}, Pos}, State = #state{chromosome = Chromosome}) ->
+handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
-  io:format("~s      ~s      ~b      ~s      ~s~n", [SeqName, Chromosome, Pos, CigarValue, SeqValue]),
+  io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue]),
   {noreply, State}.
