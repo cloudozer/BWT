@@ -101,7 +101,7 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
   gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
-handle_cast({cigar, {SeqName, SeqValue}, Cigar = {_, CigarValue}}, State = #state{chromosome = Chromosome}) ->
+handle_cast({cigar, {SeqName, SeqValue}, Cigar = {_, CigarValue}, Pos}, State = #state{chromosome = Chromosome}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
-  io:format("~s      ~s      ~s      ~s~n", [SeqName, Chromosome, CigarValue, SeqValue]),
+  io:format("~s      ~s      ~b      ~s      ~s~n", [SeqName, Chromosome, Pos, CigarValue, SeqValue]),
   {noreply, State}.

@@ -110,7 +110,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 %%       lager:info("Cigar: ~p", [Cigar]),
 
       if Cigar =/= no_match ->
-        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar});
+        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar, Start_pos});
         true -> ok
       end
 
