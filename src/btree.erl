@@ -1,5 +1,5 @@
 % An implementation of b-tree
-% every node contains the left banch, the queue, and e thright branch 
+% every node contains the left branch, the queue, and e thright branch 
 % 
 % Cloudozer(c), 2015
 %
