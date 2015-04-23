@@ -1,0 +1,13 @@
+{application, master,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+      	          bwt
+                 ]},
+  {mod, { master_app, []}},
+  {env, []}
+ ]}.
