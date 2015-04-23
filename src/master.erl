@@ -77,19 +77,16 @@ handle_call(get_workload, _From, S = #state{fastq = {_, FqDev}, chromosome = Chr
     end;
 
 handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}) ->
-  {Seeds1, Seeds2} = lists:split(length(Seeds) div length(Workers), Seeds),
-%%   Seeds1 = Seeds,
-  Seeds3 = lists:map(fun({SeqName, SeqPos, L}) ->
+  Seeds1 = lists:map(fun({SeqName, SeqPos, L}) ->
     {ok, Dev} = file:open(FileName, [read, raw, read_ahead]), 
     {ok, SeqPos} = file:position(Dev, SeqPos),
     {ok, {SeqName, SeqData}} = fastq:read_seq(Dev),
     ok = file:close(Dev),
     {{SeqName, SeqData}, L}
-  end, Seeds1),
-%%   lager:info("master sent sw workload: ~p", [Seeds3]),
-  Workload = {sw, Chromosome, Seeds3},
-%%   {reply, {ok, Workload}, S#state{seeds = []}}.
-  {reply, {ok, Workload}, S#state{seeds = Seeds2}}.
+  end, Seeds),
+  %lager:info("master sent sw workload: ~p", [Seeds1]),
+  Workload = {sw, Chromosome, Seeds1},
+  {reply, {ok, Workload}, S#state{seeds = []}}.
 
 
 handle_cast(schedule, State) ->
@@ -97,7 +94,7 @@ handle_cast(schedule, State) ->
   {noreply, State};
 
 handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}) ->
-  lager:info("Master got seeds ~p. total: ~p", [Results, ResSize + length(Results)]),
+  lager:info("Total 'results': ~p", [ResSize + length(Results)]),
   gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
@@ -106,4 +103,11 @@ handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 260 ->
 handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
   io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue]),
-  {noreply, State}.
+  {noreply, State};
+
+handle_cast({done, LastPid}, S=#state{workers = [LastPid]}) ->
+  lager:info("last worker done"),
+  {stop, normal, S};
+handle_cast({done, Pid}, S = #state{workers = Workers}) ->
+  lager:info("worker ~p done", [Pid]),
+  {noreply, S#state{workers = lists:delete(Pid, Workers)}}.

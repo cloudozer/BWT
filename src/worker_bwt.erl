@@ -38,7 +38,8 @@ init(_) ->
 terminate(Reason, State) ->
   lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
-handle_info({'DOWN', _Ref, process, SlavePid, normal}, #state{slave = SlavePid}) ->
+handle_info({'DOWN', _Ref, process, SlavePid, normal}, #state{slave = SlavePid, master = MasterPid}) ->
+  gen_server:cast(MasterPid, {done, self()}),
   {noreply, #state{}}.
 
 handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
