@@ -1,7 +1,7 @@
 -module(master).
 -behaviour(gen_server).
 
--export([start_link/1, start_link/0, register_workers/2, run/3]).
+-export([start_link/1, start_link/0, register_workers/2, run/4]).
 -export([test/0, test/2]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
 
@@ -25,7 +25,7 @@ test(SeqFileName, Chromosome) ->
   ok = master:register_workers(MPid, Pids),
   %% Tell the master to run
 
-  ok = ?MODULE:run(MPid, SeqFileName, Chromosome).
+  ok = ?MODULE:run(MPid, SeqFileName, Chromosome, WorkersNum).
 
 %% api
 
@@ -38,8 +38,8 @@ start_link(Args) ->
 register_workers(MasterPid, Pids) ->
   gen_server:call(MasterPid, {register_workers, Pids}).
 
-run(Pid, SeqFileName, Chromosome) ->
-  gen_server:call(Pid, {run, SeqFileName, Chromosome}, infinity).
+run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
+  gen_server:call(Pid, {run, SeqFileName, Chromosome, WorkersLimit}, infinity).
 
 %% gen_server callbacks
 
@@ -64,10 +64,12 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   lager:info("The master got ~b workers", [length(S1#state.workers)]),
   {reply, ok, S1};
 
-handle_call({run, FastqFileName, Chromosome}, _From, S=#state{workers=Workers}) when length(Workers) > 0 ->
+handle_call({run, FastqFileName, Chromosome, WorkersLimit}, _From, S=#state{workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
-  lists:foreach(fun(Pid) -> worker_bwt:run(Pid, self()) end, Workers),
-  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome}};
+  {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
+  lists:foreach(fun(Pid) -> worker_bwt:run(Pid, self()) end, Workers1),
+  %% TODO: demonitor the rest
+  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1}};
 
 handle_call(get_workload, _From, S = #state{fastq = {_, FqDev}, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize})
   when length(Workers) > length(Seeds) ->
