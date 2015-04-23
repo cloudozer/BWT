@@ -110,9 +110,9 @@ handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, 
   io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue]),
   {noreply, State};
 
-handle_cast({done, LastPid}, S=#state{workers = [LastPid]}) ->
+handle_cast({done, LastPid}, S=#state{workers = [LastPid], seeds = []}) ->
   lager:info("last worker done"),
   {stop, normal, S};
-handle_cast({done, Pid}, S = #state{workers = Workers}) ->
+handle_cast({done, Pid}, S = #state{workers = Workers, seeds = []}) ->
   lager:info("worker ~p done", [Pid]),
   {noreply, S#state{workers = lists:delete(Pid, Workers)}}.
