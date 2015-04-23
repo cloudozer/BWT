@@ -59,7 +59,7 @@ handle_info({'DOWN',_Ref,process,_Pid,normal}, State) ->
 
 handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
-  lists:foreach(fun(Pid)->monitor(process, Pid) end, Pids),
+  lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
   S1 = S#state{workers=Pids++Workers},
   lager:info("The master got ~b workers", [length(S1#state.workers)]),
   {reply, ok, S1};
@@ -81,7 +81,8 @@ handle_call(get_workload, _From, S = #state{fastq = {FqFileName, FqDev}, chromos
         Workload = {seed, Chromosome, SeqList},
         {reply, {ok, Workload}, S};
       eof ->
-        {reply, undefined, S#state{fastq = {FqFileName,done}}}
+%        {reply, undefined, S#state{fastq = {FqFileName,done}}}
+        {reply, undefined, S}
     end;
 
 handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}) ->
@@ -113,9 +114,9 @@ handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, 
   io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue]),
   {noreply, State};
 
-handle_cast({done, LastPid}, S=#state{workers = [LastPid]}) ->
+handle_cast({done, LastPid}, S=#state{workers = [LastPid], seeds = []}) ->
   lager:info("last worker done"),
   {stop, normal, S};
-handle_cast({done, Pid}, S = #state{workers = Workers}) ->
+handle_cast({done, Pid}, S = #state{workers = Workers, seeds = []}) ->
   lager:info("worker ~p done", [Pid]),
   {noreply, S#state{workers = lists:delete(Pid, Workers)}}.
