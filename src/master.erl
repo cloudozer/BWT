@@ -1,7 +1,7 @@
 -module(master).
 -behaviour(gen_server).
 
--export([start_link/1, register_workers/2, run/3]).
+-export([start_link/1, start_link/0, register_workers/2, run/3]).
 -export([test/0, test/2]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
 
@@ -29,8 +29,11 @@ test(SeqFileName, Chromosome) ->
 
 %% api
 
+start_link() ->
+  gen_server:start_link({local, master}, ?MODULE, {}, []).
+
 start_link(Args) ->
-  gen_server:start_link(?MODULE, Args, []).
+  gen_server:start_link({local, master}, ?MODULE, Args, []).
 
 register_workers(MasterPid, Pids) ->
   gen_server:call(MasterPid, {register_workers, Pids}).
