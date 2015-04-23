@@ -71,14 +71,17 @@ handle_call({run, FastqFileName, Chromosome, WorkersLimit}, _From, S=#state{work
   %% TODO: demonitor the rest
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1}};
 
-handle_call(get_workload, _From, S = #state{fastq = {_, FqDev}, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize})
+handle_call(get_workload, _From, S = #state{fastq = {_, done}, seeds = []}) ->
+  {reply, stop, S};
+
+handle_call(get_workload, _From, S = #state{fastq = {FqFileName, FqDev}, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize})
   when length(Workers) > length(Seeds) ->
     case fastq:read_seq(FqDev, SeedWorkPkgSize) of
       {_, SeqList} ->
         Workload = {seed, Chromosome, SeqList},
         {reply, {ok, Workload}, S};
       eof ->
-        {reply, undefined, S}
+        {reply, undefined, S#state{fastq = {FqFileName,done}}}
     end;
 
 handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}) ->
