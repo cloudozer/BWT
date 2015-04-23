@@ -38,9 +38,9 @@ init(_) ->
 terminate(Reason, State) ->
   lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
-handle_info({'DOWN', _Ref, process, SlavePid, normal}, #state{slave = SlavePid, master = MasterPid}) ->
+handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlavePid, master = MasterPid}) ->
   gen_server:cast(MasterPid, {done, self()}),
-  {noreply, #state{}}.
+  {stop, normal, S}.
 
 handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
   WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), 5, [], beg_forever]),
@@ -141,6 +141,8 @@ workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever)
     {ok, Workload} ->
       workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], beg_forever);
     undefined ->
+      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever);
+    stop ->
       workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, stop)
   end;
 workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], NextAction) ->
