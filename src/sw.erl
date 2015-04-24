@@ -54,7 +54,7 @@ sw([_|_]=Qseq,[_|_]=Ref) ->
 
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 2));
+	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 5));
 
 
 sw(N1,N2) when N1 =< N2 -> 
