@@ -81,8 +81,8 @@ handle_call(get_workload, _From, S = #state{fastq = {FqFileName, FqDev}, chromos
         Workload = {seed, Chromosome, SeqList},
         {reply, {ok, Workload}, S};
       eof ->
-%        {reply, undefined, S#state{fastq = {FqFileName,done}}}
-        {reply, undefined, S}
+        {reply, undefined, S#state{fastq = {FqFileName,done}}}
+%        {reply, undefined, S}
     end;
 
 handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}) ->
@@ -115,9 +115,9 @@ handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, 
   ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue},
   {noreply, State};
 
-handle_cast({done, LastPid}, S=#state{workers = [LastPid], seeds = []}) ->
+handle_cast({done, LastPid}, S=#state{workers = [LastPid]}) -> %, seeds = []}) ->
   lager:info("last worker done"),
   {stop, normal, S};
-handle_cast({done, Pid}, S = #state{workers = Workers, seeds = []}) ->
+handle_cast({done, Pid}, S = #state{workers = Workers}) -> % , seeds = []}) ->
   lager:info("worker ~p done", [Pid]),
   {noreply, S#state{workers = lists:delete(Pid, Workers)}}.
