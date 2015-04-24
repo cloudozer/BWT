@@ -93,8 +93,8 @@ make_index(Chrom) ->
 	io:format("Maping takes: ~pms~n",[T1]),
 	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
-	FM = fm(Ref_seq1),
-	Meta = [{pointers, get_3_pointers(FM)}],
+	FM = fm(st:append($$,Ref_seq1)),
+	Meta = [{pointers, get_3_pointers(FM)},{shift, Shift}],
 	Bin = term_to_binary({Meta,FM}),
 	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
 
@@ -105,6 +105,7 @@ get_index(Chrom) ->
 	{ok,Bin} = file:read_file(filename:join(BwtFiles, Chrom++".fm")),
 	%{ok,Bin} = file:read_file(filename:join("bwt_files/", Chrom++".fm")),
 	binary_to_term(Bin).
+
 
 
 get_ref(Chrom,Pos,Len) ->
@@ -154,7 +155,7 @@ get_all_permutations(Acc,T,K,N) ->
 %% returns an FM index for a given reference sequence
 fm(X) ->
 	_ = statistics(runtime),
-	Ls = sort_chuncks(get_suffs(X),100000),
+	Ls = st:sa_seq(X),
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
 	%io:format("Sufs:~p~n",[Ls]),
