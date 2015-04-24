@@ -43,7 +43,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0}).
+-record(state, {workers=[], fastq, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -64,12 +64,12 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   lager:info("The master got ~b workers", [length(S1#state.workers)]),
   {reply, ok, S1};
 
-handle_call({run, FastqFileName, Chromosome, WorkersLimit}, _From, S=#state{workers=Workers}) when length(Workers) > 0 ->
+handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
   lists:foreach(fun(Pid) -> worker_bwt:run(Pid, self()) end, Workers1),
   %% TODO: demonitor the rest
-  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1}};
+  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
 
 handle_call(get_workload, _From, S = #state{fastq = {_, done}, seeds = []}) ->
   {reply, stop, S};
@@ -109,9 +109,10 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
 
 handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 260 ->
   {noreply, State};
-handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome}) ->
+handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
   io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue]),
+  ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue},
   {noreply, State};
 
 handle_cast({done, LastPid}, S=#state{workers = [LastPid], seeds = []}) ->
