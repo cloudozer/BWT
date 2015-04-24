@@ -155,11 +155,11 @@ get_all_permutations(Acc,T,K,N) ->
 %% returns an FM index for a given reference sequence
 fm(X) ->
 	_ = statistics(runtime),
-	Ls = st:sa_seq(X),
+	SA = st:sa_seq(X),
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
 	%io:format("Sufs:~p~n",[Ls]),
-	{FM,Dq,Aq,Cq,Gq,Tq} = fm(X,Ls,[],1,[],[],[],[],[]),
+	{FM,Dq,Aq,Cq,Gq,Tq} = fm(X,SA,$$,[],1,[],[],[],[],[]),
 	{_,T3} = statistics(runtime),
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
@@ -169,15 +169,15 @@ fm(X) ->
 
 
 
-fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq) ->
+fm([S|X],[N|SA],P,Acc, K, Dq,Aq,Cq,Gq,Tq) ->
 	case S of
-		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
-		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
-		$G -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq);
-		$T -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq]);
-		$$ -> fm(X,Ls,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq)
+		$A -> fm(X,SA,$A,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
+		$C -> fm(X,SA,$C,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
+		$G -> fm(X,SA,$G,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq);
+		$T -> fm(X,SA,$T,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq]);
+		$$ -> fm(X,SA,$$,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq)
 	end;
-fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq) -> 
+fm([],[],$$,Acc,_, Dq,Aq,Cq,Gq,Tq) -> 
 	{lists:reverse(Acc),
 	lists:reverse(Dq),
 	lists:reverse(Aq),
