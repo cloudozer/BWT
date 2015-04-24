@@ -1,4 +1,4 @@
--module(bwt_app).
+-module(worker_bwt_app_app).
 
 -behaviour(application).
 
@@ -10,7 +10,8 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    bwt_sup:start_link().
+    timer:sleep(5000),
+    worker_bwt_app_sup:start_link().
 
 stop(_State) ->
     ok.

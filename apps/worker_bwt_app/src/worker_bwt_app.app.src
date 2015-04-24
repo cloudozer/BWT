@@ -1,0 +1,13 @@
+{application, worker_bwt_app,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  bwt
+                 ]},
+  {mod, { worker_bwt_app_app, []}},
+  {env, []}
+ ]}.

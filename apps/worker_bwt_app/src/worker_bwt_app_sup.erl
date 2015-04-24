@@ -1,4 +1,4 @@
--module(bwt_sup).
+-module(worker_bwt_app_sup).
 
 -behaviour(supervisor).
 
@@ -23,5 +23,9 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
+    {ok, { {one_for_one, 5, 10}, [
+
+        {worker_bwt, {worker_bwt, start_link, [{master, 'master@45.55.245.14'}]}, permanent, 5000, worker, [worker_bwt]}
+
+    ]} }.
 
