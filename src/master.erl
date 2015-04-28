@@ -81,8 +81,8 @@ handle_call(get_workload, _From, S = #state{fastq = {FqFileName, FqDev}, chromos
         Workload = {seed, Chromosome, SeqList},
         {reply, {ok, Workload}, S};
       eof ->
-        {reply, undefined, S#state{fastq = {FqFileName,done}}}
-%        {reply, undefined, S}
+%        {reply, undefined, S#state{fastq = {FqFileName,done}}}
+        {reply, undefined, S}
     end;
 
 handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}) ->
