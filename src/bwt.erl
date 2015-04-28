@@ -11,7 +11,6 @@
 		make_index/1,
 		get_ref/3,
 		get_index/1,
-		pp/1,
 		test/0
 		]).
 
@@ -94,7 +93,7 @@ make_index(Chrom) ->
 	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
 	FM = fm(st:append($$,Ref_seq1)),
-	Meta = [{pointers, get_3_pointers(FM)},{shift, Shift}],
+	Meta = [{pointers, fmi:get_3_pointers(FM)},{shift, Shift}],
 	Bin = term_to_binary({Meta,FM}),
 	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
 
@@ -117,20 +116,6 @@ get_ref(Chrom,Pos,Len) ->
 	binary_to_term(Ref).
 
 
-
-get_3_pointers(FM) ->
-	Pc = find_pointer(FM,$C,2),
-	Pg = find_pointer(FM,$G,Pc+1),
-	Pt = find_pointer(FM,$T,Pg+1),
-	{Pc,Pg,Pt}.
-
-
-find_pointer(FM,Char,P) ->
-	{F,_,_,_} = element(P,FM),
-	case F of
-		Char -> P;
-		_ -> find_pointer(FM,Char,P+1)
-	end.
 
 
 bwt(X) ->
@@ -189,35 +174,6 @@ fm([],[],$$,Acc,_, Dq,Aq,Cq,Gq,Tq) ->
 	}.
 				
 
-sort_chuncks(Ls,Size) -> sort_chuncks(Ls,Size,[]).
-sort_chuncks(Ls,Size,Acc) when length(Ls) > Size ->
-	{Chunk,Tail} = lists:split(Size,Ls),
-	io:format("Chunk sorted\t"),
-	sort_chuncks(Tail,Size,[lists:sort(Chunk)|Acc]);
-sort_chuncks(Ls,_,Acc) -> lists:merge([lists:sort(Ls)|Acc]).
-
-
-add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq) ->
-	case L of
-		$A -> 
-			[I|Aq1] = Aq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq1,Cq,Gq,Tq);
-		$C -> 
-			[I|Cq1] = Cq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq1,Gq,Tq);
-		$G -> 
-			[I|Gq1] = Gq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq1,Tq);
-		$T -> 
-			[I|Tq1] = Tq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq1);
-		$$ -> 
-			[I|Dq1] = Dq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq1,Aq,Cq,Gq,Tq)
-	end;
-add_indices([],Acc,[],[],[],[],[]) -> lists:reverse(Acc).
-	
-
 
 
 sa(X) ->
@@ -237,17 +193,3 @@ get_suffs(Acc,_,[],_) ->
 	Acc.
 
 
-
-pp(FM) -> pp(FM, 1, size(FM)).
-
-pp(FM,N,N) -> 
-	{F,L,P,SA} = element(N,FM),
-	io:format("~c ~c\t~p\t~p~n",[F,L,P,SA]);
-pp(FM,J,N) ->
-	{F,L,P,SA} = element(J,FM),
-	case {F,L} of
-		{$N,$N} -> ok;
-		_ ->
-			io:format("~c ~c\t~p\t~p~n",[F,L,P,SA])
-	end,
-	pp(FM,J+1,N).

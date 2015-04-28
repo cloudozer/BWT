@@ -63,7 +63,7 @@ append(S,Str) -> lists:reverse([S|lists:reverse(Str)]).
 sa_seq(Str) ->
 	Alphabet = "ACGT",
 	Last = lists:nth(length(Str)-1,Str),
-	io:format("Last char: ~c~n",[Last]),
+	%io:format("Last char: ~c~n",[Last]),
 	Keys = lists:sort(fun(A,B)-> A>B end,
 		[ {Last,$$,$$} |[ {I,J,K} || I <- Alphabet, J <- Alphabet, K <- [$$|Alphabet] ]]),
 	Index = lists:foldl(fun(Key,Acc1)-> 
