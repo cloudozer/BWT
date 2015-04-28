@@ -1,67 +1,53 @@
-# Burrows-Wheeler Transform
 
-Compression techniques work by finding repeated patterns in the data and encoding the duplications more compactly.
-http://en.wikipedia.org/wiki/Burrows%E2%80%93Wheeler_transform
+# How to run DNA aligner app on a cluster.
 
-## How to run
-
-1. download bwt.erl
-2. launch Erlang shell
-3. compile:  c(bwt)
-4. run bwt:bwt(String)
-
-## Example
-	1> bwt:bwt("BANANA") 
-	> Output: BNN$AAA
-	[66,78,78,"$",65,65,65]
-	2> 
-
-
-# Smith-Waterman Algorithm 
-
-The Smith–Waterman algorithm performs local sequence alignment; that is, for determining similar regions between two strings or nucleotide or protein sequences.
-http://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
-
-## How to run
-1. download sw.erl
-2. launch Erlang shell
-3. compile: c(sw)
-4. run: sw:sw(String1,String2).
-
-## Example
-	2> sw:sw("AGGTCA","CGCT").
-	GTC
-	| |
-	G-C
-	ok
-	3> 
-
-You may also run sw function with random sequences of any length as:
-
-	1> sw:sw(20,40).
-	CAGAGAAGCGT-GCG--TGC
-	||| |  || | |||  |||
-	CAG-G--GCATCGCGTTTGC
-	ok
-	2> 
-
-
-# Seeking matches in a fasta file
-
-You may find all matches of your sequence against some reference sequence contained in the .fasta file.
- 	
- 	1> msw:main(10,"ATGTGACACAGATCACTGCGGCCTTGACCTCCCAGGCTCCAGGTGGTTCTT","21","data/human_g1k_v37_decoy.fasta").
-
- The first argument means the number of parallel process. The third argument is a name of the reference sequence contained in the fasta file. In this example this is 21st chromosome.
- The function assumes that there is an index file containing the pointers to all reference sequences in the fasta file. You can build this index file using simple python application:
-
- 	>>> python make_index.py data/human_g1k_v37_decoy.fasta
- 	>>>
-
- You need to build an index file only once.
- 
+## Checkout and build
+	$ git clone https://github.com/cloudozer/BWT.git
+	$ cd BWT
+	$ git checkout 0.1
+	$ ./rebar get-deps compile
 	
+## Getting DNA files
+1. Download an archive: https://docs.google.com/uc?id=0B2DPaltm6IwpYVFHOEZYSGpldHc&export=download
+2. Extract it to the BWT folder
 	
+## Run test on local machine
+	$ ./start_local.sh
+
+## Run test on a cluster
+
+### Cluster's nodes requirements
+* Friendly Linux
+* Erlang OTP 17
+* Git
+* Internet access
+
+### Master node Setup
+
+	$ cd BWT
+	$ erl -pa ebin deps/*/ebin apps/*/ebin -name master@<HOST_NAME> -setcookie secret_gc -eval "master_app:dev()"
+
+### Worker node Setup
+
+Ensure that the following script runs on boot-up. Replace 'erlangonxen.org' wiht the master's hostname in apps/worker_bwt_app/src/worker_bwt_app_sup.erl.
+
+	cd <BWT_FOLDER>
+	git pull
+	./rebar update-deps compile
+	erl -pa ebin deps/*/ebin apps/*/ebin -name erl1@<HOST_NAME> -setcookie secret_gc -eval "worker_bwt_app_app:dev()"
+
+### To run aligner on the cluster
+1. Start master and worker nodes.
+2. Run:
+
+	# from your laptop:
+	$ ./start_cluster.sh <MASTER_HOST_NAME> <WORKERS_NUMBER>
+	
+	%% or from Erlang shell of the master node
+	1> gen_server:call(master , {run, "bwt_files/SRR770176_1.fastq", "GL000193.1", <WORKERS_NUMBER>}).
+
+[Disregards Info below this line]
+
 # Big file processing 
 
 These are small tools to help process large files in Erlang.  In general, the strategy is to read in the file as an array of possibly overlapping Erlang binary "chunks".  These can then be processed in parallel/concurrently.
@@ -97,7 +83,3 @@ These are small tools to help process large files in Erlang.  In general, the st
 
     4>  bio_pfile:spawn_find_pattern(Data,<<"TATATTCAGTCTTTCTAACACCATTTATTGAAGAGACTGTAG">>).
     [{162758595,42}]
-
-## Cluster
-$ ./rebar compile
-$ ./start.sh
