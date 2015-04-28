@@ -54,7 +54,11 @@ sw([_|_]=Qseq,[_|_]=Ref) ->
 
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
+<<<<<<< HEAD
 	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 5));
+=======
+	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 7));
+>>>>>>> new_fm_index
 
 
 sw(N1,N2) when N1 =< N2 -> 
