@@ -77,25 +77,25 @@ skip_Ns(_,[],_,_) -> no_more_subseqs.
 
 
 % returns a position referenced from the end of the query sequence, which is a good pattern for seeds
-get_subseq(Qseq) -> get_subseq(lists:reverse(Qseq), [], 0).
+%get_subseq(Qseq) -> get_subseq(lists:reverse(Qseq), [], 0).
 
-get_subseq(_,Queue,Pos) when length(Queue) == ?MIN_LEN -> Pos;
-get_subseq([_],_,_) -> no_more;
-get_subseq([X1,X2|Seq], Queue, Pos) when X1=:=$C; X1=:=$G; X2=:=$C; X2=:=$G ->
-	get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
+%get_subseq(_,Queue,Pos) when length(Queue) == ?MIN_LEN -> Pos;
+%get_subseq([_],_,_) -> no_more;
+%get_subseq([X1,X2|Seq], Queue, Pos) when X1=:=$C; X1=:=$G; X2=:=$C; X2=:=$G ->
+%	get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
 %get_subseq(_,_,Pos) when Pos >= 7 -> 1;
-get_subseq([X1,X2|Seq], Queue, Pos) ->
+%get_subseq([X1,X2|Seq], Queue, Pos) ->
 	%io:format("{~p,~p}, Q: ~p~n",[X1,X2,Queue]),
-	case lists:keyfind({X1,X2},1,Queue) of
-		false -> get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
-		_ -> 
-			{Queue1,Pos1} = remove(X1,X2, lists:reverse([{{X1,X2},1}|Queue]), 1 ),
-			get_subseq([X2|Seq], Queue1, Pos+Pos1)
-	end.
+%	case lists:keyfind({X1,X2},1,Queue) of
+%		false -> get_subseq([X2|Seq], [{{X1,X2},1}|Queue], Pos);
+%		_ -> 
+%			{Queue1,Pos1} = remove(X1,X2, lists:reverse([{{X1,X2},1}|Queue]), 1 ),
+%			get_subseq([X2|Seq], Queue1, Pos+Pos1)
+%	end.
 
 
-remove(X1,X2, [{{X1,X2},1}|Ls], N) -> {lists:reverse(Ls),N};
-remove(X1,X2, [_|Ls], N) -> remove(X1,X2, Ls, N+1).
+%remove(X1,X2, [{{X1,X2},1}|Ls], N) -> {lists:reverse(Ls),N};
+%remove(X1,X2, [_|Ls], N) -> remove(X1,X2, Ls, N+1).
 
 
 

@@ -17,8 +17,8 @@
 
 find_seeds(_,Sp,Ep,_,?MAX_LEN) when Ep-Sp > ?MAX_RANGE -> too_many_seeds;
 find_seeds(FM,Sp,Ep,_,?MAX_LEN) -> sga:get_seed_ends(FM,Sp,Ep,?MAX_LEN); 
-find_seeds(FM,Sp,Ep,[$N|Qseq],N) when Ep-Sp > ?MAX_RANGE -> too_many_seeds; 
-find_seeds(FM,Sp,Ep,[$N|Qseq],N) -> sga:get_seed_ends(FM,Sp,Ep,N);
+find_seeds(_,Sp,Ep,[$N|_],_) when Ep-Sp > ?MAX_RANGE -> too_many_seeds; 
+find_seeds(FM,Sp,Ep,[$N|_],N) -> sga:get_seed_ends(FM,Sp,Ep,N);
 	
 find_seeds(FM,Sp,Ep,[C2|Qseq],N) ->
 	%io:format("Looking for {~p,~p}~n",[C1,C2]),
@@ -36,7 +36,7 @@ find_seeds(FM, Pc,Pg,Pt, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 	[H|Tail] = lists:reverse(Subseq),
 	%initialize_sp_ep(H,1,size(FM),FM)
 	case H of
-		$A -> Sp = 2, Ep = Pc-1;
+		$A -> Sp = 2,  Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;
 		$G -> Sp = Pg, Ep = Pt-1;
 		$T -> Sp = Pt, Ep = size(FM);

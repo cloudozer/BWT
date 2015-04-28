@@ -13,7 +13,7 @@ test() ->
 
 test(SeqFileName, Chromosome) ->
   lager:start(),
-  lager:set_loglevel(lager_console_backend, error),
+%  lager:set_loglevel(lager_console_backend, error),
   ok = application:start(bwt),
 
   %% Create a master process
