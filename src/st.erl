@@ -68,20 +68,23 @@ sa_seq(Str) ->
 		[ {Last,$$,$$} |[ {I,J,K} || I <- Alphabet, J <- Alphabet, K <- [$$|Alphabet] ]]),
 	Index = lists:foldl(fun(Key,Acc1)-> 
 
-					ChunkInd = get_chunk_sa(Key,Str),
+					{K,_,_} = Key,
+					ChunkInd = [ {K,L,I} || {L,I} <- get_chunk_sa(Key,Str)],
 					io:format("completed.~n"),
 					lists:foldl(fun(S,Acc2)-> [S|Acc2] end,
 					Acc1,ChunkInd)
 					%io:format("complete~n")
 
 				end, [], Keys),
-	[length(Str)-1|Index].
+	[{$$,Last,length(Str)-1}|Index].
 
 
-get_chunk_sa({_,$$,$$},Str) -> [length(Str)-2];
+get_chunk_sa({_,$$,$$},Str) -> 
+	[$$,_,L|_] = lists:reverse(Str),
+	[{L,length(Str)-2}];
 get_chunk_sa(Key,Str) -> 
 	io:format("Processing chunk ~p ... ",[Key]),
-	Index = get_chunk_sa(Key,Str,0,[]),
+	Index = get_chunk_sa(Key,$$,Str,0,[]),
 	io:format(" selected ~p sufixes. Sorting ... ",[length(Index)]),
 	Str_bin = list_to_binary(Str),
 	Bin_index = fun(N) -> binary:at(Str_bin, N) end,
@@ -91,13 +94,13 @@ get_chunk_sa(Key,Str) ->
 			case Vx =:= Vy of true -> F(F,X1+1,X2+1); _ -> Vx > Vy end
 		end,
 	
-	Compare = fun(X1,X2) -> F(F,X1,X2) end,	
+	Compare = fun({_,X1},{_,X2}) -> F(F,X1,X2) end,	
 	lists:sort(Compare,Index).
 
-get_chunk_sa({I,J,$$},[I,J,$$],N,Acc) -> [N|Acc];
-get_chunk_sa({_,_,_},[_,_,$$],_,Acc) -> Acc;
-get_chunk_sa({I,J,K},[I|[J,K|_]=Str],N,Acc) -> get_chunk_sa({I,J,K},Str,N+1,[N|Acc]);
-get_chunk_sa(Key,[_|Str],N,Acc) -> get_chunk_sa(Key,Str,N+1,Acc).
+get_chunk_sa({I,J,$$},L,[I,J,$$],N,Acc) -> [{L,N}|Acc];
+get_chunk_sa({_,_,_},_,[_,_,$$],_,Acc) -> Acc;
+get_chunk_sa({I,J,K},L,[I|[J,K|_]=Str],N,Acc) -> get_chunk_sa({I,J,K},I,Str,N+1,[{L,N}|Acc]);
+get_chunk_sa(Key,_,[L|Str],N,Acc) -> get_chunk_sa(Key,L,Str,N+1,Acc).
 
 
 

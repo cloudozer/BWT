@@ -93,6 +93,7 @@ make_index(Chrom) ->
 	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
 	FM = fm(st:append($$,Ref_seq1)),
+	io:format("~p~n",[FM]),
 	Meta = [{pointers, fmi:get_3_pointers(FM)},{shift, Shift}],
 	Bin = term_to_binary({Meta,FM}),
 	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
@@ -141,31 +142,34 @@ get_all_permutations(Acc,T,K,N) ->
 fm(X) ->
 	_ = statistics(runtime),
 	SA = st:sa_seq(X),
+	io:format("~p~n",[SA]),
+	
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
 	%io:format("Sufs:~p~n",[Ls]),
-	{FM,Dq,Aq,Cq,Gq,Tq} = fm(X,SA,$$,[],1,[],[],[],[],[]),
+	{Dq,Aq,Cq,Gq,Tq} = fm(SA,1,[],[],[],[],[]),
+	%io:format("~p~n",[FM]),
 	{_,T3} = statistics(runtime),
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
 	%list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
-	list_to_tuple(fmi:assemble_index(FM,[],0,[],Dq,Aq,Cq,Gq,Tq)).
+	list_to_tuple(fmi:assemble_index(SA,[],$$,[],Dq,Aq,Cq,Gq,Tq)).
 	
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
 
 
 
-fm([S|X],[N|SA],P,Acc, K, Dq,Aq,Cq,Gq,Tq) ->
-	case S of
-		$A -> fm(X,SA,$A,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
-		$C -> fm(X,SA,$C,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
-		$G -> fm(X,SA,$G,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq);
-		$T -> fm(X,SA,$T,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq]);
-		$$ -> fm(X,SA,$$,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq)
+fm([{F,_,_}|SA],K, Dq,Aq,Cq,Gq,Tq) ->
+	case F of
+		$A -> fm(SA,K+1,Dq,[K|Aq],Cq,Gq,Tq);
+		$C -> fm(SA,K+1,Dq,Aq,[K|Cq],Gq,Tq);
+		$G -> fm(SA,K+1,Dq,Aq,Cq,[K|Gq],Tq);
+		$T -> fm(SA,K+1,Dq,Aq,Cq,Gq,[K|Tq]);
+		$$ -> fm(SA,K+1,[K|Dq],Aq,Cq,Gq,Tq)
 	end;
-fm([],[],$$,Acc,_, Dq,Aq,Cq,Gq,Tq) -> 
-	{lists:reverse(Acc),
+fm([],_, Dq,Aq,Cq,Gq,Tq) -> 
+	{
 	lists:reverse(Dq),
 	lists:reverse(Aq),
 	lists:reverse(Cq),
@@ -176,9 +180,7 @@ fm([],[],$$,Acc,_, Dq,Aq,Cq,Gq,Tq) ->
 
 
 
-sa(X) ->
-	Ls = lists:sort(get_suffs(X)),
-	[ N || {_,N,_} <- Ls].
+sa(X) -> [ N || {_,N,_} <- lists:sort(get_suffs(X)) ].
 
 
 

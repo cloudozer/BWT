@@ -86,7 +86,7 @@ find_pointer(FM,Char,P) -> find_pointer(FM,Char,P bsr ?BLOCK_SHIFT + 1,
 												element(P bsr ?BLOCK_SHIFT + 1,FM)).
 
 find_pointer(FM,Char,B_id,ID,_) when ID =:= ?BLOCK_LEN + 1 ->
-	%io:format("~nBlock:~p~n",[B_id]),
+	io:format("~nBlock:~p~n",[B_id]),
 	find_pointer(FM,Char,B_id+1,1,element(B_id+1,FM));
 find_pointer(FM,Char,B_id,ID,Block) ->
 	case element(ID,Block) of
