@@ -9,7 +9,8 @@
 -export([
 		se_down/4,
 		se_up/3,
-		fm/1
+		assemble_index/9,
+		get_3_pointers/1
 		]).
 
 -define(BLOCK_LEN,64).
@@ -44,39 +45,49 @@ se_up(B_id,IDc,C2,FM,Block) ->
 	end.
 
 
+assemble_index(FM,Acc,?BLOCK_LEN,Result,Dq,Aq,Cq,Gq,Tq) ->
+	assemble_index(FM,[],0,[list_to_tuple(lists:reverse(Acc))|Result],Dq,Aq,Cq,Gq,Tq);
 
-%% returns an FM index for a given reference sequence
-fm(X) ->
-	_ = statistics(runtime),
-	Ls = bwt:sort_chuncks(bwt:get_suffs(X),100000),
-	{_,T2} = statistics(runtime),
-	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
-	%io:format("Sufs:~p~n",[Ls]),
-	{FM,Dq,Aq,Cq,Gq,Tq} = fm(X,Ls,[],1,[],[],[],[],[]),
-	{_,T3} = statistics(runtime),
-	io:format("Building the queues took ~p sec~n",[T3/1000]),
-
-	list_to_tuple(bwt:add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
-	%{_,T4} = statistics(runtime),
-	%io:format("Building the index took ~p sec~n",[T4/1000]).
-
-
-
-fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq) ->
-	case S of
-		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
-		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
-		$G -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq);
-		$T -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq]);
-		$$ -> fm(X,Ls,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq)
+assemble_index([{F,L,SA}|FM],Acc,N,Result,Dq,Aq,Cq,Gq,Tq) ->
+	case L of
+		$A -> 
+			[I|Aq1] = Aq, 
+			assemble_index(FM,[{F,L,I,SA}|Acc],N+1,Result,Dq,Aq1,Cq,Gq,Tq);
+		$C -> 
+			[I|Cq1] = Cq, 
+			assemble_index(FM,[{F,L,I,SA}|Acc],N+1,Result,Dq,Aq,Cq1,Gq,Tq);
+		$G -> 
+			[I|Gq1] = Gq, 
+			assemble_index(FM,[{F,L,I,SA}|Acc],N+1,Result,Dq,Aq,Cq,Gq1,Tq);
+		$T -> 
+			[I|Tq1] = Tq, 
+			assemble_index(FM,[{F,L,I,SA}|Acc],N+1,Result,Dq,Aq,Cq,Gq,Tq1);
+		$$ -> 
+			[I|Dq1] = Dq, 
+			assemble_index(FM,[{F,L,I,SA}|Acc],N+1,Result,Dq1,Aq,Cq,Gq,Tq)
 	end;
-fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq) -> 
-	{lists:reverse(Acc),
-	lists:reverse(Dq),
-	lists:reverse(Aq),
-	lists:reverse(Cq),
-	lists:reverse(Gq),
-	lists:reverse(Tq)
-	}.
+assemble_index([],Acc,_,Result,[],[],[],[],[]) -> 
+	lists:reverse([list_to_tuple(lists:reverse(Acc))|Result]).
+
+
+
+get_3_pointers(FM) ->
+	Pc = find_pointer(FM,$C,2),
+	Pg = find_pointer(FM,$G,Pc+1),
+	Pt = find_pointer(FM,$T,Pg+1),
+	{Pc,Pg,Pt}.
+
+
+find_pointer(FM,Char,P) -> find_pointer(FM,Char,P bsr ?BLOCK_SHIFT + 1,
+												P band ?BLOCK_ID_MASK, 
+												element(P bsr ?BLOCK_SHIFT + 1,FM)).
+
+find_pointer(FM,Char,B_id,ID,_) when ID =:= ?BLOCK_LEN + 1 ->
+	find_pointer(FM,Char,B_id+1,1,element(B_id+1,FM));
+find_pointer(FM,Char,B_id,ID,Block) ->
+	case element(ID,Block) of
+		Char -> B_id bsl ?BLOCK_SHIFT + ID;
+		_ -> find_pointer(FM,Char,B_id,ID+1,Block)
+	end.
 
 

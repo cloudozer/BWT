@@ -94,7 +94,8 @@ make_index(Chrom) ->
 	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
 	FM = fm(Ref_seq1),
-	Meta = [{pointers, get_3_pointers(FM)}],
+	io:format("~p~n",[FM]),
+	Meta = [{pointers, fmi:get_3_pointers(FM)}],
 	Bin = term_to_binary({Meta,FM}),
 	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
 
@@ -162,7 +163,9 @@ fm(X) ->
 	{_,T3} = statistics(runtime),
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
-	list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
+	%list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
+	list_to_tuple(fmi:assemble_index(FM,[],0,[],Dq,Aq,Cq,Gq,Tq)).
+	
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
 
