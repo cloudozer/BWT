@@ -22,14 +22,16 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
-  %{Meta,FM} = get_index("GL000192.1"),
-  {Meta,FM} = get_index("GL000207.1"),
-  {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
+  {Meta,FM} = get_index("GL000192.1"),
+  %{Meta,FM} = get_index("GL000207.1"),
+  {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
   Qs = [
   	"ACCCCACGTTTTTGGAGTTATATGTTGGCACTGATACTGGCCATAGAATTCCCTATGGTA",
     "ACCNNNNCCACGTTTTTGGAGTTATATGTTGATACTGGCCATAGAATTCCCTATNGGTA",
     "ACCCCACGTTTTTGGAGTTATATGTTGTTCTTGCACTGATACTGGCCATAGAATTCCCTATGGTA",
     
+    "TAATCAGAACAGGTTTACAACATAAATAAATAGATTGAACTTACTTTGTATAAAAATTGT",
+
     "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
     "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
     "CAATTCACTAGTTTATATAGAAGACTTGGTTTTTGTCTTTGCCCCATTTTATATTTGTAT",
@@ -60,7 +62,7 @@ test() ->
     "TAAAAATTACCAAAAGTACTTTGGAAACTATTCTTAGGCAGATTTACTGTAAACAAATTA"
   ],
 
-  lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Pc,Pg,Pt,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
+  lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Pc,Pg,Pt,Last,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
 
 
 
@@ -93,15 +95,16 @@ make_index(Chrom) ->
 	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
 	FM = fm(st:append($$,Ref_seq1)),
-	io:format("~p~n",[FM]),
-	Meta = [{pointers, fmi:get_3_pointers(FM)},{shift, Shift}],
+	%io:format("~p~n",[FM]),
+	Meta = [{pointers, fmi:get_index_pointers(FM)},{shift, Shift}],
 	Bin = term_to_binary({Meta,FM}),
 	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
 
 
 
 get_index(Chrom) ->
-	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	%{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	BwtFiles = "bwt_files/",
 	{ok,Bin} = file:read_file(filename:join(BwtFiles, Chrom++".fm")),
 	%{ok,Bin} = file:read_file(filename:join("bwt_files/", Chrom++".fm")),
 	binary_to_term(Bin).
@@ -142,18 +145,17 @@ get_all_permutations(Acc,T,K,N) ->
 fm(X) ->
 	_ = statistics(runtime),
 	SA = st:sa_seq(X),
-	io:format("~p~n",[SA]),
+	%io:format("~p~n",[SA]),
 	
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
-	%io:format("Sufs:~p~n",[Ls]),
-	{Dq,Aq,Cq,Gq,Tq} = fm(SA,1,[],[],[],[],[]),
+	{Dq,Aq,Cq,Gq,Tq} = fm(SA,0,[],[],[],[],[]),
 	%io:format("~p~n",[FM]),
 	{_,T3} = statistics(runtime),
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
 	%list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
-	list_to_tuple(fmi:assemble_index(SA,[],$$,[],Dq,Aq,Cq,Gq,Tq)).
+	list_to_tuple(fmi:assemble_index(SA,[],0,[],Dq,Aq,Cq,Gq,Tq)).
 	
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
