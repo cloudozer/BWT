@@ -66,16 +66,17 @@ sa_seq(Str) ->
 	%io:format("Last char: ~c~n",[Last]),
 	Keys = lists:sort(fun(A,B)-> A>B end,
 		[ {Last,$$,$$} |[ {I,J,K} || I <- Alphabet, J <- Alphabet, K <- [$$|Alphabet] ]]),
+
 	Index = lists:foldl(fun(Key,Acc1)-> 
 
 					{K,_,_} = Key,
 					ChunkInd = [ {K,L,I} || {L,I} <- get_chunk_sa(Key,Str)],
 					io:format("completed.~n"),
-					lists:foldl(fun(S,Acc2)-> [S|Acc2] end,
-					Acc1,ChunkInd)
+					lists:foldl(fun(S,Acc2)-> [S|Acc2] end, Acc1,ChunkInd)
 					%io:format("complete~n")
 
-				end, [], Keys),
+						end, [], Keys),
+	
 	[{$$,Last,length(Str)-1}|Index].
 
 
@@ -83,9 +84,9 @@ get_chunk_sa({_,$$,$$},Str) ->
 	[$$,_,L|_] = lists:reverse(Str),
 	[{L,length(Str)-2}];
 get_chunk_sa(Key,Str) -> 
-	io:format("Processing chunk ~p ... ",[Key]),
+	io:format("Processing chunk ~p... ",[Key]),
 	Index = get_chunk_sa(Key,$$,Str,0,[]),
-	io:format(" selected ~p sufixes. Sorting ... ",[length(Index)]),
+	io:format(" selected ~p sufixes. Sorting... ",[length(Index)]),
 	Str_bin = list_to_binary(Str),
 	Bin_index = fun(N) -> binary:at(Str_bin, N) end,
 	
@@ -111,7 +112,7 @@ sa(Str) ->
 	io:format("Scanning is complete. ~p workers started~n",[dict:size(Ps)]),
 	lists:foldl(fun(Key, Acc) -> 
 		
-		io:format("Processing branch ~p ... ",[Key]),
+		io:format("Processing branch ~p... ",[Key]),
 		dict:fetch(Key,Ps) ! finish,
 		receive
 			{Key,Index} -> 

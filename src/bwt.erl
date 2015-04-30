@@ -22,8 +22,8 @@
 %-record(fm,{f,l,d,a,c,g,t,sa}).
 
 test() ->
-  {Meta,FM} = get_index("GL000192.1"),
-  %{Meta,FM} = get_index("GL000207.1"),
+  %{Meta,FM} = get_index("GL000192.1"),
+  {Meta,FM} = get_index("GL000207.1"),
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
   Qs = [
   	"ACCCCACGTTTTTGGAGTTATATGTTGGCACTGATACTGGCCATAGAATTCCCTATGGTA",
