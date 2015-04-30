@@ -63,28 +63,25 @@ append(S,Str) -> lists:reverse([S|lists:reverse(Str)]).
 sa_seq(Str) ->
 	Alphabet = "ACGT",
 	Last = lists:nth(length(Str)-1,Str),
-	%io:format("Last char: ~c~n",[Last]),
 	Keys = lists:sort(fun(A,B)-> A>B end,
 		[ {Last,$$,$$} |[ {I,J,K} || I <- Alphabet, J <- Alphabet, K <- [$$|Alphabet] ]]),
+	io:format("Keys:~n~p~n",[Keys]),
 
-	Index = lists:foldl(fun(Key,Acc1)-> 
+	[ {$$,Last,length(Str)-1} | lists:foldl(fun(Key,Acc1) -> 
 
-					{K,_,_} = Key,
-					ChunkInd = [ {K,L,I} || {L,I} <- get_chunk_sa(Key,Str)],
 					io:format("completed.~n"),
-					lists:foldl(fun(S,Acc2)-> [S|Acc2] end, Acc1,ChunkInd)
-					%io:format("complete~n")
+					lists:foldl(fun(Row,Acc2) -> [Row|Acc2] end, Acc1, get_chunk_sa(Key,Str))
+					
+											end, [], Keys)
+		].
 
-						end, [], Keys),
-	
-	[{$$,Last,length(Str)-1}|Index].
 
 
 get_chunk_sa({_,$$,$$},Str) -> 
-	[$$,_,L|_] = lists:reverse(Str),
-	[{L,length(Str)-2}];
+	[$$,L,P|_] = lists:reverse(Str),
+	[{L,P,length(Str)-2}];
 get_chunk_sa(Key,Str) -> 
-	io:format("Processing chunk ~p... ",[Key]),
+	io:format("Processing ~c~c~c.. suffixes... ",[{C1,C2,C3}]),
 	Index = get_chunk_sa(Key,$$,Str,0,[]),
 	io:format(" selected ~p sufixes. Sorting... ",[length(Index)]),
 	Str_bin = list_to_binary(Str),
@@ -95,12 +92,12 @@ get_chunk_sa(Key,Str) ->
 			case Vx =:= Vy of true -> F(F,X1+1,X2+1); _ -> Vx > Vy end
 		end,
 	
-	Compare = fun({_,X1},{_,X2}) -> F(F,X1,X2) end,	
+	Compare = fun({_,_,X1},{_,_,X2}) -> F(F,X1,X2) end,	
 	lists:sort(Compare,Index).
 
-get_chunk_sa({I,J,$$},L,[I,J,$$],N,Acc) -> [{L,N}|Acc];
+get_chunk_sa({I,J,$$},L,[I,J,$$],N,Acc) -> [{I,L,N}|Acc];
 get_chunk_sa({_,_,_},_,[_,_,$$],_,Acc) -> Acc;
-get_chunk_sa({I,J,K},L,[I|[J,K|_]=Str],N,Acc) -> get_chunk_sa({I,J,K},I,Str,N+1,[{L,N}|Acc]);
+get_chunk_sa({I,J,K},L,[I|[J,K|_]=Str],N,Acc) -> get_chunk_sa({I,J,K},I,Str,N+1,[{I,L,N}|Acc]);
 get_chunk_sa(Key,_,[L|Str],N,Acc) -> get_chunk_sa(Key,L,Str,N+1,Acc).
 
 
