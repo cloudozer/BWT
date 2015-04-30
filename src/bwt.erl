@@ -11,7 +11,6 @@
 		make_index/1,
 		get_ref/3,
 		get_index/1,
-		pp/1,
 		test/0
 		]).
 
@@ -25,12 +24,14 @@
 test() ->
   %{Meta,FM} = get_index("GL000192.1"),
   {Meta,FM} = get_index("GL000207.1"),
-  {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
+  {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
   Qs = [
   	"ACCCCACGTTTTTGGAGTTATATGTTGGCACTGATACTGGCCATAGAATTCCCTATGGTA",
     "ACCNNNNCCACGTTTTTGGAGTTATATGTTGATACTGGCCATAGAATTCCCTATNGGTA",
     "ACCCCACGTTTTTGGAGTTATATGTTGTTCTTGCACTGATACTGGCCATAGAATTCCCTATGGTA",
     
+    "TAATCAGAACAGGTTTACAACATAAATAAATAGATTGAACTTACTTTGTATAAAAATTGT",
+
     "CTCAGCCTCCATAATTATGTGAACCAGTTCCCCTAATGAATCTTCTCTCATCTGTCTACA",
     "TATATCCTATTGATTCTGCCTTTCTGGAGACCCCTGACTAATGTGATTACAATAACTACA",
     "CAATTCACTAGTTTATATAGAAGACTTGGTTTTTGTCTTTGCCCCATTTTATATTTGTAT",
@@ -61,7 +62,7 @@ test() ->
     "TAAAAATTACCAAAAGTACTTTGGAAACTATTCTTAGGCAGATTTACTGTAAACAAATTA"
   ],
 
-  lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Pc,Pg,Pt,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
+  lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Pc,Pg,Pt,Last,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
 
 
 
@@ -93,18 +94,21 @@ make_index(Chrom) ->
 	io:format("Maping takes: ~pms~n",[T1]),
 	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
-	FM = fm(Ref_seq1),
-	Meta = [{pointers, get_3_pointers(FM)}],
+	FM = fm(st:append($$,Ref_seq1)),
+	%io:format("~p~n",[FM]),
+	Meta = [{pointers, fmi:get_index_pointers(FM)},{shift, Shift}],
 	Bin = term_to_binary({Meta,FM}),
 	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
 
 
 
 get_index(Chrom) ->
-	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	%{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+	BwtFiles = "bwt_files/",
 	{ok,Bin} = file:read_file(filename:join(BwtFiles, Chrom++".fm")),
 	%{ok,Bin} = file:read_file(filename:join("bwt_files/", Chrom++".fm")),
 	binary_to_term(Bin).
+
 
 
 get_ref(Chrom,Pos,Len) ->
@@ -116,20 +120,6 @@ get_ref(Chrom,Pos,Len) ->
 	binary_to_term(Ref).
 
 
-
-get_3_pointers(FM) ->
-	Pc = find_pointer(FM,$C,2),
-	Pg = find_pointer(FM,$G,Pc+1),
-	Pt = find_pointer(FM,$T,Pg+1),
-	{Pc,Pg,Pt}.
-
-
-find_pointer(FM,Char,P) ->
-	{F,_,_,_} = element(P,FM),
-	case F of
-		Char -> P;
-		_ -> find_pointer(FM,Char,P+1)
-	end.
 
 
 bwt(X) ->
@@ -154,30 +144,34 @@ get_all_permutations(Acc,T,K,N) ->
 %% returns an FM index for a given reference sequence
 fm(X) ->
 	_ = statistics(runtime),
-	Ls = sort_chuncks(get_suffs(X),100000),
+	SA = st:sa_seq(X),
+	%io:format("~p~n",[SA]),
+	
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
-	%io:format("Sufs:~p~n",[Ls]),
-	{FM,Dq,Aq,Cq,Gq,Tq} = fm(X,Ls,[],1,[],[],[],[],[]),
+	{Dq,Aq,Cq,Gq,Tq} = fm(SA,0,[],[],[],[],[]),
+	%io:format("~p~n",[FM]),
 	{_,T3} = statistics(runtime),
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
-	list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
+	%list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
+	list_to_tuple(fmi:assemble_index(SA,[],0,[],Dq,Aq,Cq,Gq,Tq)).
+	
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
 
 
 
-fm(X,[{[S|_],N,P}|Ls], Acc, K, Dq,Aq,Cq,Gq,Tq) ->
-	case S of
-		$A -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,[K|Aq],Cq,Gq,Tq);
-		$C -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,[K|Cq],Gq,Tq);
-		$G -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,[K|Gq],Tq);
-		$T -> fm(X,Ls,[{S,P,N}|Acc],K+1,Dq,Aq,Cq,Gq,[K|Tq]);
-		$$ -> fm(X,Ls,[{S,P,N}|Acc],K+1,[K|Dq],Aq,Cq,Gq,Tq)
+fm([{F,_,_}|SA],K, Dq,Aq,Cq,Gq,Tq) ->
+	case F of
+		$A -> fm(SA,K+1,Dq,[K|Aq],Cq,Gq,Tq);
+		$C -> fm(SA,K+1,Dq,Aq,[K|Cq],Gq,Tq);
+		$G -> fm(SA,K+1,Dq,Aq,Cq,[K|Gq],Tq);
+		$T -> fm(SA,K+1,Dq,Aq,Cq,Gq,[K|Tq]);
+		$$ -> fm(SA,K+1,[K|Dq],Aq,Cq,Gq,Tq)
 	end;
-fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq) -> 
-	{lists:reverse(Acc),
+fm([],_, Dq,Aq,Cq,Gq,Tq) -> 
+	{
 	lists:reverse(Dq),
 	lists:reverse(Aq),
 	lists:reverse(Cq),
@@ -186,40 +180,9 @@ fm(_,[], Acc, _, Dq,Aq,Cq,Gq,Tq) ->
 	}.
 				
 
-sort_chuncks(Ls,Size) -> sort_chuncks(Ls,Size,[]).
-sort_chuncks(Ls,Size,Acc) when length(Ls) > Size ->
-	{Chunk,Tail} = lists:split(Size,Ls),
-	io:format("Chunk sorted\t"),
-	sort_chuncks(Tail,Size,[lists:sort(Chunk)|Acc]);
-sort_chuncks(Ls,_,Acc) -> lists:merge([lists:sort(Ls)|Acc]).
 
 
-add_indices([{F,L,SA}|FM],Acc,Dq,Aq,Cq,Gq,Tq) ->
-	case L of
-		$A -> 
-			[I|Aq1] = Aq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq1,Cq,Gq,Tq);
-		$C -> 
-			[I|Cq1] = Cq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq1,Gq,Tq);
-		$G -> 
-			[I|Gq1] = Gq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq1,Tq);
-		$T -> 
-			[I|Tq1] = Tq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq,Aq,Cq,Gq,Tq1);
-		$$ -> 
-			[I|Dq1] = Dq, 
-			add_indices(FM,[{F,L,I,SA}|Acc],Dq1,Aq,Cq,Gq,Tq)
-	end;
-add_indices([],Acc,[],[],[],[],[]) -> lists:reverse(Acc).
-	
-
-
-
-sa(X) ->
-	Ls = lists:sort(get_suffs(X)),
-	[ N || {_,N,_} <- Ls].
+sa(X) -> [ N || {_,N,_} <- lists:sort(get_suffs(X)) ].
 
 
 
@@ -234,17 +197,3 @@ get_suffs(Acc,_,[],_) ->
 	Acc.
 
 
-
-pp(FM) -> pp(FM, 1, size(FM)).
-
-pp(FM,N,N) -> 
-	{F,L,P,SA} = element(N,FM),
-	io:format("~c ~c\t~p\t~p~n",[F,L,P,SA]);
-pp(FM,J,N) ->
-	{F,L,P,SA} = element(J,FM),
-	case {F,L} of
-		{$N,$N} -> ok;
-		_ ->
-			io:format("~c ~c\t~p\t~p~n",[F,L,P,SA])
-	end,
-	pp(FM,J+1,N).

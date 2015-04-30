@@ -61,11 +61,11 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, F
         {MetaFM, FMs}
     end,
 
-  {Pc,Pg,Pt} = proplists:get_value(pointers, Meta),
+  {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 
   Seeds = lists:foldl(
     fun({QSeqName,QPos,Qseq},Acc) ->
-      case sga:sga(FM,Pc,Pg,Pt,Qseq) of
+      case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
         [] -> Acc;
         ResultsList -> [{QSeqName,QPos,ResultsList}|Acc]
       end
