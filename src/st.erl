@@ -80,8 +80,9 @@ sa_seq(Str) ->
 get_chunk_sa({_,$$,$$},Str) -> 
 	[$$,L,P|_] = lists:reverse(Str),
 	[{L,P,length(Str)-2}];
-get_chunk_sa(Key,Str) -> 
-	io:format("Processing ~c~c~c.. suffixes... ",[{C1,C2,C3}]),
+get_chunk_sa({C1,C2,C3}=Key,Str) -> 
+
+	io:format("Processing ~c~c~c.. suffixes... ",[C1,C2,C3]),
 	Index = get_chunk_sa(Key,$$,Str,0,[]),
 	io:format(" selected ~p sufixes. Sorting... ",[length(Index)]),
 	Str_bin = list_to_binary(Str),
