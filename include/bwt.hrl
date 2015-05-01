@@ -5,3 +5,5 @@
 -define(MAX_RANGE,25).
 -define(MAX_LEN,13). % a maximal length of the string after which the range should be less than MAX_RANGE
 
+-define(SORTED_MAX,100000). %maximal length of array to sort
+

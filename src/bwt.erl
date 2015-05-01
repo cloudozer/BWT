@@ -91,7 +91,7 @@ make_index(Chrom) ->
 							($T)->$T
 						end, Ref_seq),
 	{_,T1} = statistics(runtime),
-	io:format("Maping takes: ~pms~n",[T1]),
+	io:format("Mapping takes: ~pms~n",[T1]),
 	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
 
 	FM = fm(st:append($$,Ref_seq1)),
@@ -144,7 +144,8 @@ get_all_permutations(Acc,T,K,N) ->
 %% returns an FM index for a given reference sequence
 fm(X) ->
 	_ = statistics(runtime),
-	SA = st:sa_seq(X),
+	%SA = st:sa_seq(X),
+	SA = dsa:dsa(X),
 	%io:format("~p~n",[SA]),
 	
 	{_,T2} = statistics(runtime),

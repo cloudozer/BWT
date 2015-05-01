@@ -17,18 +17,20 @@
 
 t() ->
 	Tests = [
-		"21"
-		%"GL000207.1",
-		%"GL000226.1"
-		%"GL000229.1",
-		%"GL000231.1",
+		%"21"
+		"GL000207.1",
+		"GL000226.1",
+		"GL000229.1",
+		"GL000231.1",
 		%"GL000210.1",
-		%"GL000239.1",
-		%"GL000235.1",
-		%"GL000201.1",
-		%"GL000247.1",
-		%"GL000245.1",
-		%"GL000197.1"
+		"GL000239.1",
+		"GL000235.1",
+		"GL000201.1",
+		"GL000247.1",
+		"GL000245.1",
+		%"GL000197.1",
+		"GL000192.1",
+		"GL000193.1"
 	],
 	t(Tests).
 
@@ -37,18 +39,19 @@ t([Chrom|Tests]) ->
 	
 	{Pos,Len} = msw:get_reference_position(Chrom,File),
 	{_,Ref_seq} = msw:get_ref_seq(File,Pos,Len),
+	find_other_chars(Ref_seq),
 	io:format("~nCromosome:~p, Length:~p~n",[Chrom,length(Ref_seq)]),
 	Str = append($$,Ref_seq),
 
 	%io:format("~nCromosome:~p - ",[Chrom]),
 	statistics(runtime),
-	DSA = sa_seq(Str),
+	DSA = [ N ||{_,_,N} <- dsa:dsa(Str) ],
 	{_,T1} = statistics(runtime),
-	io:format("~n DSA: ~pms~n",[T1]),
+	io:format(" DSA: ~pms~n",[T1]),
 	SA = bwt:sa(Ref_seq),
 	{_,T2} = statistics(runtime),
 	io:format(" SA: ~pms~n",[T2]),
-	io:format("test passed:~p~n",[DSA==SA]),
+	io:format("test passed: ~p~n",[DSA==SA]),
 
 	t(Tests);
 t([]) -> ok.
@@ -62,30 +65,42 @@ append(S,Str) -> lists:reverse([S|lists:reverse(Str)]).
 
 sa_seq(Str) ->
 	Alphabet = "ACGT",
-	Last = lists:nth(length(Str)-1,Str),
+	[$$,L1,L2|_] = lists:reverse(Str),
 	Keys = lists:sort(fun(A,B)-> A>B end,
-		[ {Last,$$,$$} |[ {I,J,K} || I <- Alphabet, J <- Alphabet, K <- [$$|Alphabet] ]]),
-	io:format("Keys:~n~p~n",[Keys]),
+		[ {L1,$$,$$,$$}, {L2,L1,$$,$$} |[ {I,J,K,M} || I <- Alphabet, J <- Alphabet, 
+									K <- Alphabet, M <- [$$|Alphabet] ]]),
+	Str_bin = list_to_binary(Str),
 
-	[ {$$,Last,length(Str)-1} | lists:foldl(fun(Key,Acc1) -> 
+	[ {$$,L1,length(Str)-1} | lists:foldl(fun(Key,Acc1) -> 
 
-					io:format("completed.~n"),
-					lists:foldl(fun(Row,Acc2) -> [Row|Acc2] end, Acc1, get_chunk_sa(Key,Str))
+					lists:foldl(fun(Row,Acc2) -> [Row|Acc2] end, Acc1, get_chunk_sa(Key,Str,Str_bin))
 					
 											end, [], Keys)
 		].
 
 
 
-get_chunk_sa({_,$$,$$},Str) -> 
-	[$$,L,P|_] = lists:reverse(Str),
-	[{L,P,length(Str)-2}];
-get_chunk_sa({C1,C2,C3}=Key,Str) -> 
+get_chunk_sa({L1,$$,$$,$$},Str,_) -> 
+	[$$,L1,L2|_] = lists:reverse(Str),
+	io:format("completed~nProcessing ~c$ -",[L1]),
+	[{L1,L2,length(Str)-2}];
+get_chunk_sa({L2,L1,$$,$$},Str,_) -> 
+	[$$,L1,L2,L3|_] = lists:reverse(Str),
+	io:format("completed~nProcessing ~c~c$ -",[L2,L1]),
+	[{L2,L3,length(Str)-3}];
+get_chunk_sa({L3,L2,L1,$$},Str,_) -> 
+	[$$,C1,C2,C3,C4|_] = lists:reverse(Str),
+	case C1=:=L1 andalso C2=:=L2 andalso C3=:=L3 of
+		true ->
+			io:format("completed~nProcessing ~c~c~c$ -",[L3,L2,L1]), 
+			[{L3,C4,length(Str)-4}];
+		_ -> []
+	end;
+get_chunk_sa({C1,C2,C3,C4}=Key,Str,Str_bin) -> 
 
-	io:format("Processing ~c~c~c.. suffixes... ",[C1,C2,C3]),
+	io:format("completed~nProcessing ~c~c~c~c...",[C1,C2,C3,C4]),
 	Index = get_chunk_sa(Key,$$,Str,0,[]),
-	io:format(" selected ~p sufixes. Sorting... ",[length(Index)]),
-	Str_bin = list_to_binary(Str),
+	io:format(" ~p suffixes selected. Sorting... ",[length(Index)]),
 	Bin_index = fun(N) -> binary:at(Str_bin, N) end,
 	
 	F = fun(F,X1,X2) -> 
@@ -96,9 +111,9 @@ get_chunk_sa({C1,C2,C3}=Key,Str) ->
 	Compare = fun({_,_,X1},{_,_,X2}) -> F(F,X1,X2) end,	
 	lists:sort(Compare,Index).
 
-get_chunk_sa({I,J,$$},L,[I,J,$$],N,Acc) -> [{I,L,N}|Acc];
-get_chunk_sa({_,_,_},_,[_,_,$$],_,Acc) -> Acc;
-get_chunk_sa({I,J,K},L,[I|[J,K|_]=Str],N,Acc) -> get_chunk_sa({I,J,K},I,Str,N+1,[{I,L,N}|Acc]);
+get_chunk_sa({I,J,K,$$},L,[I,J,K,$$],N,Acc) -> [{I,L,N}|Acc];
+get_chunk_sa({_,_,_,_},_,[_,_,_,$$],_,Acc) -> Acc;
+get_chunk_sa({I,J,K,M},L,[I|[J,K,M|_]=Str],N,Acc) -> get_chunk_sa({I,J,K,M},I,Str,N+1,[{I,L,N}|Acc]);
 get_chunk_sa(Key,_,[L|Str],N,Acc) -> get_chunk_sa(Key,L,Str,N+1,Acc).
 
 
@@ -165,4 +180,16 @@ st(Master,Str,Shift,Key,Acc) ->
 		J -> st(Master,Str,Shift,Key,[J|Acc])
 	end.
 
+
+
+find_other_chars([$A|Str]) -> find_other_chars(Str);
+find_other_chars([$C|Str]) -> find_other_chars(Str);
+find_other_chars([$G|Str]) -> find_other_chars(Str);
+find_other_chars([$T|Str]) -> find_other_chars(Str);
+find_other_chars([Char|Str]) ->
+	io:format("Found: ~c~n",[Char]),
+	find_other_chars(Str);
+find_other_chars([]) -> ok.
+
+	
 
