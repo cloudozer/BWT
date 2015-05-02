@@ -59,7 +59,7 @@ handle_info({'DOWN',_Ref,process,_Pid,normal}, State) ->
 
 handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
-  lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
+  %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
   S1 = S#state{workers=Pids++Workers},
   lager:info("The master got ~b workers", [length(S1#state.workers)]),
   {reply, ok, S1};
@@ -67,7 +67,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
-  lists:foreach(fun(Pid) -> worker_bwt:run(Pid, self()) end, Workers1),
+  lists:foreach(fun({Node,Pid}) -> navel:call(Node, worker_bwt, run, [Pid,{navel:get_node(),self()}]) end, Workers1),
   %% TODO: demonitor the rest
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
 

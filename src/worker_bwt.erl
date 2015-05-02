@@ -20,9 +20,9 @@
 start_link() ->
   gen_server:start_link(?MODULE, {}, []).
 
-start_link(MasterPid) ->
+start_link({MNode, MPid}) ->
   {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
-  ok = master:register_workers(MasterPid, [Pid]),
+  ok = navel:call(MNode, master, register_workers, [MPid,[{navel:get_node(),Pid}]]),
   {ok, Pid}.
 
 run(Pid, MasterPid) ->
@@ -39,7 +39,7 @@ terminate(Reason, State) ->
   lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
 handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlavePid, master = MasterPid}) ->
-  gen_server:cast(MasterPid, {done, self()}),
+  %TODO gen_server:cast(MasterPid, {done, self()}),
   {stop, normal, S}.
 
 handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
@@ -51,7 +51,7 @@ handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
 
 %% private
 
-slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, FMs, Refs) ->
+slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, FMs, Refs) ->
   {{Meta, FM}, FMs1} =
     case proplists:get_value(ChromoName, FMs) of
       undefined ->
@@ -71,7 +71,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, F
       end
     end, [], QseqList),
   lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
-  gen_server:cast(MasterPid, {seeds, Seeds}),
+  navel:call(MNode, gen_server, cast, [MPid,{seeds,Seeds}]),
 
   case get_workload(WorkloadBufPid) of
     {ok, Workload1} ->
@@ -81,7 +81,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, F
       stop
   end;
 
-slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, Refs) ->
+slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, Refs) ->
 
   {Ref_bin, Refs1} =
     case proplists:get_value(Chromosome, Refs) of
@@ -120,10 +120,10 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
   case Cigars of
     [] -> ok;
     [{Cigar,P}] ->
-      gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar, P});
+	  navel:call(MNode, gen_server, cast, [MPid,{cigar,{SeqName,Qsec},Cigar,P}]);
     _ ->
       [{TopCigar,P} | _] = lists:sort(fun({{R1,_},_}, {{R2,_},_}) -> R1 > R2 end, Cigars), 
-      gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, TopCigar, P})
+	  navel:call(MNode, gen_server, cast, [MPid,{cigar,{SeqName,Qsec},TopCigar,P}])
   end
 
   end, Seeds),
@@ -136,8 +136,8 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
       stop
   end.
 
-workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever) when Waterline > length(WorkloadList) ->
-  case gen_server:call(MasterPid, get_workload) of
+workload_buffer_loop({MNode,MPid} =MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever) when Waterline > length(WorkloadList) ->
+  case navel:call(MNode, gen_server, call, [MPid,get_workload]) of
     {ok, Workload} ->
       workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], beg_forever);
     undefined ->
