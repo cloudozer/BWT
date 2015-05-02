@@ -54,11 +54,11 @@ get_similar(N, [P2|Ls],_,_,_,Acc,Tol) ->
 	get_similar(N, Ls, P2, 1, 0, Acc, Tol);
 get_similar(N, [], P1, Count, Dist, Acc,_) when Count >= N -> 
 	%io:format("Qty:~p~n",[Count]),
- 	io:format("Similar: ~p~n",[[{P1,Dist}|Acc]]),
+ 	%io:format("Similar: ~p~n",[[{P1,Dist}|Acc]]),
 	[{P1,Dist}|Acc];
 get_similar(_,[],_,_,_,[],_) -> [];
 get_similar(_,[],_,_,_,Acc,_) -> 
- 	io:format("Similar: ~p~n",[Acc]),
+ 	%io:format("Similar: ~p~n",[Acc]),
 	Acc.
 
 
