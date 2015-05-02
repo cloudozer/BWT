@@ -75,7 +75,7 @@ make_index(Chrom) ->
 	io:format("Removed ~p 'NNN' in the beginning~n",[Shift]),
 	io:format("Length of the ref genome: ~p~n",[length(Ref_seq)]),
 	statistics(runtime),
-	Ref_seq1 = lists:map(fun($N)->$A;
+	Ref_seq1 = lists:map(fun($N)->element(random:uniform(4),{$A,$C,$G,$T});
 							($B)->$C;
 							($D)->$G;
 							($R)->$A;

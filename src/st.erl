@@ -129,7 +129,7 @@ sa(Str) ->
 		dict:fetch(Key,Ps) ! finish,
 		receive
 			{Key,Index} -> 
-				io:format("complete~n"),
+				io:format("done~n"),
 				lists:foldl(fun(S,AccI) -> [S|AccI] end, Acc,lists:reverse(Index))
 		end
 				end, [], lists:sort(fun(A,B)-> A>B end, dict:fetch_keys(Ps))).
