@@ -1,5 +1,12 @@
+.railing
+
+*.img
+
 bwt_files
 
 deps
 ebin
 log
+
+*.fastq
+

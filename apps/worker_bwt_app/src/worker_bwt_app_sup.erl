@@ -24,7 +24,7 @@ start_link() ->
 
 init([]) ->
 	navel:start0(erl1),
-	navel:connect({127,0,0,1}),
+	navel:connect({10,0,0,1}),
     {ok, { {one_for_one, 5, 10}, [
 
         {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}

@@ -6,7 +6,7 @@
 -export([get_node/0]).
 
 -define(PROXY_TCP_PORT, 9223).
--define(SOCK_OPTS, [{active,true},{packet,4},{reuseaddr,true},binary]).
+-define(SOCK_OPTS, [{active,true},{packet,4},{recbuf,512*1024},{reuseaddr,true},binary]).
 
 start(Node) ->
 	spawn(fun() -> {ok,L} = gen_tcp:listen(?PROXY_TCP_PORT, ?SOCK_OPTS),
@@ -55,7 +55,7 @@ navel(Node, Peers, Calls) ->
 					io:format("navel: ~w not found (call to ~w:~w/~w dropped\n", [RN,M,F,length(As)]),
 					navel(Node, Peers, Calls) end;
 		
-		{tcp,S,<<_:32,Pkt/binary>>} ->
+		{tcp,S,Pkt} ->
 			case binary_to_term(Pkt) of
 				{'$iam',RN} ->
 					false = lists:keymember(S, 2, Peers),
@@ -64,10 +64,11 @@ navel(Node, Peers, Calls) ->
 					navel(Node, [{RN,S}|Peers], Calls);
 				{Ref,{'$call',M,F,As}} ->
 					Returns = (catch apply(M, F, As)),
-					%io:format("navel: call to ~w:~w/~w returns ~P\n", [M,F,length(As),Returns,12]),
+					%io:format("navel: call ~w:~w/~w\n", [M,F,length(As)]),
 					dispatch(S, {Ref,{'$returns',Returns}}),
 					navel(Node, Peers, Calls);
 				{Ref,{'$returns',Returns}} ->
+					%io:format("navel: call returns ~P\n", [Returns,12]),
 					{value,{From,_},Calls1} = lists:keytake(Ref, 2, Calls),
 					From ! {Ref,Returns},
 					navel(Node, Peers, Calls1) end;
@@ -76,6 +77,6 @@ navel(Node, Peers, Calls) ->
 
 dispatch(S, Msg) ->
 	Pkt = term_to_binary(Msg),
-	Sz = byte_size(Pkt),
-	gen_tcp:send(S, <<Sz:32,Pkt/binary>>).
+	%io:format("navel: dispatch pkt [~w byte(s)]\n", [byte_size(Pkt)]),
+	gen_tcp:send(S, Pkt).
 
