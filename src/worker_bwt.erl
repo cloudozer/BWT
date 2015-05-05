@@ -93,6 +93,9 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
         {Ref_bin, Refs}
     end,
 
+  {Meta, _} = proplists:get_value(Chromosome, FMs),
+  Shift = proplists:get_value(shift, Meta),
+
   Ref_bin_size = byte_size(Ref_bin),
 
   lists:foreach(fun({{SeqName, Qsec}, Seeds1}) ->
@@ -124,7 +127,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 
       case Cigar of
         no_match -> Acc;
-        C -> [{C,S - Ref_len} | Acc]
+        C -> [{C,S - Ref_len + Shift} | Acc]
       end
 
     end, [],  Seeds1),
