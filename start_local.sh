@@ -4,4 +4,9 @@
 
 main([]) ->
   master:test(),
+  receive stop -> ok end;
+
+main([SeqFileName, Chromosome, WorkersNumStr]) ->
+  WorkersNum = list_to_integer(WorkersNumStr),
+  master:test(SeqFileName, Chromosome, WorkersNum),
   receive stop -> ok end.
