@@ -105,7 +105,7 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
   gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
-handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 270 ->
+handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 260 ->
   {noreply, State};
 handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
