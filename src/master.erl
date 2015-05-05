@@ -2,24 +2,22 @@
 -behaviour(gen_server).
 
 -export([start_link/1, start_link/0, register_workers/2, run/4]).
--export([test/0, test/2]).
+-export([test/0, test/3]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
 
 %% test
 
 test() ->
-%%   test("bwt_files/SRR770176_1.fastq", "GL000192.1").
-  test("bwt_files/SRR770176_1.fastq", "GL000193.1").
+  test("bwt_files/SRR770176_1.fastq", "GL000193.1", 6).
 
-test(SeqFileName, Chromosome) ->
+test(SeqFileName, Chromosome, WorkersNum) ->
   lager:start(),
-%  lager:set_loglevel(lager_console_backend, error),
+  lager:set_loglevel(lager_console_backend, error),
   ok = application:start(bwt),
 
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  WorkersNum = 6,
   Pids = lists:map(fun(_) -> {ok, WPid} = worker_bwt:start_link(), WPid end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
   ok = master:register_workers(MPid, Pids),
@@ -107,7 +105,7 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
   gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
-handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 260 ->
+handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 270 ->
   {noreply, State};
 handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
