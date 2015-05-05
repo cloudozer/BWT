@@ -93,6 +93,8 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
         {Ref_bin, Refs}
     end,
 
+  Ref_bin_size = byte_size(Ref_bin),
+
   lists:foreach(fun({{SeqName, Qsec}, Seeds1}) ->
 
     Cigars = lists:foldl(fun({S,D}, Acc) ->
@@ -101,7 +103,17 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
       Start_pos = (S - Ref_len) bsl 3,
 %%       lager:info("Start pos: ~p~nRef_len: ~p",[Start_pos,Ref_len]),
 
-      <<_:Start_pos,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin,
+      {Ref_bin1, Start_pos1} = if S > Ref_bin_size ->
+          Ns = binary:copy(<<"N">>, S - Ref_bin_size),
+          {<<Ref_bin/binary, Ns/binary>>, Start_pos};
+        (S - Ref_len) < 0 ->
+          Ns = binary:copy(<<"N">>, -(S - Ref_len)),
+          {<<Ns/binary, Ref_bin/binary>>, 0};
+        true ->
+          {Ref_bin, Start_pos}
+      end,
+
+      <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin,
       Ref = binary_to_list(Ref_seq),
 %%       lager:info("Reference: ~p",[Ref]),
 %%       lager:info("Query seq: ~p",[Qsec]),
