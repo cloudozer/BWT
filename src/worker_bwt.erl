@@ -113,7 +113,7 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
           {Ref_bin, Start_pos}
       end,
 
-      <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin,
+      <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin1,
       Ref = binary_to_list(Ref_seq),
 %%       lager:info("Reference: ~p",[Ref]),
 %%       lager:info("Query seq: ~p",[Qsec]),
