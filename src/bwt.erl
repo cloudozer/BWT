@@ -72,6 +72,8 @@ make_index(Chrom) ->
 	File = filename:join(BwtFiles, "human_g1k_v37_decoy.fasta"),
 	{Pos,Len} = msw:get_reference_position(Chrom,File),
 	{Shift,Ref_seq} = msw:get_ref_seq(File,Pos,Len),
+	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq)),
+
 	io:format("Removed ~p 'NNN' in the beginning~n",[Shift]),
 	io:format("Length of the ref genome: ~p~n",[length(Ref_seq)]),
 	statistics(runtime),
@@ -92,8 +94,7 @@ make_index(Chrom) ->
 						end, Ref_seq),
 	{_,T1} = statistics(runtime),
 	io:format("Mapping takes: ~pms~n",[T1]),
-	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq1)),
-
+	
 	FM = fm(st:append($$,Ref_seq1)),
 	%io:format("~p~n",[FM]),
 	Meta = [{pointers, fmi:get_index_pointers(FM)},{shift, Shift}],
