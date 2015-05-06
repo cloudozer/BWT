@@ -30,7 +30,7 @@ run(Pid, MasterPid) ->
 
 %% callbacks
 
--record(state, {master, slave, workloads = [], workload_waterline = 10}).
+-record(state, {master, slave, workloads = [], workload_waterline = 10, stopping = false}).
 
 init(_) ->
   {ok, #state{}}.
@@ -43,16 +43,23 @@ handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlaveP
   {stop, normal, S}.
 
 handle_cast({run, MasterPid}, S=#state{slave = undefined, workloads = [], workload_waterline = Waterline}) ->
-  {ok, Workload} = gen_server:call(MasterPid, {get_workload, Waterline}, 60000),
+  Workload = gen_server:call(MasterPid, {get_workload, Waterline}, 60000),
+  true = is_list(Workload),
   SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), Workload, undefined, undefined]),
   erlang:monitor(process, SlavePid),
   gen_server:cast(MasterPid, {get_workload, Waterline, self()}),
   {noreply, S#state{master = MasterPid, slave = SlavePid}};
 
-handle_cast({workload, {ok, Workload}}, S = #state{workloads = WorkloadList}) ->
+handle_cast({workload, stop}, S) ->
+  {noreply, S#state{stopping = true}};
+handle_cast({workload, Workload}, S = #state{workloads = WorkloadList}) when is_list(Workload) ->
   lager:info("worker got workload ~p", [length(Workload)]),
   {noreply, S#state{workloads = Workload ++ WorkloadList}}.
-handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = [], workload_waterline = Waterline, master = MasterPid}) ->
+
+handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = [], stopping = true}) ->
+  lager:info("Worker is stopping"),
+  {stop, normal, stop, S};
+handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = [], workload_waterline = Waterline, master = MasterPid, stopping = false}) ->
   gen_server:cast(MasterPid, {get_workload, Waterline, self()}),
   {reply, wait, S};
 
@@ -79,7 +86,10 @@ slave_loop(MasterPid, WorkerPid, [], FM, Ref) ->
       slave_loop(MasterPid, WorkerPid, Workload, FM, Ref);
     wait ->
       timer:sleep(1000),
-      slave_loop(MasterPid, WorkerPid, [], FM, Ref)
+      slave_loop(MasterPid, WorkerPid, [], FM, Ref);
+    stop ->
+      lager:info("Worker's slave is stopping"),
+      bye
   end;
 
 slave_loop(MasterPid, WorkerPid, [{seed, ChromoName, QseqList} | WorkloadRest], MetaFM, Ref) ->
@@ -95,10 +105,10 @@ slave_loop(MasterPid, WorkerPid, [{seed, ChromoName, QseqList} | WorkloadRest], 
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 
   Seeds = lists:foldl(
-    fun({QSeqName,QPos,Qseq},Acc) ->
+    fun({QPos,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
         [] -> Acc;
-        ResultsList -> [{QSeqName,QPos,ResultsList}|Acc]
+        ResultsList -> [{QPos,ResultsList}|Acc]
       end
     end, [], QseqList),
 

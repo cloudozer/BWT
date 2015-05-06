@@ -1,5 +1,5 @@
 -module(fastq).
--export([read_seq/1, read_seq/2, read_seq_pos/1, fold/3, size/1, get_value/2]).
+-export([read_seq/1, read_seqs/2, read_seq_pos/1, fold/3, size/1, get_value/2]).
 
 size(FileName) ->
   fastq:fold(fun(_,Acc) -> 1+Acc end, 0, FileName).
@@ -13,8 +13,8 @@ read_seq(Dev) ->
       Seq = {lists:droplast(SeqName),
              lists:droplast(SeqData)},
       {ok, Seq};
-    {ok, _} -> 
-      wrong_format;
+    {ok, _} ->
+      read_seq_pos(Dev);
     eof ->
       eof
   end.
@@ -22,35 +22,36 @@ read_seq(Dev) ->
 read_seq_pos(Dev) ->
   {ok, Pos} = file:position(Dev, cur),
   case file:read_line(Dev) of
-    {ok, [$@ | SeqName]} ->
+    {ok, [$@ | _SeqName]} ->
       {ok, SeqData} = file:read_line(Dev),
       _Delimiter = file:read_line(Dev),
       _Quality = file:read_line(Dev),
-      Seq = {lists:droplast(SeqName),
-              Pos,
-             lists:droplast(SeqData)},
-      {ok, Seq};
+      {ok, {Pos, lists:droplast(SeqData)}};
     {ok, _} ->
-      wrong_format;
+      read_seq_pos(Dev);
     eof ->
       eof
   end.
 
-read_seq(Dev, N) ->
-  read_seq(Dev, N, []).
+read_seqs(Dev, N) ->
+  read_seqs(Dev, N, []).
 
-read_seq(_Dev, 0, Acc) ->
+read_seqs(_Dev, 0, Acc) ->
   {ok, Acc};
-read_seq(Dev, N, Acc) ->
-%%   case read_seq(Dev) of
+read_seqs(Dev, N, []) ->
   case read_seq_pos(Dev) of
     {ok, Seq} ->
-      read_seq(Dev, N-1, [Seq|Acc]);
+      read_seqs(Dev, N-1, [Seq]);
     eof ->
-      if (Acc == []) ->
         eof;
-      true -> {eof, Acc}
-      end;
+    Err -> Err
+  end;
+read_seqs(Dev, N, Acc) ->
+  case read_seq_pos(Dev) of
+    {ok, Seq} ->
+      read_seqs(Dev, N-1, [Seq|Acc]);
+    eof ->
+      {eof, Acc};
     Err -> Err
   end.
 

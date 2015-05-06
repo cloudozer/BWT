@@ -46,7 +46,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client}).
+-record(state, {workers=[], fastq, fastq_eof = false, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client, stopping = false}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -74,42 +74,39 @@ handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#st
   %% TODO: demonitor the rest workers
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
 
-handle_call({get_workload, N}, _From, S) ->
-  {Workload,S1} = produce_workload(N, S),
-  {reply, {ok, Workload}, S1}.
+handle_call({get_workload, N}, _From, S=#state{stopping = false}) ->
+  {Result,S1} = produce_workload(N, S),
+  {reply, Result, S1}.
 
 produce_workload(N, State) ->
   produce_workload(N, State, []).
 
 produce_workload(0, State, Acc) ->
-%%   lager:info("produce_workload 0"),
   {Acc, State};
 
-produce_workload(N, S = #state{fastq = {_, FqDev}, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize}, Acc)
+produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize}, Acc)
   when length(Workers) > length(Seeds) ->
-%%   lager:info("produce_workload 1 ~p", [N]),
-    case fastq:read_seq(FqDev, SeedWorkPkgSize) of
+    case fastq:read_seqs(FqDev, SeedWorkPkgSize) of
       {_, SeqList} ->
         Workload = {seed, Chromosome, SeqList},
         produce_workload(N-1, S, [Workload | Acc]);
       eof ->
-        throw(eof)
-%% %        {reply, undefined, S#state{fastq = {FqFileName,done}}}
-%%         {reply, undefined, S}
+        {Acc, S#state{fastq_eof = true}}
     end;
 
-produce_workload(N, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}, Acc) ->
-  Seeds1 = lists:map(fun({SeqName, SeqPos, L}) ->
+produce_workload(_N, S = #state{fastq_eof = true, seeds = []}, []) ->
+  {stop, S#state{stopping = true}};
+
+produce_workload(N, S = #state{chromosome = Chromosome, seeds = Seeds, fastq={FileName, _}}, Acc) ->
+  Seeds1 = lists:map(fun({SeqPos, L}) ->
     {ok, Dev} = file:open(FileName, [read, raw, read_ahead]),
     {ok, SeqPos} = file:position(Dev, SeqPos),
     {ok, {SeqName, SeqData}} = fastq:read_seq(Dev),
     ok = file:close(Dev),
     {{SeqName, SeqData}, L}
   end, Seeds),
-  %lager:info("master sent sw workload: ~p", [Seeds1]),
   Workload = {sw, Chromosome, Seeds1},
   produce_workload(N-1, S#state{seeds = []}, [Workload | Acc]).
-
 
 handle_cast({get_workload, N, Pid}, State) ->
   Self = self(),
