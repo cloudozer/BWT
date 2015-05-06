@@ -114,7 +114,7 @@ produce_workload(N, S = #state{chromosome = Chromosome, seeds = Seeds, workers =
 handle_cast({get_workload, N, Pid}, State) ->
   Self = self(),
   spawn_link(fun() ->
-    Resp = gen_server:call(Self, {get_workload, N}),
+    Resp = gen_server:call(Self, {get_workload, N}, 60000),
     gen_server:cast(Pid, {workload, Resp})
   end),
   {noreply, State};
@@ -123,12 +123,12 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
   lager:info("Total 'results': ~p", [ResSize + length(Results)]),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
-handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 270 ->
+handle_cast({cigar, _, {CigarRate, _}, _, _}, State) when CigarRate < 270 ->
   {noreply, State};
-handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
+handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
-  io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue]),
-  ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue},
+  io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
+  ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq},
   {noreply, State};
 
 handle_cast({done, LastPid}, S=#state{workers = [LastPid]}) -> %, seeds = []}) ->

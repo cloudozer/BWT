@@ -152,18 +152,18 @@ slave_loop(MasterPid, WorkerPid, [{sw, Chromosome, Seeds} | WorkloadRest], FM = 
 
       case Cigar of
         no_match -> Acc;
-        C -> [{C,S - Ref_len + Shift} | Acc]
+        C -> [{C,S - Ref_len + Shift,Ref_seq1} | Acc]
       end
 
     end, [],  Seeds1),
 
     case Cigars of
       [] -> ok;
-      [{Cigar,P}] ->
-        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar, P});
+      [{Cigar,P,RefSeq}] ->
+        gen_server:cast(MasterPid, {cigar, SeqName, Cigar, P, RefSeq});
       _ ->
-        [{TopCigar,P} | _] = lists:sort(fun({{R1,_},_}, {{R2,_},_}) -> R1 > R2 end, Cigars),
-        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, TopCigar, P})
+        [{TopCigar,P,RefSeq} | _] = lists:sort(fun({{R1,_},_,_}, {{R2,_},_,_}) -> R1 > R2 end, Cigars),
+        gen_server:cast(MasterPid, {cigar, SeqName, TopCigar, P, RefSeq})
     end
 
   end, Seeds),
