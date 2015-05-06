@@ -25,26 +25,26 @@
 ### Master node Setup
 
 	$ cd BWT
-	$ erl -pa ebin deps/*/ebin apps/*/ebin -name master@<HOST_NAME> -setcookie secret_gc -eval "master_app:dev()"
+	$ erl -pa ebin deps/*/ebin apps/*/ebin -name master@%HOST_NAME% -setcookie secret_gc -eval "master_app:dev()"
 
 ### Worker node Setup
 
 Ensure that the following script runs on boot-up. Replace 'erlangonxen.org' wiht the master's hostname in apps/worker_bwt_app/src/worker_bwt_app_sup.erl.
 
-	cd <BWT_FOLDER>
+	cd %BWT_FOLDER%
 	git pull
 	./rebar update-deps compile
-	erl -pa ebin deps/*/ebin apps/*/ebin -name erl1@<HOST_NAME> -setcookie secret_gc -eval "worker_bwt_app_app:dev()"
+	erl -pa ebin deps/*/ebin apps/*/ebin -name erl1@%HOST_NAME% -setcookie secret_gc -eval "worker_bwt_app_app:dev()"
 
 ### To run aligner on the cluster
 1. Start master and worker nodes.
 2. Run:
 
 	# from your laptop:
-	$ ./start_cluster.sh <MASTER_HOST_NAME> <WORKERS_NUMBER>
+	$ ./start_cluster.sh %MASTER_HOST_NAME% %WORKERS_NUMBER%
 	
 	%% or from Erlang shell of the master node
-	1> gen_server:call(master , {run, "bwt_files/SRR770176_1.fastq", "GL000193.1", <WORKERS_NUMBER>}).
+	1> gen_server:call(master , {run, "bwt_files/SRR770176_1.fastq", "GL000193.1", %WORKERS_NUMBER%}).
 
 [Disregards Info below this line]
 

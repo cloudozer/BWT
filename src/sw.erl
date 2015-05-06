@@ -17,7 +17,7 @@
 -define(GAP_PENALTY,-2).
 -define(GAP_EXT_PENALTY,0).
 
--define(UNDEF,1.5).
+-define(UNDEF,1.8).
 
 
 t_e() ->
