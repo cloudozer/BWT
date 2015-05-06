@@ -2,17 +2,22 @@
 -behaviour(gen_server).
 
 -export([start_link/1, start_link/0, register_workers/2, run/4]).
--export([test/0, test/3]).
+-export([test/0, test/4]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
 
 %% test
 
 test() ->
-  test("bwt_files/SRR770176_1.fastq", "GL000193.1", 6).
+  test("bwt_files/SRR770176_1.fastq", "GL000193.1", 6, false).
 
-test(SeqFileName, Chromosome, WorkersNum) ->
+test(SeqFileName, Chromosome, WorkersNum, Debug) ->
   lager:start(),
-  lager:set_loglevel(lager_console_backend, error),
+  if Debug == true ->
+    lager:set_loglevel(lager_console_backend, debug);
+  true ->
+    lager:set_loglevel(lager_console_backend, error)
+  end,
+
   ok = application:start(bwt),
 
   %% Create a master process
@@ -66,26 +71,36 @@ handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#st
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
   lists:foreach(fun(Pid) -> worker_bwt:run(Pid, self()) end, Workers1),
-  %% TODO: demonitor the rest
+  %% TODO: demonitor the rest workers
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
 
-handle_call(get_workload, _From, S = #state{fastq = {_, done}, seeds = []}) ->
-  {reply, stop, S};
+handle_call({get_workload, N}, _From, S) ->
+  {Workload,S1} = produce_workload(N, S),
+  {reply, {ok, Workload}, S1}.
 
-handle_call(get_workload, _From, S = #state{fastq = {FqFileName, FqDev}, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize})
+produce_workload(N, State) ->
+  produce_workload(N, State, []).
+
+produce_workload(0, State, Acc) ->
+%%   lager:info("produce_workload 0"),
+  {Acc, State};
+
+produce_workload(N, S = #state{fastq = {_, FqDev}, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize}, Acc)
   when length(Workers) > length(Seeds) ->
+%%   lager:info("produce_workload 1 ~p", [N]),
     case fastq:read_seq(FqDev, SeedWorkPkgSize) of
       {_, SeqList} ->
         Workload = {seed, Chromosome, SeqList},
-        {reply, {ok, Workload}, S};
+        produce_workload(N-1, S, [Workload | Acc]);
       eof ->
-%        {reply, undefined, S#state{fastq = {FqFileName,done}}}
-        {reply, undefined, S}
+        throw(eof)
+%% %        {reply, undefined, S#state{fastq = {FqFileName,done}}}
+%%         {reply, undefined, S}
     end;
 
-handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}) ->
+produce_workload(N, S = #state{chromosome = Chromosome, seeds = Seeds, workers = Workers, fastq={FileName, _}}, Acc) ->
   Seeds1 = lists:map(fun({SeqName, SeqPos, L}) ->
-    {ok, Dev} = file:open(FileName, [read, raw, read_ahead]), 
+    {ok, Dev} = file:open(FileName, [read, raw, read_ahead]),
     {ok, SeqPos} = file:position(Dev, SeqPos),
     {ok, {SeqName, SeqData}} = fastq:read_seq(Dev),
     ok = file:close(Dev),
@@ -93,16 +108,19 @@ handle_call(get_workload, _From, S = #state{chromosome = Chromosome, seeds = See
   end, Seeds),
   %lager:info("master sent sw workload: ~p", [Seeds1]),
   Workload = {sw, Chromosome, Seeds1},
-  {reply, {ok, Workload}, S#state{seeds = []}}.
+  produce_workload(N-1, S#state{seeds = []}, [Workload | Acc]).
 
 
-handle_cast(schedule, State) ->
-  %% TODO: do something
+handle_cast({get_workload, N, Pid}, State) ->
+  Self = self(),
+  spawn_link(fun() ->
+    Resp = gen_server:call(Self, {get_workload, N}),
+    gen_server:cast(Pid, {workload, Resp})
+  end),
   {noreply, State};
 
 handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}) ->
   lager:info("Total 'results': ~p", [ResSize + length(Results)]),
-  gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
 handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 270 ->

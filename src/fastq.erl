@@ -46,7 +46,7 @@ read_seq(Dev, N, Acc) ->
   case read_seq_pos(Dev) of
     {ok, Seq} ->
       read_seq(Dev, N-1, [Seq|Acc]);
-    eof -> 
+    eof ->
       if (Acc == []) ->
         eof;
       true -> {eof, Acc}

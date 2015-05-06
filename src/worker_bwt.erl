@@ -10,8 +10,8 @@
 -behaviour(gen_server).
 
 -export([start_link/0, start_link/1, run/2]).
--export([init/1, terminate/2, handle_info/2, handle_cast/2]).
--export([workload_buffer_loop/5, slave_loop/6]).
+-export([init/1, terminate/2, handle_info/2, handle_cast/2, handle_call/3]).
+-export([slave_loop/5]).
 
 -include("bwt.hrl").
 
@@ -30,7 +30,7 @@ run(Pid, MasterPid) ->
 
 %% callbacks
 
--record(state, {master, slave}).
+-record(state, {master, slave, workloads = [], workload_waterline = 10}).
 
 init(_) ->
   {ok, #state{}}.
@@ -42,23 +42,54 @@ handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlaveP
   gen_server:cast(MasterPid, {done, self()}),
   {stop, normal, S}.
 
-handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
-  WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), 5, [], beg_forever]),
-  {ok, Workload} = get_workload(WorkloadBufPid),
-  SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), WorkloadBufPid, Workload, [], []]),
+handle_cast({run, MasterPid}, S=#state{slave = undefined, workloads = [], workload_waterline = Waterline}) ->
+  {ok, Workload} = gen_server:call(MasterPid, {get_workload, Waterline}, 60000),
+  SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), Workload, undefined, undefined]),
   erlang:monitor(process, SlavePid),
-  {noreply, S#state{master = MasterPid, slave = SlavePid}}.
+  gen_server:cast(MasterPid, {get_workload, Waterline, self()}),
+  {noreply, S#state{master = MasterPid, slave = SlavePid}};
+
+handle_cast({workload, {ok, Workload}}, S = #state{workloads = WorkloadList}) ->
+  lager:info("worker got workload ~p", [length(Workload)]),
+  {noreply, S#state{workloads = Workload ++ WorkloadList}}.
+handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = [], workload_waterline = Waterline, master = MasterPid}) ->
+  gen_server:cast(MasterPid, {get_workload, Waterline, self()}),
+  {reply, wait, S};
+
+handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = Workloads, workload_waterline = Waterline, master = MasterPid}) ->
+  WorkLen = length(Workloads),
+
+  if WorkLen =< Waterline ->
+    gen_server:cast(MasterPid, {get_workload, Waterline, self()});
+    true -> ok
+  end,
+%%   {Workloads1, WorkloadsRest} = lists:split(WorkLen div 2, Workloads),
+
+  lager:info("slave get_workload ~p", [length(Workloads)]),
+%%   lager:info("slave get_workload ~p", [{length(Workloads1),length(WorkloadsRest)}]),
+
+  {reply, {ok, Workloads}, S#state{workloads = []}}.
+%%   {reply, {ok, Workloads1}, S#state{workloads = WorkloadsRest}}.
 
 %% private
 
-slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, FMs, Refs) ->
-  {{Meta, FM}, FMs1} =
-    case proplists:get_value(ChromoName, FMs) of
+slave_loop(MasterPid, WorkerPid, [], FM, Ref) ->
+  case gen_server:call(WorkerPid, get_workload) of
+    {ok, Workload} ->
+      slave_loop(MasterPid, WorkerPid, Workload, FM, Ref);
+    wait ->
+      timer:sleep(1000),
+      slave_loop(MasterPid, WorkerPid, [], FM, Ref)
+  end;
+
+slave_loop(MasterPid, WorkerPid, [{seed, ChromoName, QseqList} | WorkloadRest], MetaFM, Ref) ->
+
+  MetaFM1 = {Meta, FM} =
+    case MetaFM of
       undefined ->
-        MetaFM = bwt:get_index(ChromoName),
-        {MetaFM, [{ChromoName, MetaFM}]};
-      MetaFM ->
-        {MetaFM, FMs}
+        bwt:get_index(ChromoName);
+      {_Meta, _FM} ->
+        MetaFM
     end,
 
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
@@ -70,30 +101,24 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName, QseqList}, F
         ResultsList -> [{QSeqName,QPos,ResultsList}|Acc]
       end
     end, [], QseqList),
+
   lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
   gen_server:cast(MasterPid, {seeds, Seeds}),
 
-  case get_workload(WorkloadBufPid) of
-    {ok, Workload1} ->
-      slave_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs1, Refs);
-    %% TODO: change
-    stop ->
-      stop
-  end;
+  slave_loop(MasterPid, WorkerPid, WorkloadRest, MetaFM1, Ref);
 
-slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, Refs) ->
+slave_loop(MasterPid, WorkerPid, [{sw, Chromosome, Seeds} | WorkloadRest], FM = {Meta, _}, Ref) ->
 
-  {Ref_bin, Refs1} =
-    case proplists:get_value(Chromosome, Refs) of
+  Ref1 =
+    case Ref of
       undefined ->
         {ok, BwtFiles} = application:get_env(bwt,bwt_files),
         {ok, Ref_bin} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
-        {Ref_bin, [{Chromosome,Ref_bin}|Refs]};
-      Ref_bin ->
-        {Ref_bin, Refs}
+        Ref_bin;
+      Ref_bin when is_binary(Ref_bin) ->
+        Ref_bin
     end,
 
-  {Meta, _} = proplists:get_value(Chromosome, FMs),
   Shift = proplists:get_value(shift, Meta),
 
   Ref_bin_size = byte_size(Ref_bin),
@@ -108,20 +133,20 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 
       {Ref_bin1, Start_pos1} = if S > Ref_bin_size ->
           Ns = binary:copy(<<"N">>, S - Ref_bin_size),
-          {<<Ref_bin/binary, Ns/binary>>, Start_pos};
+          {<<Ref1/binary, Ns/binary>>, Start_pos};
         (S - Ref_len) < 0 ->
           Ns = binary:copy(<<"N">>, -(S - Ref_len)),
-          {<<Ns/binary, Ref_bin/binary>>, 0};
+          {<<Ns/binary, Ref1/binary>>, 0};
         true ->
-          {Ref_bin, Start_pos}
+          {Ref1, Start_pos}
       end,
 
       <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin1,
-      Ref = binary_to_list(Ref_seq),
+      Ref_seq1 = binary_to_list(Ref_seq),
 %%       lager:info("Reference: ~p",[Ref]),
 %%       lager:info("Query seq: ~p",[Qsec]),
 
-      Cigar = sw:sw(Qsec,Ref),
+      Cigar = sw:sw(Qsec,Ref_seq1),
 
 %%       lager:info("Cigar: ~p", [Cigar]),
 
@@ -132,51 +157,16 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 
     end, [],  Seeds1),
 
-  case Cigars of
-    [] -> ok;
-    [{Cigar,P}] ->
-      gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar, P});
-    _ ->
-      [{TopCigar,P} | _] = lists:sort(fun({{R1,_},_}, {{R2,_},_}) -> R1 > R2 end, Cigars), 
-      gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, TopCigar, P})
-  end
+    case Cigars of
+      [] -> ok;
+      [{Cigar,P}] ->
+        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, Cigar, P});
+      _ ->
+        [{TopCigar,P} | _] = lists:sort(fun({{R1,_},_}, {{R2,_},_}) -> R1 > R2 end, Cigars),
+        gen_server:cast(MasterPid, {cigar, {SeqName,Qsec}, TopCigar, P})
+    end
 
   end, Seeds),
 
-  case get_workload(WorkloadBufPid) of
-    {ok, Workload1} ->
-      slave_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs, Refs1);
-    %% TODO: change
-    stop ->
-      stop
-  end.
+  slave_loop(MasterPid, WorkerPid, WorkloadRest, FM, Ref1).
 
-workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever) when Waterline > length(WorkloadList) ->
-  case gen_server:call(MasterPid, get_workload) of
-    {ok, Workload} ->
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], beg_forever);
-    undefined ->
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, beg_forever);
-    stop ->
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, stop)
-  end;
-workload_buffer_loop(MasterPid, WorkerPid, Waterline, [Workload | WorkloadList], NextAction) ->
-  receive
-    {get_workload, Pid} ->
-      Pid ! {ok, Workload},
-      workload_buffer_loop(MasterPid, WorkerPid, Waterline, WorkloadList, NextAction)
-  end;
-workload_buffer_loop(_MasterPid, _WorkerPid, _Waterline, [], stop) ->
-  receive
-    {get_workload, Pid} ->
-      Pid ! stop,
-      %% TODO: wait for stop signal from the master
-      stop
-  end.
-
-get_workload(SupplierPid) ->
-  SupplierPid ! {get_workload, self()},
-  receive
-    {ok, W} -> {ok, W};
-    Error -> Error
-  end.
