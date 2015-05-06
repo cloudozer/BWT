@@ -55,28 +55,36 @@ init(_Args) ->
 terminate(Reason, State) ->
   lager:info("Master terminated: ~p", [{Reason, State}]).
 
-%% A worker is finished
-handle_info({'DOWN',_Ref,process,_Pid,normal}, State) ->
-  {noreply, State}.
+handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}]}) ->
+  lager:info("It's all over"),
+  {stop, normal, S};
+handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
+  {noreply, S#state{workers = lists:delete({Pid,Ref}, S#state.workers)}}.
 
 
 handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
-  %% monitor new workers
-  lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
-  S1 = S#state{workers=Pids++Workers},
+  %% link and monitor new workers
+  NewWorkers = lists:map(fun(Pid)->
+                  true = link(Pid),
+                  Ref = monitor(process, Pid),
+                  {Pid, Ref}
+  end, Pids),
+  S1 = S#state{workers=NewWorkers++Workers},
   lager:info("The master got ~b workers", [length(S1#state.workers)]),
   {reply, ok, S1};
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
-  {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
-  lists:foreach(fun(Pid) -> worker_bwt:run(Pid, self()) end, Workers1),
-  %% TODO: demonitor the rest workers
+  {Workers1, Workers2} = lists:split(WorkersLimit, Workers),
+  lists:foreach(fun({Pid,_}) -> worker_bwt:run(Pid, self()) end, Workers1),
+  lists:foreach(fun({Pid,Ref}) -> true = unlink(Pid), true = demonitor(Ref) end, Workers2),
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
 
 handle_call({get_workload, N}, _From, S=#state{stopping = false}) ->
   {Result,S1} = produce_workload(N, S),
-  {reply, Result, S1}.
+  {reply, Result, S1};
+handle_call({get_workload, _N}, _From, S=#state{stopping = true}) ->
+  {reply, stop, S}.
 
 produce_workload(N, State) ->
   produce_workload(N, State, []).
