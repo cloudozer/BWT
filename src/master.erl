@@ -118,7 +118,7 @@ handle_cast({get_workload, N, Pid}, State) ->
   end),
   {noreply, State};
 
-handle_cast({cigar, _, {CigarRate, _}, _, _}, State) when CigarRate < 270 ->
+handle_cast({cigar, _, {CigarRate, _}, _, _}, State) when CigarRate < 265 ->
   {noreply, State};
 handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
