@@ -55,9 +55,11 @@ init(_Args) ->
 terminate(Reason, State) ->
   lager:info("Master terminated: ~p", [{Reason, State}]).
 
-handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}], start_time = StartTime}) ->
+handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
-  io:format("It's all over. ~.1f sec.~n", [Microsec / 1000000]),
+  Sec = Microsec / 1000000,
+  io:format("It's all over. ~.1f sec.~n", [Sec]),
+  ClientPid ! {stop, Sec},
   {stop, normal, S};
 handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
 lager:info("Worker down: ~p",[node(Pid)]),
