@@ -9,7 +9,7 @@
 -module(worker_bwt).
 -behaviour(gen_server).
 
--export([start_link/0, start_link/1, run/2]).
+-export([start_link/1, run/2]).
 -export([init/1, terminate/2, handle_cast/2, handle_call/3]).
 -export([slave_loop/5]).
 
@@ -17,12 +17,10 @@
 
 %% api
 
-start_link() ->
-  gen_server:start_link(?MODULE, {}, []).
-
-start_link(MasterPid) ->
+start_link(MasterRef = {_, Node}) ->
+  wait_connection_forever(Node),
   {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
-  ok = master:register_workers(MasterPid, [Pid]),
+  ok = master:register_workers(MasterRef, [Pid]),
   {ok, Pid}.
 
 run(Pid, MasterPid) ->
@@ -162,3 +160,13 @@ slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM
   lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
   slave_loop(MasterPid, WorkerPid, WorkloadRest, MetaFM1, Ref).
+
+wait_connection_forever(Node) ->
+  case net_adm:ping(Node) of
+    pong ->
+      ok;
+    pang ->
+      timer:sleep(5000),
+      lager:info("~p is down, waiting...", [Node]),
+      wait_connection_forever(Node)
+  end.

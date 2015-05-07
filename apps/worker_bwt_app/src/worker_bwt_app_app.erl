@@ -10,7 +10,6 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    timer:sleep(5000),
     worker_bwt_app_sup:start_link().
 
 stop(_State) ->
