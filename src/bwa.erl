@@ -16,11 +16,11 @@ find_seeds(FM, Pc,Pg,Pt,Last, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 		$A -> Sp = 1,  Ep = Pc-1;
 		$C -> Sp = Pc, Ep = Pg-1;
 		$G -> Sp = Pg, Ep = Pt-1;
-		$T -> Sp = Pt, Ep = Last
+		$T -> Sp = Pt, Ep = Last;
 		%% TODO: handle N symbols
-		%$N ->
+		$N ->
 %% 			io:format("N found in fasq seq~n"),
-		%	Sp = 1, Ep = Pc-1
+			Sp = 1, Ep = Pc-1
 	end,
 	find_seeds(FM, Sp,Ep, Tail, 1).
 

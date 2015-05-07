@@ -13,7 +13,7 @@ read_seq(Dev) ->
       _Quality = file:read_line(Dev),
       Seq = {lists:droplast(SeqName),
              lists:droplast(SeqData)},
-      io:format("Name:~p~nData:~p~n",[SeqName,SeqData]),
+      %io:format("Name:~p~nData:~p~n",[SeqName,SeqData]),
       {ok, Seq};
     {ok, _} ->
       read_seq_pos(Dev);

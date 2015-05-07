@@ -48,8 +48,8 @@ rand_seq(Acc,N) ->
 
 
 sw([_|_]=Qseq,[_|_]=Ref) ->
-	io:format("Seq: ~p~n",[Qseq]),
-	io:format("Ref: ~p~n",[Ref]),
+	%io:format("Seq: ~p~n",[Qseq]),
+	%io:format("Ref: ~p~n",[Ref]),
 	Lq = length(Qseq),
 
 	%%%%%% {Header,[column]}
@@ -66,7 +66,7 @@ sw(_,_) -> no_match.
 
 
 build_tab(_,_,_,V1max,Vthr) when V1max < Vthr -> 
-	io:format(" SW: no match~n"),
+	%io:format(" SW: no match~n"),
 	no_match;
 build_tab([[{V,Dir}|FirstCol]|Tab1],Ref,[S|Qseq],_,Vthr) -> % Vs1, Vs2 - starting scores for the previous and curr rows
 	V1 = case FirstCol of
