@@ -46,7 +46,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, fastq_eof = false, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client, stopping = false, start_time}).
+-record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 1000, client, stopping = false, start_time}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -93,29 +93,17 @@ produce_workload(N, State) ->
 produce_workload(0, State, Acc) ->
   {Acc, State};
 
-produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, chromosome = Chromosome, seeds = Seeds, workers = Workers, seed_workload_pkg_size = SeedWorkPkgSize}, Acc)
-  when length(Workers) > length(Seeds) ->
-    case fastq:read_seqs(FqDev, SeedWorkPkgSize) of
-      {_, SeqList} ->
-        Workload = {seed, Chromosome, SeqList},
-        produce_workload(N-1, S, [Workload | Acc]);
-      eof ->
-        {Acc, S#state{fastq_eof = true}}
-    end;
+produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, chromosome = Chromosome, workload_size = WorkloadSize}, Acc) ->
+  case fastq:read_seqs(FqDev, WorkloadSize) of
+    {_, SeqList} ->
+      Workload = {Chromosome, SeqList},
+      produce_workload(N-1, S, [Workload | Acc]);
+    eof ->
+      {Acc, S#state{fastq_eof = true}}
+  end;
 
-produce_workload(_N, S = #state{fastq_eof = true, seeds = []}, []) ->
-  {stop, S#state{stopping = true}};
-
-produce_workload(N, S = #state{chromosome = Chromosome, seeds = Seeds, fastq={FileName, _}}, Acc) ->
-  Seeds1 = lists:map(fun({SeqPos, L}) ->
-    {ok, Dev} = file:open(FileName, [read, raw, read_ahead]),
-    {ok, SeqPos} = file:position(Dev, SeqPos),
-    {ok, {SeqName, SeqData}} = fastq:read_seq(Dev),
-    ok = file:close(Dev),
-    {{SeqName, SeqData}, L}
-  end, Seeds),
-  Workload = {sw, Chromosome, Seeds1},
-  produce_workload(N-1, S#state{seeds = []}, [Workload | Acc]).
+produce_workload(_N, S = #state{fastq_eof = true}, []) ->
+  {stop, S#state{stopping = true}}.
 
 handle_cast({get_workload, N, Pid}, State) ->
   Self = self(),
@@ -125,21 +113,10 @@ handle_cast({get_workload, N, Pid}, State) ->
   end),
   {noreply, State};
 
-handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}) ->
-  lager:info("Total 'results': ~p", [ResSize + length(Results)]),
-  {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
-
 handle_cast({cigar, _, {CigarRate, _}, _, _}, State) when CigarRate < 270 ->
   {noreply, State};
 handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
   io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
   ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq},
-  {noreply, State};
-
-handle_cast({done, LastPid}, S=#state{workers = [LastPid]}) -> %, seeds = []}) ->
-  lager:info("last worker done"),
-  {stop, normal, S};
-handle_cast({done, Pid}, S = #state{workers = Workers}) -> % , seeds = []}) ->
-  lager:info("worker ~p done", [Pid]),
-  {noreply, S#state{workers = lists:delete(Pid, Workers)}}.
+  {noreply, State}.
