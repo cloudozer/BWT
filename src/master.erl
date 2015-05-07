@@ -58,11 +58,10 @@ terminate(Reason, State) ->
 handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
-  io:format("It's all over. ~.1f sec.~n", [Sec]),
+  lager:info("It's all over. ~.1f sec.", [Sec]),
   ClientPid ! {stop, Sec},
   {stop, normal, S};
 handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
-lager:info("Worker down: ~p",[node(Pid)]),
   {noreply, S#state{workers = lists:delete({Pid,Ref}, S#state.workers)}}.
 
 
