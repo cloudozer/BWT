@@ -104,8 +104,8 @@ make_index(Chrom) ->
 
 
 get_index(Chrom) ->
-	%{ok, BwtFiles} = application:get_env(bwt,bwt_files),
-	BwtFiles = "bwt_files/",
+	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
+%% 	BwtFiles = "bwt_files/",
 	{ok,Bin} = file:read_file(filename:join(BwtFiles, Chrom++".fm")),
 	%{ok,Bin} = file:read_file(filename:join("bwt_files/", Chrom++".fm")),
 	binary_to_term(Bin).
