@@ -1,5 +1,5 @@
 -module(fastq).
--export([read_seq/1, read_seq/2, read_seq_pos/1, fold/3, size/1, get_value/2]).
+-export([read_seq/1, read_seq/2, read_seq_pos/1, fold/3, size/1, get_value/2, reverse_compliment/1]).
 
 size(FileName) ->
   fastq:fold(fun(_,Acc) -> 1+Acc end, 0, FileName).
@@ -12,6 +12,7 @@ read_seq(Dev) ->
       _Quality = file:read_line(Dev),
       Seq = {lists:droplast(SeqName),
              lists:droplast(SeqData)},
+      io:format("Name:~p~nData:~p~n",[SeqName,SeqData]),
       {ok, Seq};
     {ok, _} -> 
       wrong_format;
@@ -80,3 +81,16 @@ get_value_inner(SeqName, Dev) ->
     {ok, _} ->
       get_value_inner(SeqName, Dev)
   end.
+
+
+reverse_compliment(Ls) -> rc(Ls,[]).
+
+rc([$A|Ls],Acc) -> rc(Ls,[$T|Acc]);
+rc([$T|Ls],Acc) -> rc(Ls,[$A|Acc]);
+rc([$C|Ls],Acc) -> rc(Ls,[$G|Acc]);
+rc([$G|Ls],Acc) -> rc(Ls,[$C|Acc]);
+rc([$N|Ls],Acc) -> rc(Ls,[$N|Acc]);
+rc([],Acc) -> Acc.
+
+
+  

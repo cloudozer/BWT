@@ -120,7 +120,7 @@ get_seed_ends(_,_,_,N) when N < ?MIN_LEN ->
 	%io:format("no seeds. N=~p~n",[N]),
 	no_seeds; 
 get_seed_ends(FM,Sp,Ep,N) -> 
-	%io:format("Extracting seed ends from range: (~p,~p)~n",[Sp,Ep]),
+	%io:format("Extracting seed ends. N=~p~n",[N]),
 	Sb = Sp bsr ?BLOCK_SHIFT + 1,
 	Eb = Ep bsr ?BLOCK_SHIFT + 1,
 	Sid = Sp band ?BLOCK_ID_MASK + 1,

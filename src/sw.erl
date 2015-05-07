@@ -12,9 +12,9 @@
 		rand_seq/1]).
 
 -define(MATCH,2).
--define(UNKNOWN,1).
+-define(UNKNOWN,1.6).
 -define(MISMATCH,-1).
--define(GAP_PENALTY,-2).
+-define(GAP_PENALTY,-1).
 -define(GAP_EXT_PENALTY,0).
 
 -define(UNDEF,1).
@@ -48,13 +48,13 @@ rand_seq(Acc,N) ->
 
 
 sw([_|_]=Qseq,[_|_]=Ref) ->
-	%io:format("Seq: ~p~n",[Qseq]),
-	%io:format("Ref: ~p~n",[Ref]),
+	io:format("Seq: ~p~n",[Qseq]),
+	io:format("Ref: ~p~n",[Ref]),
 	Lq = length(Qseq),
 
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 5));
+	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 3));
 
 
 sw(N1,N2) when N1 =< N2 -> 
@@ -65,7 +65,9 @@ sw(_,_) -> no_match.
 
 
 
-build_tab(_,_,_,V1max,Vthr) when V1max < Vthr -> no_match;
+build_tab(_,_,_,V1max,Vthr) when V1max < Vthr -> 
+	io:format(" SW: no match~n"),
+	no_match;
 build_tab([[{V,Dir}|FirstCol]|Tab1],Ref,[S|Qseq],_,Vthr) -> % Vs1, Vs2 - starting scores for the previous and curr rows
 	V1 = case FirstCol of
 		[] -> V+?GAP_PENALTY;

@@ -43,7 +43,7 @@ handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlaveP
   {stop, normal, S}.
 
 handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
-  WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), 5, [], beg_forever]),
+  WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), 1, [], beg_forever]),
   {ok, Workload} = get_workload(WorkloadBufPid),
   SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), WorkloadBufPid, Workload, [], []]),
   erlang:monitor(process, SlavePid),
@@ -103,8 +103,8 @@ slave_loop(MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, R
 
       <<_:Start_pos,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin,
       Ref = binary_to_list(Ref_seq),
-%%       lager:info("Reference: ~p",[Ref]),
-%%       lager:info("Query seq: ~p",[Qsec]),
+       lager:info("Reference: ~p",[Ref]),
+       lager:info("Query seq: ~p",[Qsec]),
 
       Cigar = sw:sw(Qsec,Ref),
 

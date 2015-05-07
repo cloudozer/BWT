@@ -22,13 +22,13 @@ sga(FM,Pc,Pg,Pt,Last,Qseq,Acc,Qty,Shift) ->
 			Qlen = length(Qseq1),
 			case bwa:find_seeds(FM,Pc,Pg,Pt,Last,Qseq1) of
 				no_seeds ->
-					%io:format("Seeds not found~n"),
+					io:format("Seeds not found~n"),
 					sga(FM,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN), Acc, Qty,Shift+?MIN_LEN+Skip);
 				too_many_seeds ->
-					%io:format("Got too many seeds for a subseq: ~p~n",[Qseq]),
+					io:format("Got too many seeds for a subseq: ~p~n",[Qseq]),
 					sga(FM,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN),Acc,Qty,Shift+?MIN_LEN+Skip);
 				Seed_ends ->
-					%io:format("~p seeds found: ~p~n",[length(Seed_ends),[S+Shift||S<-Seed_ends]]),
+					io:format("~p seeds found: ~p~n",[length(Seed_ends),[S+Shift||S<-Seed_ends]]),
 					sga(FM,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN),add_seeds(Seed_ends,Acc,Shift+Skip),Qty+1,Shift+?MIN_LEN+Skip)					
 			end
 	end.
@@ -54,11 +54,13 @@ get_similar(N, [P2|Ls],_,_,_,Acc,Tol) ->
 	get_similar(N, Ls, P2, 1, 0, Acc, Tol);
 get_similar(N, [], P1, Count, Dist, Acc,_) when Count >= N -> 
 	%io:format("Qty:~p~n",[Count]),
-%%  	io:format("Similar: ~p~n",[[{P1,Dist}|Acc]]),
+  	io:format(" * * Similar: ~p~n",[[{P1,Dist}|Acc]]),
 	[{P1,Dist}|Acc];
-get_similar(_,[],_,_,_,[],_) -> [];
+get_similar(_,[],_,_,_,[],_) -> 
+	io:format(" * * No similar alignments * *~n"),
+	[];
 get_similar(_,[],_,_,_,Acc,_) -> 
-%%  	io:format("Similar: ~p~n",[Acc]),
+  	io:format(" * * Similar: ~p~n",[Acc]),
 	Acc.
 
 

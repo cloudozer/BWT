@@ -8,7 +8,7 @@
 %% test
 
 test() ->
-  test("bwt_files/SRR770176_1.fastq", "GL000193.1", 6).
+  test("bwt_files/21_not_found.fastq", "21", 1).
 
 test(SeqFileName, Chromosome, WorkersNum) ->
   lager:start(),
@@ -41,7 +41,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client}).
+-record(state, {workers=[], fastq, chromosome, seeds = [], seed_workload_pkg_size = 2, result_size=0, client}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -65,7 +65,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
-  lists:foreach(fun(Pid) -> worker_bwt:run(Pid, self()) end, Workers1),
+  lists:foreach(fun(Pid) -> lager:info("run ~p", [Pid]), worker_bwt:run(Pid, self()) end, Workers1),
   %% TODO: demonitor the rest
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
 
@@ -105,7 +105,7 @@ handle_cast({seeds, Results}, S=#state{seeds = SeedsList, result_size = ResSize}
   gen_server:cast(self(), schedule),
   {noreply, S#state{seeds = Results ++ SeedsList, result_size = ResSize + length(Results)}};
 
-handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 270 ->
+handle_cast({cigar, _, {CigarRate, _}, _}, State) when CigarRate < 200 ->
   {noreply, State};
 handle_cast({cigar, {SeqName, SeqValue}, Cigar = {CigarRate, CigarValue}, Pos}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
