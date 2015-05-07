@@ -23,7 +23,7 @@ test(SeqFileName, Chromosome, WorkersNum, Debug) ->
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  Pids = lists:map(fun(_) -> {ok, WPid} = worker_bwt:start_link(), WPid end, lists:seq(1, WorkersNum)),
+  Pids = lists:map(fun(_) -> {ok, WPid} = gen_server:start_link(worker_bwt, {}, []), WPid end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
   ok = master:register_workers(MPid, Pids),
   %% Tell the master to run
