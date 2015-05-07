@@ -71,7 +71,7 @@ slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName
       end
     end, [], QseqList),
   lager:info("Worker ~p done ~p sga:sga", [self(), length(QseqList)]),
-  navel:call(MNode, gen_server, cast, [MPid,{seeds,Seeds}]),
+  navel:call_no_return(MNode, gen_server, cast, [MPid,{seeds,Seeds}]),
 
   case get_workload(WorkloadBufPid) of
     {ok, Workload1} ->
@@ -120,10 +120,10 @@ slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, 
   case Cigars of
     [] -> ok;
     [{Cigar,P}] ->
-	  navel:call(MNode, gen_server, cast, [MPid,{cigar,{SeqName,Qsec},Cigar,P}]);
+	  navel:call_no_return(MNode, gen_server, cast, [MPid,{cigar,{SeqName,Qsec},Cigar,P}]);
     _ ->
       [{TopCigar,P} | _] = lists:sort(fun({{R1,_},_}, {{R2,_},_}) -> R1 > R2 end, Cigars), 
-	  navel:call(MNode, gen_server, cast, [MPid,{cigar,{SeqName,Qsec},TopCigar,P}])
+	  navel:call_no_return(MNode, gen_server, cast, [MPid,{cigar,{SeqName,Qsec},TopCigar,P}])
   end
 
   end, Seeds),

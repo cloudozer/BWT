@@ -3,6 +3,7 @@
 -export([start0/1]).
 -export([connect/1]).
 -export([call/4]).
+-export([call_no_return/4]).
 -export([get_node/0]).
 
 -define(PROXY_TCP_PORT, 9223).
@@ -13,7 +14,11 @@ start(Node) ->
 				   acceptor(L) end),
 	start0(Node).
 
-start0(Node) -> register(?MODULE, spawn(fun() -> navel(Node, [], []) end)).
+start0(Node) ->
+	Pid = spawn(fun() -> navel(Node, [], []) end),
+	timer:sleep(1000), %% classic
+	register(?MODULE, Pid),
+	link(Pid).
 
 connect(IpAddr) ->
 	{ok,S} = gen_tcp:connect(IpAddr, ?PROXY_TCP_PORT, ?SOCK_OPTS),
@@ -24,6 +29,11 @@ call(Node, M, F, As) ->
 	Ref = make_ref(),
 	navel ! {self(),Ref,{call,Node,M,F,As}},
 	receive {Ref,X} -> X end.
+
+call_no_return(Node, M, F, As) ->
+	Ref = make_ref(), %% redundant?
+	navel ! {self(),Ref,{call_no_return,Node,M,F,As}},
+	noreply.
 
 get_node() ->
 	Ref = make_ref(),
@@ -54,6 +64,15 @@ navel(Node, Peers, Calls) ->
 				false ->
 					io:format("navel: ~w not found (call to ~w:~w/~w dropped\n", [RN,M,F,length(As)]),
 					navel(Node, Peers, Calls) end;
+
+		{_From,Ref,{call_no_return,RN,M,F,As}} ->
+			case lists:keyfind(RN, 1, Peers) of
+				{_,S} ->
+					dispatch(S, {Ref,{'$call_no_return',M,F,As}}),
+					navel(Node, Peers, Calls);
+				false ->
+					io:format("navel: ~w not found (call_no_return to ~w:~w/~w dropped\n", [RN,M,F,length(As)]),
+					navel(Node, Peers, Calls) end;
 		
 		{tcp,S,Pkt} ->
 			case binary_to_term(Pkt) of
@@ -67,11 +86,20 @@ navel(Node, Peers, Calls) ->
 					%io:format("navel: call ~w:~w/~w\n", [M,F,length(As)]),
 					dispatch(S, {Ref,{'$returns',Returns}}),
 					navel(Node, Peers, Calls);
+				{_Ref,{'$call_no_return',M,F,As}} ->
+					case (catch apply(M, F, As)) of
+						{'EXIT',Reason} ->
+							io:format("navel: exception caught while calling ~w:~w/~w: ~p\n", [M,F,length(As),Reason]);
+						_ -> ok end,
+					navel(Node, Peers, Calls);
 				{Ref,{'$returns',Returns}} ->
 					%io:format("navel: call returns ~P\n", [Returns,12]),
 					{value,{From,_},Calls1} = lists:keytake(Ref, 2, Calls),
 					From ! {Ref,Returns},
-					navel(Node, Peers, Calls1) end;
+					navel(Node, Peers, Calls1);
+				Req ->
+					io:format("navel: unknown request: ~p\n", [Req]),
+					navel(Node, Peers, Calls) end;
 
 		X -> throw({todo,X}) end.
 

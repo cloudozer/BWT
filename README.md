@@ -1,6 +1,8 @@
 
 # How to run DNA aligner app on a cluster.
 
+[TODO: update with LING specifics]
+
 ## Checkout and build
 	$ git clone https://github.com/cloudozer/BWT.git
 	$ cd BWT

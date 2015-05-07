@@ -43,7 +43,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client}).
+-record(state, {workers=[], fastq, chromosome, seeds = [], seed_workload_pkg_size = 100, result_size=0, client}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -67,7 +67,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) > 0 ->
   {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
-  lists:foreach(fun({Node,Pid}) -> navel:call(Node, worker_bwt, run, [Pid,{navel:get_node(),self()}]) end, Workers1),
+  lists:foreach(fun({Node,Pid}) -> navel:call_no_return(Node, worker_bwt, run, [Pid,{navel:get_node(),self()}]) end, Workers1),
   %% TODO: demonitor the rest
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
 
