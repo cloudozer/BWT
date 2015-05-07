@@ -60,9 +60,12 @@ handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}], sta
   io:format("It's all over. ~.1f sec.~n", [Microsec / 1000000]),
   {stop, normal, S};
 handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
+lager:info("Worker down: ~p",[node(Pid)]),
   {noreply, S#state{workers = lists:delete({Pid,Ref}, S#state.workers)}}.
 
 
+handle_call({register_workers, _}, _, S=#state{start_time=T}) when T =/= undefined ->
+	{reply, ok, S};
 handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% link and monitor new workers
   NewWorkers = lists:map(fun(Pid)->
