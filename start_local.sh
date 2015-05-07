@@ -7,6 +7,10 @@ main([]) ->
   receive stop -> ok end;
 
 main([SeqFileName, Chromosome, WorkersNumStr]) ->
+  main([SeqFileName, Chromosome, WorkersNumStr, "false"]);
+
+main([SeqFileName, Chromosome, WorkersNumStr, DebugStr]) ->
   WorkersNum = list_to_integer(WorkersNumStr),
-  master:test(SeqFileName, Chromosome, WorkersNum),
+  Debug = list_to_atom(DebugStr),
+  master:test(SeqFileName, Chromosome, WorkersNum, Debug),
   receive stop -> ok end.

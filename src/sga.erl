@@ -67,7 +67,7 @@ get_similar(_,[],_,_,_,Acc,_) ->
 % scans from the end. If finds N, cuts the Qseq up to the N and repeats again
 % returns new Subseq of len at least MIN_LEN 
 skip_Ns(Qseq) when length(Qseq) < ?MIN_LEN -> no_more_subseqs;
-skip_Ns(Qseq) -> skip_Ns(Qseq,lists:reverse(Qseq),1,0).
+skip_Ns(Qseq) -> skip_Ns(Qseq,lists:reverse(Qseq),0,0).
 
 skip_Ns(Qseq,_,?MIN_LEN,0) -> {0,Qseq};
 skip_Ns(Qseq,_,?MIN_LEN,Skipped) -> {Skipped,lists:sublist(Qseq,length(Qseq)-Skipped)};

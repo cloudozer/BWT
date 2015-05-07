@@ -15,8 +15,8 @@ main([Chromosome, MasterIpStr, WorkersNumStr]) ->
 
 receive_cigars() ->
   receive
-    {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue} ->
-      io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, SeqValue]),
+    {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq} ->
+      io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
       receive_cigars();
 
     Error -> io:format("Error: ~p~n", [Error])
