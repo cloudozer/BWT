@@ -46,7 +46,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, fastq_eof = false, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client, stopping = false}).
+-record(state, {workers=[], fastq, fastq_eof = false, chromosome, seeds = [], seed_workload_pkg_size = 1000, result_size=0, client, stopping = false, start_time}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -55,8 +55,9 @@ init(_Args) ->
 terminate(Reason, State) ->
   lager:info("Master terminated: ~p", [{Reason, State}]).
 
-handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}]}) ->
-  lager:info("It's all over"),
+handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}], start_time = StartTime}) ->
+  Microsec = timer:now_diff(now(), StartTime),
+  io:format("It's all over. ~.1f sec.~n", [Microsec / 1000000]),
   {stop, normal, S};
 handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
   {noreply, S#state{workers = lists:delete({Pid,Ref}, S#state.workers)}}.
@@ -78,7 +79,7 @@ handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#st
   {Workers1, Workers2} = lists:split(WorkersLimit, Workers),
   lists:foreach(fun({Pid,_}) -> worker_bwt:run(Pid, self()) end, Workers1),
   lists:foreach(fun({Pid,Ref}) -> true = unlink(Pid), true = demonitor(Ref) end, Workers2),
-  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid}};
+  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid, start_time = now()}};
 
 handle_call({get_workload, N}, _From, S=#state{stopping = false}) ->
   {Result,S1} = produce_workload(N, S),
