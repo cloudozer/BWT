@@ -14,10 +14,10 @@
 -define(MATCH,2).
 -define(UNKNOWN,1.6).
 -define(MISMATCH,-1).
--define(GAP_PENALTY,-1).
--define(GAP_EXT_PENALTY,0).
+-define(GAP_PENALTY,-2).
+-define(GAP_EXT_PENALTY,-0.5).
 
--define(UNDEF,1.8).
+-define(UNDEF,0).
 
 
 t_e() ->
@@ -118,7 +118,7 @@ get_CIGAR(Tab,Vmax) ->
 	%io:format("Tab: ~n~p~n",[Tab1]),
 	[ [{_,Dir}|Column] | Tab2 ] = Tab1,
 	
-	{Vmax,	case Dir of
+	{trunc(Vmax),	case Dir of
 				up -> get_CIGAR(Tab2,Column,1,Dir,1,""); % eat current column 
 				_ -> get_CIGAR(Tab2,1,Dir,1,"")  % eat next column
 			end
