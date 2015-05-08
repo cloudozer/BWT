@@ -30,7 +30,7 @@ run(Pid, MasterPid) ->
 
 %% callbacks
 
--record(state, {master, slave, workloads = [], workload_waterline = 10, stopping = false}).
+-record(state, {master, slave, workloads = [], workload_waterline = 1, stopping = false}).
 
 init(_) ->
   {ok, #state{}}.

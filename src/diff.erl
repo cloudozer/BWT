@@ -21,10 +21,12 @@ diff(File1,File2,Shift) ->
 	io:format("There are ~p unique reads found by bwa-mem and gen-da~n",[sets:size(SetU)]),
 	io:format("bwa-mem matched ~p reads which gen-da did not~n",[sets:size(Absent_in_2)]),
 	io:format("gen-da matched ~p reads which bwa-mem did not~n",[sets:size(Absent_in_1)]),
-	Ls = sets:to_list(Absent_in_2),
-	io:format("The reads not found by gen-da:~n"),
-	[io:format("~p\t~p~n",[Name,dict:fetch(Name,Data1)]) || Name <- Ls],
-	{Data1,Data2}.
+	%Ls = sets:to_list(Absent_in_2),
+	%io:format("The reads not found by gen-da:~n"),
+	%[io:format("~p\t~p~n",[Name,dict:fetch(Name,Data1)]) || Name <- Ls],
+	Ls = sets:to_list(Absent_in_1),
+	io:format("The reads not found by bwa-mem:~n"),
+	[io:format("~p\t~p~n",[Name,dict:fetch(Name,Data2)]) || Name <- Ls].
 	
 
 
@@ -54,7 +56,10 @@ read_data(Dev,Shift,Dict) ->
 		{ok, Line} -> 
 			[Name,_,_,Pos,CIGAR,Score,Ref] = string:tokens(Line," \t"),
 			%[_,Q_id] = string:tokens(Name,"."),
-			read_data(Dev,Shift,dict:store(Name,{list_to_integer(Pos)+Shift,CIGAR,Score,Ref},Dict)); 
+			read_data(Dev,Shift,dict:store(Name,{list_to_integer(Pos),
+												CIGAR,
+												list_to_integer(Score),
+												Ref},Dict)); 
 		eof ->
 			file:close(Dev), 
 			Dict

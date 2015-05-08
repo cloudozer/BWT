@@ -9,15 +9,11 @@
 		t/1,
 		t_e/0,
 		sw/2,
-		rand_seq/1]).
+		sw/3,
+		rand_seq/1,
+		get_starting_point/2]).
 
--define(MATCH,2).
--define(UNKNOWN,1.6).
--define(MISMATCH,-1).
--define(GAP_PENALTY,-1).
--define(GAP_EXT_PENALTY,0).
-
--define(UNDEF,1.8).
+-include("bwt.hrl").
 
 
 t_e() ->
@@ -47,38 +43,43 @@ rand_seq(Acc,N) ->
 
 
 
-sw([_|_]=Qseq,[_|_]=Ref) ->
-	%io:format("Seq: ~p~n",[Qseq]),
-	%io:format("Ref: ~p~n",[Ref]),
-	Lq = length(Qseq),
-
-	%%%%%% {Header,[column]}
-	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	build_tab(Tab0,Ref,Qseq,0,-?MATCH*(Lq div 3));
-
-
+sw([_|_]=Qseq,[_|_]=Ref) -> 
+	F = fun(_Qseq,_Ref,Tab,V) -> get_CIGAR(Tab,V) end,
+	sw(Qseq,Ref,F);
 sw(N1,N2) when N1 =< N2 -> 
 	random:seed(),
 	rand_seq(10),
 	sw(rand_seq(N1),rand_seq(N2));
 sw(_,_) -> no_match.
 
+sw(Qseq,Ref,F) ->
+	%io:format("Seq: ~p~n",[Qseq]),
+	%io:format("Ref: ~p~n",[Ref]),
+	Lq = length(Qseq),
+	%%%%%% {Header,[column]}
+	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
+	Thershold = -?MATCH*(Lq div 5),
+	build_tab(F,Tab0,Ref,Qseq,[],0,Thershold).
 
 
-build_tab(_,_,_,V1max,Vthr) when V1max < Vthr -> 
+
+
+
+build_tab(_,_,_,_,_,V1max,Vthr) when V1max < Vthr -> 
 	%io:format(" SW: no match~n"),
 	no_match;
-build_tab([[{V,Dir}|FirstCol]|Tab1],Ref,[S|Qseq],_,Vthr) -> % Vs1, Vs2 - starting scores for the previous and curr rows
+build_tab(F,[[{V,Dir}|FirstCol]|Tab1],Ref,[S|Qseq],Qseq_rev,_,Vthr) -> % Vs1, Vs2 - starting scores for the previous and curr rows
 	V1 = case FirstCol of
 		[] -> V+?GAP_PENALTY;
 		_ -> V+?GAP_EXT_PENALTY
 	end,
 	{V2max,Tab2} = add_row2tab(Tab1,Ref,S,[[{V1,up},{V,Dir}|FirstCol]], V1), % Gap = Insertion
 	
-	build_tab(Tab2,Ref,Qseq,V2max,Vthr+?MATCH);
-build_tab(Tab,_,[],Vmax,_) -> 
+	build_tab(F,Tab2,Ref,Qseq,[S|Qseq_rev],V2max,Vthr+?MATCH);
+build_tab(F,Tab,Ref,[],Qseq_rev,Vmax,_) -> F(Qseq_rev,Ref,Tab,Vmax).
 	%io:format("Tab:~n~p~n",[Tab]),
-	get_CIGAR(Tab,Vmax).
+	%get_CIGAR(Tab,Vmax).
+
 	
 
 
