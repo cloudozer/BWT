@@ -46,7 +46,7 @@ handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
   WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), 5, [], beg_forever]),
   {ok, Workload} = get_workload(WorkloadBufPid),
   SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), WorkloadBufPid, Workload, [], []]),
-  erlang:monitor(process, SlavePid),
+  %erlang:monitor(process, SlavePid),
   {noreply, S#state{master = MasterPid, slave = SlavePid}}.
 
 %% private
@@ -75,7 +75,7 @@ slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName
 
   case get_workload(WorkloadBufPid) of
     {ok, Workload1} ->
-      slave_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs1, Refs);
+      spawn_link(?MODULE, slave_loop, [MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs1, Refs]);
     %% TODO: change
     stop ->
       stop
@@ -130,7 +130,7 @@ slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, 
 
   case get_workload(WorkloadBufPid) of
     {ok, Workload1} ->
-      slave_loop(MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs, Refs1);
+      spawn_link(?MODULE, slave_loop, [MasterPid, WorkerPid, WorkloadBufPid, Workload1, FMs, Refs1]);
     %% TODO: change
     stop ->
       stop
