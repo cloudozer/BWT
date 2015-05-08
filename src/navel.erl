@@ -16,7 +16,6 @@ start(Node) ->
 
 start0(Node) ->
 	Pid = spawn(fun() -> navel(Node, [], []) end),
-	timer:sleep(1000), %% classic
 	register(?MODULE, Pid),
 	link(Pid).
 
