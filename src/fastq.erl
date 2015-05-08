@@ -13,7 +13,6 @@ read_seq(Dev) ->
       _Quality = file:read_line(Dev),
       Seq = {lists:droplast(SeqName),
              lists:droplast(SeqData)},
-      %io:format("Name:~p~nData:~p~n",[SeqName,SeqData]),
       {ok, Seq};
     {ok, _} ->
       read_seq_pos(Dev);
@@ -41,7 +40,7 @@ read_seqs(Dev, N) ->
 read_seqs(_Dev, 0, Acc) ->
   {ok, Acc};
 read_seqs(Dev, N, []) ->
-  case read_seq_pos(Dev) of
+  case read_seq(Dev) of
     {ok, Seq} ->
       read_seqs(Dev, N-1, [Seq]);
     eof ->
@@ -49,7 +48,7 @@ read_seqs(Dev, N, []) ->
     Err -> Err
   end;
 read_seqs(Dev, N, Acc) ->
-  case read_seq_pos(Dev) of
+  case read_seq(Dev) of
     {ok, Seq} ->
       read_seqs(Dev, N-1, [Seq|Acc]);
     eof ->

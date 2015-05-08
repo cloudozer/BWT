@@ -119,7 +119,7 @@ get_CIGAR(Tab,Vmax) ->
 	%io:format("Tab: ~n~p~n",[Tab1]),
 	[ [{_,Dir}|Column] | Tab2 ] = Tab1,
 	
-	{Vmax,	case Dir of
+	{trunc(Vmax),	case Dir of
 				up -> get_CIGAR(Tab2,Column,1,Dir,1,""); % eat current column 
 				_ -> get_CIGAR(Tab2,1,Dir,1,"")  % eat next column
 			end
