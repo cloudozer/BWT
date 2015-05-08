@@ -46,7 +46,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 1, client, stopping = true, start_time}).
+-record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 1, client, stopping = false, start_time}).
 
 init(_Args) ->
   lager:info("Started master"),

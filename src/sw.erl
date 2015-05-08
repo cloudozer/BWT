@@ -10,6 +10,7 @@
 		t_e/0,
 		sw/2,
 		sw/3,
+		sigma/2,
 		rand_seq/1,
 		get_starting_point/2]).
 
@@ -58,7 +59,7 @@ sw(Qseq,Ref,F) ->
 	Lq = length(Qseq),
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	Thershold = -?MATCH*(Lq div 5),
+	Thershold = -?MATCH*(Lq div 2),
 	build_tab(F,Tab0,Ref,Qseq,[],0,Thershold).
 
 
