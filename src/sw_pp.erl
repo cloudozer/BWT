@@ -20,8 +20,7 @@ pp(Que_rev,Ref_rev,Tab,Vmax) ->
 	Tail_len = length(Tab) - length(Tab1),
 	{Tail,Ref1} = lists:split(Tail_len,Ref_rev),
 	Spaces = lists:duplicate(Tail_len,?SPACE),
-	{S1,S2,S3} = get_comb(Que_rev,Ref1,Tab1,1,Spaces,Spaces,lists:reverse(Tail)),
-	io:format("~p~n~p~n~p~n",[S1,S2,S3]).
+	get_comb(Que_rev,Ref1,Tab1,1,Spaces,Spaces,lists:reverse(Tail)).
 	
 get_comb([],Ref,_,_,Qcomb,Mcomb,Rcomb) -> 
 	L = length(Ref),
