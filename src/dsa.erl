@@ -6,8 +6,7 @@
 
 -module(dsa).
 -export([
-		dsa/1,
-		worker/2
+		dsa/1
 		]).
 
 -include("bwt.hrl").
@@ -79,30 +78,5 @@ get_sa([],Shift,_,Bin_index,Compare,Acc) ->
 			io:format("~ngetting down to level ~p, processing string of length ~p~n",[Shift+1,Len]), 
 			dsa(lists:reverse(Acc),Shift+1,"TGCA$",Bin_index,Compare,[])
 	end.
-
-
-
-worker(Pid,File) ->
-	%% read file and create Bin and sort fun
-	{ok,Bin} = file:read_file(File),
-	Size = size(Bin),
-	Bin_index = fun(N) when N < Size-1 -> binary:at(Bin, N); (_) -> $$ end,
-	F = fun(F,X1,X2) -> Vx = Bin_index(X1), Vy = Bin_index(X2),
-						case Vx =:= Vy of true -> F(F,X1+1,X2+1); _ -> Vx < Vy end
-		end,	
-	Compare = fun(Shift,Ls) -> 
-				lists:sort(fun({_,_,X1},{_,_,X2}) -> F(F,X1+Shift,X2+Shift) end,Ls) 
-	   		  end,
-	
-	%% request workload until 'stop' msg comes
-	Pid ! {self(),ready},
-	receive
-		stop -> io:format("worker terminated normally~n");
-		Prefix -> Pid ! {Prefix,Compare(length(Prefix),scan(Prefix,Bin))}
-	end.
-
-
-% returns a string of pointers
-scan(Prefix,Bin) -> ok.
 
 
