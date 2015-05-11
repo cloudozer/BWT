@@ -6,26 +6,31 @@ Assuming that aligner master already launched on host 172.16.1.254.
 ## Dom0 network setup
 
 Each worker seats on separate bridge, so we need to create bridges:
+
 	$ brctl addbr brX
 	$ ip link set brX address 00:16:EF:01:00:0X
 (replace X with bridge number)
 
 Create bridge for LINCX configurator:
+
 	$ brctl addbr xenbr0
 	$ ip ad ad 192.168.1.1/24 dev xenbr0
 
 Create bridge for cross-host worker traffic:
+
 	$ brctl addbr xenbr1
 	$ ip ad ad 172.16.X.252/24 dev xenbr1
 (replace X with host number)
 
 Enable forwarding for cross-host traffic:
+
 	$ echo 1 > /proc/sys/net/ipv4/ip_forward
 	$ echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp
 
 ## LINCX setup
 
 Get and compile sources:
+
 	$ git clone https://github.com/FlowForwarding/lincx.git
 	$ cd lincx
 	$ ./rebar get-deps compile
@@ -57,10 +62,13 @@ memory: 512
 ```
 
 Build image:
+
 	$ ./railing image
 Launch LINCX:
+
 	$ xl create domain_config
 Setup LINCX flow tables:
+
 	$ ./scripts/hetzner.erl X
 (replace X with host number)
 
@@ -68,6 +76,7 @@ Networking part is done!
 
 ## Setup BWT
 Build image:
+
 	$ git clone -b bwtling https://github.com/cloudozer/BWT.git
 	$ cd BWT
 	$ ./rebar get-deps compile
@@ -84,8 +93,10 @@ vif = ['bridge=brX']
 (replace X with worker number and Y with host number)
 
 Launch workers:
+
 	$ xl create bwtX.dom
 
 Workers setup is done! Now you can attach to master, ensure that workers are succesfully connected and issue some work to them:
+
 	$ gen_server:call(master , {run, "bwt_files/SRR770176_1.fastq", "GL000193.1", Z}).
 (replace Z with total number of your workers)
