@@ -23,11 +23,17 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	navel:start0(erl1),
-	navel:connect({10,0,0,1}),
+	{_,_,C,D} = ip(),
+	NodeName = list_to_atom("erl" ++ integer_to_list(C) ++ "." ++ integer_to_list(D)),
+	navel:start0(NodeName),
+	navel:connect({172,16,1,254}),
+	timer:sleep(1000),
     {ok, { {one_for_one, 5, 10}, [
-
         {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}
-
     ]} }.
 
+ip() ->
+    {ok,Ifaddrs} = inet:getifaddrs(),
+    case [ X || {If,Props} =X <- Ifaddrs, If =/= "lo", lists:keymember(addr, 1, Props) ] of
+	[] -> unassigned;
+	[{_,Props}|_] -> proplists:get_value(addr, Props) end.

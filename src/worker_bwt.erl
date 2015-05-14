@@ -43,6 +43,9 @@ handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlaveP
   {stop, normal, S}.
 
 handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
+
+  erlang:garbage_collect(),
+
   WorkloadBufPid = spawn_link(?MODULE, workload_buffer_loop, [MasterPid, self(), 5, [], beg_forever]),
   {ok, Workload} = get_workload(WorkloadBufPid),
   SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), WorkloadBufPid, Workload, [], []]),
@@ -82,6 +85,8 @@ slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {seed, ChromoName
   end;
 
 slave_loop({MNode,MPid} =MasterPid, WorkerPid, WorkloadBufPid, {sw, Chromosome, Seeds}, FMs, Refs) ->
+
+  erlang:garbage_collect(),
 
   {Ref_bin, Refs1} =
     case proplists:get_value(Chromosome, Refs) of

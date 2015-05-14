@@ -4,8 +4,6 @@ domain_config
 
 *.img
 
-bwt_files
-
 deps
 ebin
 log
