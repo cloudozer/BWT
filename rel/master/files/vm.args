@@ -2,11 +2,13 @@
 -name master@45.55.179.11 
 
 ## Cookie for distributed erlang
--setcookie master
+-setcookie secret_gc 
+
+-connect_all false
 
 ## Heartbeat management; auto-restarts VM if it dies or becomes unresponsive
 ## (Disabled by default..use with caution!)
-##-heart
+-heart
 
 ## Enable kernel poll and a few async threads
 ##+K true
