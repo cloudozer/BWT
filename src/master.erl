@@ -8,7 +8,7 @@
 %% test
 
 test() ->
-  test("bwt_files/21_not_found.fastq", "21", 1, false).
+  test("21_not_found.fastq", "21", 1, false).
 
 test(SeqFileName, Chromosome, WorkersNum, Debug) ->
   lager:start(),
@@ -46,7 +46,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 1, client, stopping = false, start_time}).
+-record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 500, client, stopping = false, start_time}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -79,7 +79,8 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   {reply, ok, S1};
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) > 0 ->
-  {ok, FastqDev} = file:open(FastqFileName, [read, raw, read_ahead]),
+  {ok, BwtFiles} = application:get_env(bwt,bwt_files),
+  {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
   {Workers1, Workers2} = lists:split(WorkersLimit, Workers),
   lists:foreach(fun({Pid,_}) -> worker_bwt:run(Pid, self()) end, Workers1),
   lists:foreach(fun({Pid,Ref}) -> true = unlink(Pid), true = demonitor(Ref) end, Workers2),
