@@ -7,5 +7,5 @@ script
 export HOME=/home/drc
 cd /home/drc/BWT/
 git checkout -f && git clean -fdx && git pull
-./run_master.sh
+./scripts/run_master.sh
 end script
