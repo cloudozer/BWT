@@ -9,7 +9,7 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define(CHILD(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -26,8 +26,6 @@ init([]) ->
     MasterIp = application:get_env(bwt, master_ip),
     MasterNode = list_to_atom("master@" ++ MasterIp),
     {ok, { {one_for_one, 5, 10}, [
-
-        {worker_bwt, {worker_bwt, start_link, [{master, MasterNode}]}, permanent, 5000, worker, [worker_bwt]}
-
+        ?CHILD(worker_bwt, worker, [{master, MasterNode}])
     ]} }.
 
