@@ -61,3 +61,10 @@ def get_image_id(image_name):
 
 def get_manager():
     return digitalocean.Manager(client_id=clientID, api_key=apiKey)
+
+def reboot_by_image_id(image_id):
+  manager = do.get_manager()
+  droplets = manager.get_all_droplets()
+  for d in droplets:
+    if d.image_id == image_id:
+      d.reboot()

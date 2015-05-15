@@ -23,7 +23,7 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    MasterIp = application:get_env(bwt, master_ip),
+    {ok, MasterIp} = application:get_env(bwt, master_ip),
     MasterNode = list_to_atom("master@" ++ MasterIp),
     {ok, { {one_for_one, 5, 10}, [
         ?CHILD(worker_bwt, worker, [{master, MasterNode}])
