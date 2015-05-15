@@ -83,7 +83,7 @@ handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#st
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
   {Workers1, Workers2} = lists:split(WorkersLimit, Workers),
   lists:foreach(fun({Pid,_}) -> worker_bwt:run(Pid, self()) end, Workers1),
-  lists:foreach(fun({Pid,Ref}) -> true = unlink(Pid), true = demonitor(Ref) end, Workers2),
+  %% lists:foreach(fun({Pid,Ref}) -> true = unlink(Pid), true = demonitor(Ref) end, Workers2),
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid, start_time = now()}};
 
 handle_call({get_workload, N}, _From, S=#state{stopping = false}) ->
