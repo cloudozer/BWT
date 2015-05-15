@@ -18,9 +18,11 @@
 %% api
 
 start_link(MasterRef = {_, Node}) ->
-  wait_connection_forever(Node),
   {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
-  ok = master:register_workers(MasterRef, [Pid]),
+  spawn_link(fun() ->
+    wait_connection_forever(Node),
+    ok = master:register_workers(MasterRef, [Pid])
+  end),
   {ok, Pid}.
 
 run(Pid, MasterPid) ->

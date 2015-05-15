@@ -1,5 +1,5 @@
 ## Name of the node
--name worker@45.55.237.66 
+-name worker@127.0.0.1
 
 ## Cookie for distributed erlang
 -setcookie secret_gc
