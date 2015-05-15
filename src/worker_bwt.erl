@@ -25,6 +25,7 @@ start_link(MasterRef = {_, Node}) ->
     case master:register_workers(MasterRef, [Pid]) of
       wait -> timer:sleep(3000), exit(wait);
       ok -> ok
+    end
   end),
   {ok, Pid}.
 
