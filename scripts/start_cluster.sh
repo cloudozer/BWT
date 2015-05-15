@@ -6,7 +6,10 @@ main([]) ->
   io:format("Usage: start_cluster.sh Chromosome, FastqFile, MasterIp, WorkersNumber~n");
 
 main([MasterIpStr, WorkersNumStr]) ->
-  main(["GL000193.1", "bwt_files/SRR770176_1.fastq", MasterIpStr, WorkersNumStr]);
+  main(["GL000193.1", "SRR770176_1.fastq", MasterIpStr, WorkersNumStr]);
+
+main([Chromosome, MasterIpStr, WorkersNumStr]) ->
+  main([Chromosome, "SRR770176_1.fastq", MasterIpStr, WorkersNumStr]);
 
 main([Chromosome, FastqFile, MasterIpStr, WorkersNumStr]) ->
   MasterPid = rpc:call(list_to_atom("master@" ++ MasterIpStr), erlang, whereis, [master]),
