@@ -23,9 +23,11 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
+    MasterIp = application:get_env(bwt, master_ip),
+    MasterNode = list_to_atom("master@" ++ MasterIp),
     {ok, { {one_for_one, 5, 10}, [
 
-        {worker_bwt, {worker_bwt, start_link, [{master, 'master@45.55.179.11'}]}, permanent, 5000, worker, [worker_bwt]}
+        {worker_bwt, {worker_bwt, start_link, [{master, MasterNode}]}, permanent, 5000, worker, [worker_bwt]}
 
     ]} }.
 
