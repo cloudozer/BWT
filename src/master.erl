@@ -66,7 +66,7 @@ handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
 
 
 handle_call({register_workers, _}, _, S=#state{start_time=T}) when T =/= undefined ->
-	{reply, ok, S};
+	{reply, wait, S};
 handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% link and monitor new workers
   NewWorkers = lists:map(fun(Pid)->

@@ -35,8 +35,8 @@ run(Pid, MasterPid) ->
 init(_) ->
   {ok, #state{}}.
 
-%% terminate(normal, _State) ->
-%%   ok;
+terminate(normal, _State) ->
+  ok;
 terminate(Reason, State) ->
   lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
