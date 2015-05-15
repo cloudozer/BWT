@@ -22,7 +22,9 @@ start_link(MasterRef = {_, Node}) ->
   spawn(fun() ->
     link(Pid),
     wait_connection_forever(Node),
-    ok = master:register_workers(MasterRef, [Pid])
+    case master:register_workers(MasterRef, [Pid]) of
+      wait -> timer:sleep(3000), exit(wait);
+      ok -> ok
   end),
   {ok, Pid}.
 
