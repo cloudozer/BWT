@@ -1,0 +1,11 @@
+description     "start BWT master"
+
+start on started networking
+setuid drc
+
+script
+export HOME=/home/drc
+cd /home/drc/BWT/
+git checkout -f && git clean -fdx && git pull
+./run_worker.sh
+end script
