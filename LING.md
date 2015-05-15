@@ -2,6 +2,7 @@
 
 Below is the steps required to setup hosts with aligner workers.
 Assuming that aligner master already launched on host 172.16.1.254.
+(Master IP can be assigned via '-worker_bwt_app master_ip {A,B,C,D}' option in extra section of domain_config).
 
 ## Dom0 network setup
 
@@ -86,7 +87,7 @@ Create domain config bwtX.dom for each worker:
 ```
 name = "bwtX"
 kernel = "BWT.img"
-extra = "-ipaddr 172.16.Y.X -netmask 255.255.0.0 -home /BWT -pz /BWT/apps/master/ebin /BWT/apps/worker_bwt_app/ebin /BWT/bwt_files /BWT/deps/goldrush/ebin /BWT/deps/lager/ebin /BWT/ebin -eval 'application:start(sasl),application:start(bwt),application:start(worker_bwt_app)'"
+extra = "-ipaddr 172.16.Y.X -netmask 255.255.0.0 -worker_bwt_app master_ip {172,16,1,254} -home /BWT -pz /BWT/apps/master/ebin /BWT/apps/worker_bwt_app/ebin /BWT/bwt_files /BWT/deps/goldrush/ebin /BWT/deps/lager/ebin /BWT/ebin -eval 'application:start(sasl),application:start(bwt),application:start(worker_bwt_app)'"
 memory = 1024
 vif = ['bridge=brX']
 ```
