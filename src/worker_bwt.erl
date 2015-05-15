@@ -19,9 +19,9 @@
 
 start_link(MasterRef = {_, Node}) ->
   {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
-  timer:sleep(3000),
   spawn(fun() ->
     link(Pid),
+    timer:sleep(3000),
   %  wait_connection_forever(Node),
     ok = master:register_workers(MasterRef, [Pid])
   end),
