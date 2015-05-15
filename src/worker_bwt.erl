@@ -19,13 +19,11 @@
 
 start_link(MasterRef = {_, Node}) ->
   {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
+  timer:sleep(3000),
   spawn(fun() ->
     link(Pid),
     wait_connection_forever(Node),
-    case master:register_workers(MasterRef, [Pid]) of
-      wait -> timer:sleep(3000), exit(wait);
-      ok -> ok
-    end
+    ok = master:register_workers(MasterRef, [Pid])
   end),
   {ok, Pid}.
 
