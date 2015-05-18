@@ -38,7 +38,7 @@ init(_) ->
   {ok, #state{}}.
 
 terminate(normal, _State) ->
-  ok;
+  lager:info("garbage_collection: ~p~nexact_reductions: ~p~nmemory: ~p", [erlang:statistics(garbage_collection), erlang:statistics(exact_reductions), erlang:memory()]);;
 terminate(Reason, State) ->
   lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
@@ -79,6 +79,13 @@ handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads 
 
 %% private
 
+slave_loop(MasterPid, WorkerPid, Workload, undefined, undefined) ->
+  FM = bwt:get_index(Chromosome),
+
+  {ok, BwtFiles} = application:get_env(bwt,bwt_files),
+  {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
+  slave_loop(MasterPid, WorkerPid, Workload, FM, Ref);
+
 slave_loop(MasterPid, WorkerPid, [], FM, Ref) ->
   case gen_server:call(WorkerPid, get_workload) of
     {ok, Workload} ->
@@ -91,15 +98,7 @@ slave_loop(MasterPid, WorkerPid, [], FM, Ref) ->
       bye
   end;
 
-slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM, Ref) ->
-
-  MetaFM1 = {Meta, FM} =
-    case MetaFM of
-      undefined ->
-        bwt:get_index(Chromosome);
-      {_Meta, _FM} ->
-        MetaFM
-    end,
+slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM={Meta,FM}, Ref) ->
 
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 
@@ -110,16 +109,6 @@ slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM
         ResultsList -> [{{Qname,Qseq},ResultsList}|Acc]
       end
     end, [], QseqList),
-
-  Ref1 =
-    case Ref of
-      undefined ->
-        {ok, BwtFiles} = application:get_env(bwt,bwt_files),
-        {ok, Ref_bin} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
-        Ref_bin;
-      Ref_bin when is_binary(Ref_bin) ->
-        Ref_bin
-    end,
 
   Shift = proplists:get_value(shift, Meta),
 
@@ -165,7 +154,7 @@ slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM
 
   lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
-  slave_loop(MasterPid, WorkerPid, WorkloadRest, MetaFM1, Ref).
+  slave_loop(MasterPid, WorkerPid, WorkloadRest, MetaFM, Ref).
 
 wait_connection_forever(Node) ->
   case net_adm:ping(Node) of
