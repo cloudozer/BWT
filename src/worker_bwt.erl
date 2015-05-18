@@ -38,7 +38,7 @@ init(_) ->
   {ok, #state{}}.
 
 terminate(normal, _State) ->
-  lager:info("garbage_collection: ~p~nexact_reductions: ~p~nmemory: ~p", [erlang:statistics(garbage_collection), erlang:statistics(exact_reductions), erlang:memory()]);;
+  lager:info("garbage_collection: ~p~nexact_reductions: ~p~nmemory: ~p", [erlang:statistics(garbage_collection), erlang:statistics(exact_reductions), erlang:memory()]);
 terminate(Reason, State) ->
   lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
@@ -79,7 +79,7 @@ handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads 
 
 %% private
 
-slave_loop(MasterPid, WorkerPid, Workload, undefined, undefined) ->
+slave_loop(MasterPid, WorkerPid, Workload=[{Chromosome,_}|_], undefined, undefined) ->
   FM = bwt:get_index(Chromosome),
 
   {ok, BwtFiles} = application:get_env(bwt,bwt_files),
@@ -112,7 +112,7 @@ slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM
 
   Shift = proplists:get_value(shift, Meta),
 
-  Ref_bin_size = byte_size(Ref_bin),
+  Ref_bin_size = byte_size(Ref),
 
   lists:foreach(fun({{SeqName, Qsec}, Seeds1}) ->
 
@@ -121,17 +121,17 @@ slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM
       Ref_len = length(Qsec) + D,
       Start_pos = (S - Ref_len) bsl 3,
 
-      {Ref_bin1, Start_pos1} = if S > Ref_bin_size ->
+      {Ref1, Start_pos1} = if S > Ref_bin_size ->
         Ns = binary:copy(<<"N">>, S - Ref_bin_size),
-        {<<Ref1/binary, Ns/binary>>, Start_pos};
+        {<<Ref/binary, Ns/binary>>, Start_pos};
                                  (S - Ref_len) < 0 ->
                                    Ns = binary:copy(<<"N">>, -(S - Ref_len)),
-                                   {<<Ns/binary, Ref1/binary>>, 0};
+                                   {<<Ns/binary, Ref/binary>>, 0};
                                  true ->
-                                   {Ref1, Start_pos}
+                                   {Ref, Start_pos}
                                end,
 
-      <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref_bin1,
+      <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref1,
       Ref_seq1 = binary_to_list(Ref_seq),
 
       case sw:sw(Qsec,Ref_seq1) of
