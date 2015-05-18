@@ -3,12 +3,17 @@
 %
 
 -module(sw_pp).
--export([pp/2]).
+-export([pp/2,ppp/2]).
 
 -include("bwt.hrl").
 -define(SPACE,32).
 -define(BAR,$|).
 -define(DASH,$-).
+
+
+ppp(Qseq,Ref) ->
+	{L1,L2,L3} = pp(Qseq,Ref),
+	io:format("~s~n~s~n~s~n",[L1,L2,L3]).
 
 
 pp(Qseq,Ref) -> sw:sw(Qseq,Ref,fun(Qs,Rs,Tab,V) -> pp(Qs,lists:reverse(Rs),Tab,V) end).
@@ -45,31 +50,4 @@ get_comb([Sq|Qseq],[Sr|Ref],[Col|Tab],N,Qcomb,Mcomb,Rcomb) ->
 		{up_left,_} -> % MISMATCH
 			get_comb(Qseq,Ref,Tab,N+1,[Sq|Qcomb],[?SPACE|Mcomb],[Sr|Rcomb])
 	end.
-
-
-%
-%get_CIGAR([Column|Tab],Skip,Dir,N,CIGAR) ->
-%	%io:format("Next Col. CIGAR: ~p~n",[CIGAR]),
-%	ColTail = lists:nthtail(Skip,Column),
-%	get_CIGAR(Tab,ColTail,Skip,Dir,N,CIGAR).
-%
-%
-%get_CIGAR(_,[{_,undef}],_,Dir,N,CIGAR) -> get_str(N,Dir)++CIGAR;
-%
-%get_CIGAR(Tab,[{_,up}|Column],Skip,up,N,CIGAR) ->	
-%	get_CIGAR(Tab,Column,Skip+1,up,N+1,CIGAR);
-%get_CIGAR(Tab,[{_,up}|Column],Skip,Dir,N,CIGAR)	->
-%	get_CIGAR(Tab,Column,Skip+1,up,1,get_str(N,Dir)++CIGAR);
-%get_CIGAR(Tab,[{_,Dir}|_],Skip,Dir,N,CIGAR) ->
-%	case Dir of
-%		up_left -> get_CIGAR(Tab,Skip+1,Dir,N+1,CIGAR);
-%		left -> get_CIGAR(Tab,Skip,Dir,N+1,CIGAR)
-%	end;
-%
-%get_CIGAR(Tab,[{_,Dir2}|_],Skip,Dir1,N,CIGAR) ->
-%	case Dir2 of
-%		up_left -> get_CIGAR(Tab,Skip+1,Dir2,1,get_str(N,Dir1)++CIGAR);
-%		left ->    get_CIGAR(Tab,Skip,  Dir2,1,get_str(N,Dir1)++CIGAR)
-%	end.
-
 
