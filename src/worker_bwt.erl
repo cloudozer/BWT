@@ -80,25 +80,25 @@ handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads 
 %% private
 
 slave_loop(MasterPid, WorkerPid, Workload=[{Chromosome,_}|_], undefined, undefined) ->
-  FM = bwt:get_index(Chromosome),
+  {Meta,FM} = bwt:get_index(Chromosome),
 
   {ok, BwtFiles} = application:get_env(bwt,bwt_files),
   {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
-  slave_loop(MasterPid, WorkerPid, Workload, FM, Ref);
+  slave_loop(MasterPid, WorkerPid, Workload, Meta, FM, Ref).
 
-slave_loop(MasterPid, WorkerPid, [], FM, Ref) ->
+slave_loop(MasterPid, WorkerPid, [], Meta, FM, Ref) ->
   case gen_server:call(WorkerPid, get_workload) of
     {ok, Workload} ->
-      slave_loop(MasterPid, WorkerPid, Workload, FM, Ref);
+      slave_loop(MasterPid, WorkerPid, Workload, Meta, FM, Ref);
     wait ->
       timer:sleep(1000),
-      slave_loop(MasterPid, WorkerPid, [], FM, Ref);
+      slave_loop(MasterPid, WorkerPid, [], Meta, FM, Ref);
     stop ->
       lager:info("Worker's slave is stopping"),
       bye
   end;
 
-slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM={Meta,FM}, Ref) ->
+slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], Meta, FM, Ref) ->
 
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 
@@ -154,7 +154,7 @@ slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], MetaFM
 
   lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
-  slave_loop(MasterPid, WorkerPid, WorkloadRest, MetaFM, Ref).
+  slave_loop(MasterPid, WorkerPid, WorkloadRest, Meta, FM, Ref).
 
 wait_connection_forever(Node) ->
   case net_adm:ping(Node) of
