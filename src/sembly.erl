@@ -24,14 +24,17 @@ t(Chromo, Len) ->
 
 
 assemble(Reads) ->
-	queue(Reads).
+	Q_reads = encode_G(Reads),
+	gc_graph:build_graph(Q_reads).
 
 
-queue(Reads) ->
-	queue(Reads,[]).
 
-queue([{Read,J}|Reads],Acc) -> queue(Reads,[{Read,J,extract_G(Read)}|Acc]);
-queue([],Acc) -> Acc.
+
+encode_G(Reads) ->
+	encode_G(Reads,[]).
+
+encode_G([{Read,J}|Reads],Acc) -> encode_G(Reads,[{Read,J,extract_G(Read)}|Acc]);
+encode_G([],Acc) -> queue:from_list(Acc).
 
 
 extract_G(Read) -> extract_G(Read,1,[]).
