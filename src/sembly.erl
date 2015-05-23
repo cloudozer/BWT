@@ -23,16 +23,17 @@ t(Chromo, Len) ->
 	Entire_seq = binary_to_list(Ref),
 	
 	Reads = get_reads(Entire_seq,D,Len,0,[]),
+	io:format("Reads: ~p~n",[Reads]),
 	assemble(Reads),
 
 	io:format("~p~n",[Reads]).
 
 
 get_reads(Entire_seq,D,Len,_,Acc) when length(Entire_seq) =< Len+D -> 
-	[lists:nthtail(length(Entire_seq)-Len,Entire_seq)|Acc];
+	[{length(Entire_seq)-Len,lists:nthtail(length(Entire_seq)-Len,Entire_seq)}|Acc];
 get_reads(Entire_seq,D,Len,J,Acc) ->
 	D1 = random:uniform(D),
-	get_reads(lists:nthtail(D1,Entire_seq),D,Len,J+D1,[{lists:sublist(Entire_seq,D1+1,Len),J+D1}|Acc]).
+	get_reads(lists:nthtail(D1,Entire_seq),D,Len,J+D1,[{J+D1,lists:sublist(Entire_seq,D1+1,Len)}|Acc]).
 
 
 assemble([R|Reads]) ->
@@ -42,7 +43,7 @@ assemble([R|Reads]) ->
 
 build_graph(Q,Workers,0) ->
 	io:format("~p reads were not matched~n",[queue:len(Q)]),
-	[ Pid ! {get_graph} || Pid <- Workers ],
+	[ Pid ! get_graph || Pid <- Workers ],
 	assemble_graph(length(Workers),[]);
 
 build_graph(Q,Workers,N) ->
@@ -51,6 +52,7 @@ build_graph(Q,Workers,N) ->
 			build_graph(Q1,Workers,Read,N);
 		{empty,_} -> 
 			[ Pid ! {get_graph} || Pid <- Workers ],
+			io:format("Assembling graph...~n~p~n",[Workers]),
 			assemble_graph(length(Workers),[])
 	end.
 	
