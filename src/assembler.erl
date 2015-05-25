@@ -56,8 +56,8 @@ attach_read(Gph,R_id,Read,Read_str,[{Node_id,Attrs}|Nodes],Acc,Attached) ->
 		[] -> attach_read(Gph,R_id,Read,Read_str,Nodes,[{Node_id,Attrs}|Acc],Attached);
 		Candidates ->
 			io:format("G-string matches: ~p~n",[Candidates]), 
-			Gph1 = add_parent_node(Gph,Node_id,Attrs,R_id,Read,Read_str,Candidates),
-			throw(not_implemented),
+			Gph1 = add_parent_node(Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,Candidates),
+			%throw(not_implemented),
 			attach_read(Gph1,R_id,Read,Read_str,Nodes,[{Node_id,Attrs}|Acc],true)
 	end;
 
@@ -127,22 +127,27 @@ align(right,_,[],[],Acc) -> Acc.
 
 %% Checks if a read matches with Node at each position
 %% if it does, it adds child and parent node
-add_parent_node(Gph,Node_id,Attrs,R_id,Read,Read_str,[Sh|Shifts]) ->
-	io:format("Read:~s~n",[Read]),
-	Read_bias = get_first_G(lists:reverse(Read)),
+add_parent_node(Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,[Sh|Shifts]) ->
 	{read,G_read} = lists:keyfind(read,1,Attrs),
-	Graph_bias= get_first_G(G_read),
-	
-	Overlap = Sh + Read_bias + Graph_bias - 1,
-	L = length(Read),
-	case Overlap =< L of
-		true ->
+	R_body = lists:sum(Read_str),
+	G_body = lists:sum(Graph_str),
+	if
+		Sh < R_body ->
+			io:format(" LEFT alignment~n"),
+			L = length(Read),
+			Overlap = Sh + get_first_G(lists:reverse(Read)) + get_first_G(G_read) - 1,
 			R = lists:sublist(Read,L-Overlap+1,Overlap),
 			G = lists:sublist(G_read,Overlap),
-			io:format("~s~n~s~n",[G,R])
+			io:format("~s~n~s~n",[G,R]);
+		Sh =:= R_body andalso Sh =:= G_body -> io:format(" CENTER alignment~n");
+		Sh =:= R_body -> io:format(" CENTER alignment~n");
+		Sh =:= G_body -> io:format(" CENTER alignment~n");
+		Sh > G_body -> io:format(" RIGHT alignment~n");
+
+		true -> throw(impossible_case)
 	end,
-	add_parent_node(Gph,Node_id,Attrs,R_id,Read,Read_str,Shifts);
-add_parent_node(Gph,_,_,_,_,_,[]) -> Gph.
+	add_parent_node(Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,Shifts);
+add_parent_node(Gph,_,_,_,_,_,_,[]) -> Gph.
 
 
 
