@@ -23,7 +23,7 @@ t(Chromo, Len) ->
 	Entire_seq = binary_to_list(Ref),
 	
 	Reads = get_reads(Entire_seq,D,Len,0,[]),
-	io:format("Reads: ~p~n",[Reads]),
+	%io:format("Reads: ~p~n",[Reads]),
 	assemble(Reads),
 
 	io:format("~p~n",[Reads]).
