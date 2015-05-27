@@ -14,8 +14,8 @@
 -define(MATCH,2).
 -define(UNKNOWN,1.6).
 -define(MISMATCH,-1).
--define(GAP_PENALTY,-1).
--define(GAP_EXT_PENALTY,0).
+-define(GAP_PENALTY,-2).
+-define(GAP_EXT_PENALTY,-1).
 
 -define(UNDEF,0).
 
