@@ -8,7 +8,7 @@
 -export([t/0]).
 
 -define(WORKERS_NBR,2).
--define(X_TRIALS,1). 	%% number of times a read will be tried to attach to the graph
+-define(X_TRIALS,10). 	%% number of times a read will be tried to attach to the graph
 
 
 
@@ -24,23 +24,29 @@ t(Chromo, Len) ->
 	
 	Uid = uid:init(),
 	Reads = get_reads(Entire_seq,D,Len,0,[]),
-	%io:format("Reads: ~p~n",[Reads]),
+	io:format("Reads: ~p~n",[Reads]),
 	assemble(Reads,Uid),
 	uid:stop(Uid).
 	%io:format("~p~n",[Reads]).
 
 
 get_reads(Entire_seq,D,Len,_,Acc) when length(Entire_seq) =< Len+D -> 
-	[{length(Entire_seq)-Len,lists:nthtail(length(Entire_seq)-Len,Entire_seq)}|Acc];
+	[ {Pos,R} || {_,Pos,R} <- 
+		lists:sort( [{random:uniform(),
+					length(Entire_seq)-Len,
+					lists:nthtail(length(Entire_seq)-Len,Entire_seq)} | Acc] )
+	];
 get_reads(Entire_seq,D,Len,J,Acc) ->
 	D1 = random:uniform(D),
-	get_reads(lists:nthtail(D1,Entire_seq),D,Len,J+D1,[{J+D1,lists:sublist(Entire_seq,D1+1,Len)}|Acc]).
+	get_reads(lists:nthtail(D1,Entire_seq),D,Len,J+D1,[{random:uniform(),J+D1,lists:sublist(Entire_seq,D1+1,Len)}|Acc]).
+
 
 
 assemble([R|Reads],Uid) ->
 	Pid = spawn(assembler,start_worker,[self(),Uid,R]),
 	build_graph(queue:from_list(Reads),[Pid],length(Reads)*?X_TRIALS).
 	
+
 
 build_graph(Q,Workers,0) ->
 	io:format("~p reads were not matched~n",[queue:len(Q)]),
@@ -69,14 +75,16 @@ build_graph(Q,Workers,{Pos,Read},N) ->
 	case L of 
 		0 -> 	%% spawn a new assembler or put Read back to the queue
 			io:format("Read did not match~n"),
-			Q1 = queue:in(Read,Q),
+			Q1 = queue:in({Pos,Read},Q),
 			build_graph(Q1,Workers,N-1);
 		1 -> 
 			io:format("read attached to the only subgraph~n"),
 			build_graph(Q,Workers,N);
 		2 -> 
 			io:format("Merge subgraphs~n"),
-			build_graph(Q,Workers,N)
+			build_graph(Q,Workers,N);
+		_ ->
+			io:format("L:~p~n",[L])
 	end.
 	
 

@@ -45,8 +45,9 @@ init(Uid,Seq,Pos,G_str) ->
 %% tries to attach a given Read to the graph
 attach_read(Uid,{Nodes,_}=Gph,R_id,Read) ->
 	G_str = encode_G(Read),
+	io:format("New read: ~p~n",[R_id]),
 	%% try to attach the Read to top-level nodes of Gph
-	Top_nodes = lists:filter(fun({Node_id,_})->digr:incidents(Node_id,Gph)==[] end, Nodes),
+	Top_nodes = lists:filter(fun({Node_id,_}) -> length(digr:incidents(Node_id,Gph))==0 end, Nodes),
 	%io:format("Top_nodes: ~w~n",[[ ID || {ID,_}<-Top_nodes]]),
 	attach_read(Uid,Gph,R_id,Read,G_str,Top_nodes,[],false).
 
@@ -65,6 +66,7 @@ attach_read(Uid,Gph,R_id,Read,Read_str,[{Node_id,Attrs}|Nodes],Acc,Attached) ->
 
 attach_read(Uid,Gph,R_id,Read,Read_str,[],Nodes,false) ->
 	%% find all children nodes and continue search
+	io:format("read not aligned. Aligning to the children ...~n"),
 	Children = lists:usort( lists:foldl(fun({Nid,_},Acc)-> digr:neighbors(Nid,Gph)++Acc
 										end, [], Nodes)
 	),
@@ -135,13 +137,14 @@ add_parent_node(Uid,Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,[Sh|Shifts]) 
 	G_body = lists:sum(Graph_str),
 	if
 		Sh < R_body ->
-			io:format(" LEFT alignment~n"),
 			L = length(Read),
 			Overlap = Sh + get_first_G(lists:reverse(Read)) + get_first_G(G_read) - 1,
 			R = lists:sublist(Read,L-Overlap+1,Overlap),
 			G = lists:sublist(G_read,Overlap),
 			case R =:= G of
 				true ->
+					io:format(" LEFT alignment~n"),
+			
 					{loc,Loc} = lists:keyfind(loc,1,Attrs),
 					Loc1 = Loc + Overlap - length(Read),
 					Kid_id = uid:next(Uid),
@@ -151,7 +154,7 @@ add_parent_node(Uid,Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,[Sh|Shifts]) 
 					%io:format("~p~n~p~n",[Read,G_read]),
 					Left_part = lists:sublist(Read,length(Read)-Overlap),
 					Par_read = Left_part++G_read,
-					io:format("New parent: ~p~n",[length(Par_read)]),
+					io:format("New parent. Length: ~p~n",[length(Par_read)]),
 					Par_id = uid:next(Uid),
 					Gph2 = digr:add_node(Par_id,[{read,Par_read},
 												{loc,Loc1},{g_string,encode_G(Par_read)}],Gph1),
@@ -169,11 +172,21 @@ add_parent_node(Uid,Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,[Sh|Shifts]) 
 			Gph3 = Gph,
 			io:format(" CENTER alignment~n");
 
-		Sh =:= G_body -> Gph3 = Gph, io:format(" CENTER alignment~n");
+		Sh =:= G_body -> 
+			Gph3 = Gph,
+			io:format(" CENTER alignment~n");
 
-		Sh > G_body -> Gph3 = Gph, io:format(" RIGHT alignment~n");
+		Sh < G_body -> % Shift is larger than Read
+			Gph3 = Gph,
+			io:format(" CENTER alignment~n");
 
-		true -> throw(impossible_case), Gph3 = Gph
+		Sh > G_body -> 
+			Gph3 = Gph,
+			io:format(" RIGHT alignment~n");
+
+		true ->
+			io:format("G_body:~p, R_body:~p, Shift:~p~n",[G_body,R_body,Sh]), 
+			throw(impossible_case), Gph3 = Gph
 	end,
 	add_parent_node(Uid,Gph3,Node_id,Graph_str,Attrs,R_id,Read,Read_str,Shifts);
 add_parent_node(_,Gph,_,_,_,_,_,_,[]) -> Gph.
