@@ -5,63 +5,65 @@
 
 
 -module(assembler).
--export([start_worker/2,
+-export([start_worker/3,
 		encode_G/1
 		]).
 
 
 
-
 %% worker builds a sub-graph and then returns it back to Pid
-start_worker(Pid,{J,Read}) ->
+start_worker(Pid,Uid,{J,Read}) ->
 	G_str = encode_G(Read),
-	Gph = init(Read,J,G_str),
-	worker(Pid,Gph,G_str).
+	Gph = init(Uid,Read,J,G_str),
+	worker(Pid,Uid,Gph,G_str).
 
 
-worker(Pid,Gph,Prev_read) ->
+worker(Pid,Uid,Gph,Prev_read) ->
 	receive
-		get_graph -> Pid ! Gph; 						%% sends graph to master and terminates
+		get_graph -> 
+			io:format("Graph got ~p nodes~n",[length(digr:nodes(Gph))]),
+			digr:export_to_dot(Gph,"sembly"),
+			Pid ! {graph,Gph}; 						%% sends graph to master and terminates
 		{merge_to,Wid} -> {add_graph, Wid ! Gph}; 		%% sends graph to the other worker and terminates
 		{add_graph,Gph1} -> 							%% merges a sub_graph and confirms that to master
 			Pid ! {self(),merged},
-			worker(Pid, merge_graphs(Gph,Gph1,Prev_read), Prev_read);
-		{R_id,Read} -> 										%% tries to attach read and confirms the result to master
-			case attach_read(Gph,R_id,Read) of
-				{Size,Gph1} -> Pid ! {self(), Size}, worker(Pid,Gph1,Read);
-				false -> Pid ! not_attached, worker(Pid,Gph,Read)
+			worker(Pid,Uid,merge_graphs(Gph,Gph1,Prev_read), Prev_read);
+		{next_read,R_id,Read} -> 										%% tries to attach read and confirms the result to master
+			case attach_read(Uid,Gph,R_id,Read) of
+				{Size,Gph1} -> Pid ! {self(), Size}, worker(Pid,Uid,Gph1,Read);
+				false -> Pid ! not_attached, worker(Pid,Uid,Gph,Read)
 			end
 	end.
 
 
 % TODO: initialise the graph for a given Read
-init(Seq,Pos,G_str) -> 
-	digr:add_node(Pos,[{g_string,G_str},{read,Seq},{loc,0}],digr:new()).
+init(Uid,Seq,Pos,G_str) -> 
+	digr:add_node(uid:next(Uid),[{g_string,G_str},{read,Seq},{loc,0},{pos,Pos}],digr:new()).
 
 
 
 %% tries to attach a given Read to the graph
-attach_read({Nodes,_}=Gph,R_id,Read) ->
+attach_read(Uid,{Nodes,_}=Gph,R_id,Read) ->
 	G_str = encode_G(Read),
 	%% try to attach the Read to top-level nodes of Gph
 	Top_nodes = lists:filter(fun({Node_id,_})->digr:incidents(Node_id,Gph)==[] end, Nodes),
 	%io:format("Top_nodes: ~w~n",[[ ID || {ID,_}<-Top_nodes]]),
-	attach_read(Gph,R_id,Read,G_str,Top_nodes,[],false).
+	attach_read(Uid,Gph,R_id,Read,G_str,Top_nodes,[],false).
 
-attach_read(Gph,R_id,Read,Read_str,[{Node_id,Attrs}|Nodes],Acc,Attached) ->
+attach_read(Uid,Gph,R_id,Read,Read_str,[{Node_id,Attrs}|Nodes],Acc,Attached) ->
 	{g_string,Graph_str} = lists:keyfind(g_string,1,Attrs),
-	io:format("g_string:~p~n",[Graph_str]),
-	io:format("read:    ~p~n",[Read_str]),
+	%io:format("g_string:~p~n",[Graph_str]),
+	%io:format("read:    ~p~n",[Read_str]),
 	case align(Read_str,Graph_str) of
-		[] -> attach_read(Gph,R_id,Read,Read_str,Nodes,[{Node_id,Attrs}|Acc],Attached);
+		[] -> attach_read(Uid,Gph,R_id,Read,Read_str,Nodes,[{Node_id,Attrs}|Acc],Attached);
 		Candidates ->
-			io:format("G-string matches: ~p~n",[Candidates]), 
-			Gph1 = add_parent_node(Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,Candidates),
+			%io:format("G-string matches: ~p~n",[Candidates]), 
+			Gph1 = add_parent_node(Uid,Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,Candidates),
 			%throw(not_implemented),
-			attach_read(Gph1,R_id,Read,Read_str,Nodes,[{Node_id,Attrs}|Acc],true)
+			attach_read(Uid,Gph1,R_id,Read,Read_str,Nodes,[{Node_id,Attrs}|Acc],true)
 	end;
 
-attach_read(Gph,R_id,Read,Read_str,[],Nodes,false) ->
+attach_read(Uid,Gph,R_id,Read,Read_str,[],Nodes,false) ->
 	%% find all children nodes and continue search
 	Children = lists:usort( lists:foldl(fun({Nid,_},Acc)-> digr:neighbors(Nid,Gph)++Acc
 										end, [], Nodes)
@@ -70,10 +72,10 @@ attach_read(Gph,R_id,Read,Read_str,[],Nodes,false) ->
 	%io:format("Children: ~p~n",[Children]),
 	case Children of
 		[] -> false;
-		_ -> attach_read(Gph,R_id,Read,Read_str,Children,[],false)
+		_ -> attach_read(Uid,Gph,R_id,Read,Read_str,Children,[],false)
 	end;
 
-attach_read(Gph,_,_,_,[],_,true) -> {digr:size(Gph),Gph}.
+attach_read(_,Gph,_,_,_,[],_,true) -> {digr:size(Gph),Gph}.
 
 
 %% matches a shorter Read_str against a longer Graph_str
@@ -127,7 +129,7 @@ align(right,_,[],[],Acc) -> Acc.
 
 %% Checks if a read matches with Node at each position
 %% if it does, it adds child and parent node
-add_parent_node(Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,[Sh|Shifts]) ->
+add_parent_node(Uid,Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,[Sh|Shifts]) ->
 	{read,G_read} = lists:keyfind(read,1,Attrs),
 	R_body = lists:sum(Read_str),
 	G_body = lists:sum(Graph_str),
@@ -138,16 +140,43 @@ add_parent_node(Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,[Sh|Shifts]) ->
 			Overlap = Sh + get_first_G(lists:reverse(Read)) + get_first_G(G_read) - 1,
 			R = lists:sublist(Read,L-Overlap+1,Overlap),
 			G = lists:sublist(G_read,Overlap),
-			io:format("~s~n~s~n",[G,R]);
-		Sh =:= R_body andalso Sh =:= G_body -> io:format(" CENTER alignment~n");
-		Sh =:= R_body -> io:format(" CENTER alignment~n");
-		Sh =:= G_body -> io:format(" CENTER alignment~n");
-		Sh > G_body -> io:format(" RIGHT alignment~n");
+			case R =:= G of
+				true ->
+					{loc,Loc} = lists:keyfind(loc,1,Attrs),
+					Loc1 = Loc + Overlap - length(Read),
+					Kid_id = uid:next(Uid),
+					Gph1 = digr:add_node(Kid_id,[{read,Read},{loc,Loc1},{g_string,Read_str},{pos,R_id}],Gph),
 
-		true -> throw(impossible_case)
+					%% add new parent node
+					%io:format("~p~n~p~n",[Read,G_read]),
+					Left_part = lists:sublist(Read,length(Read)-Overlap),
+					Par_read = Left_part++G_read,
+					io:format("New parent: ~p~n",[length(Par_read)]),
+					Par_id = uid:next(Uid),
+					Gph2 = digr:add_node(Par_id,[{read,Par_read},
+												{loc,Loc1},{g_string,encode_G(Par_read)}],Gph1),
+					%% add two edges
+					Gph3 = digr:add_edge({Par_id,Kid_id}, digr:add_edge({Par_id,Node_id},Gph2) );
+
+				false-> Gph3 = Gph
+			end;
+
+		Sh =:= R_body andalso Sh =:= G_body -> 
+			Gph3 = Gph,
+			io:format(" CENTER alignment~n");
+
+		Sh =:= R_body -> 
+			Gph3 = Gph,
+			io:format(" CENTER alignment~n");
+
+		Sh =:= G_body -> Gph3 = Gph, io:format(" CENTER alignment~n");
+
+		Sh > G_body -> Gph3 = Gph, io:format(" RIGHT alignment~n");
+
+		true -> throw(impossible_case), Gph3 = Gph
 	end,
-	add_parent_node(Gph,Node_id,Graph_str,Attrs,R_id,Read,Read_str,Shifts);
-add_parent_node(Gph,_,_,_,_,_,_,[]) -> Gph.
+	add_parent_node(Uid,Gph3,Node_id,Graph_str,Attrs,R_id,Read,Read_str,Shifts);
+add_parent_node(_,Gph,_,_,_,_,_,_,[]) -> Gph.
 
 
 

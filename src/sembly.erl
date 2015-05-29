@@ -17,16 +17,17 @@ t() ->
 	t(Chromo,100).
 
 t(Chromo, Len) ->
-	Coverage = 7,
+	Coverage = 5,
 	{ok,Ref} = file:read_file("bwt_files/"++Chromo++".ref"),
 	D = round(2*Len/Coverage),
 	Entire_seq = binary_to_list(Ref),
 	
+	Uid = uid:init(),
 	Reads = get_reads(Entire_seq,D,Len,0,[]),
 	%io:format("Reads: ~p~n",[Reads]),
-	assemble(Reads),
-
-	io:format("~p~n",[Reads]).
+	assemble(Reads,Uid),
+	uid:stop(Uid).
+	%io:format("~p~n",[Reads]).
 
 
 get_reads(Entire_seq,D,Len,_,Acc) when length(Entire_seq) =< Len+D -> 
@@ -36,8 +37,8 @@ get_reads(Entire_seq,D,Len,J,Acc) ->
 	get_reads(lists:nthtail(D1,Entire_seq),D,Len,J+D1,[{J+D1,lists:sublist(Entire_seq,D1+1,Len)}|Acc]).
 
 
-assemble([R|Reads]) ->
-	Pid = spawn(assembler,start_worker,[self(),R]),
+assemble([R|Reads],Uid) ->
+	Pid = spawn(assembler,start_worker,[self(),Uid,R]),
 	build_graph(queue:from_list(Reads),[Pid],length(Reads)*?X_TRIALS).
 	
 
@@ -51,14 +52,14 @@ build_graph(Q,Workers,N) ->
 		{{value,Read},Q1} -> 
 			build_graph(Q1,Workers,Read,N);
 		{empty,_} -> 
-			[ Pid ! {get_graph} || Pid <- Workers ],
+			[ Pid ! get_graph || Pid <- Workers ],
 			io:format("Assembling graph...~n~p~n",[Workers]),
 			assemble_graph(length(Workers),[])
 	end.
 	
-build_graph(Q,Workers,Read,N) -> 
+build_graph(Q,Workers,{Pos,Read},N) -> 
 	%% sends Read to all workers which then try to attach it to their sub-graphs
-	lists:foreach(fun(Wpid) -> Wpid ! Read end, Workers),
+	lists:foreach(fun(Wpid) -> Wpid ! {next_read,Pos,Read} end, Workers),
 	Res = [ receive Msg -> Msg end || _ <- Workers ],
 	%io:format("Got messages from ~p workers: ~p~n",[length(Res),Res]),
 	
@@ -67,6 +68,7 @@ build_graph(Q,Workers,Read,N) ->
 	L = length(lists:filter(fun(not_attached)->false; (_)->true end,Res)),
 	case L of 
 		0 -> 	%% spawn a new assembler or put Read back to the queue
+			io:format("Read did not match~n"),
 			Q1 = queue:in(Read,Q),
 			build_graph(Q1,Workers,N-1);
 		1 -> 
@@ -82,10 +84,7 @@ build_graph(Q,Workers,Read,N) ->
 
 %% collect all sub-graphs
 assemble_graph(0,Acc) -> Acc;
-assemble_graph(Workers_nbr,Acc) -> receive Graph -> assemble_graph(Workers_nbr-1, [Graph|Acc]) end.
-
-
-
+assemble_graph(Workers_nbr,Acc) -> receive {graph,Graph} -> assemble_graph(Workers_nbr-1, [Graph|Acc]) end.
 
 
 
