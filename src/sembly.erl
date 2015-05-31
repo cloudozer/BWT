@@ -8,7 +8,7 @@
 -export([t/0]).
 
 -define(WORKERS_NBR,2).
--define(X_TRIALS,10). 	%% number of times a read will be tried to attach to the graph
+-define(X_TRIALS,1). 	%% number of times a read will be tried to attach to the graph
 
 
 
@@ -24,7 +24,7 @@ t(Chromo, Len) ->
 	
 	Uid = uid:init(),
 	Reads = get_reads(Entire_seq,D,Len,0,[]),
-	io:format("Reads: ~p~n",[Reads]),
+	%io:format("Reads: ~p~n",[Reads]),
 	assemble(Reads,Uid),
 	uid:stop(Uid).
 	%io:format("~p~n",[Reads]).
