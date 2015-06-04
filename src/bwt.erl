@@ -95,7 +95,7 @@ fm(X) ->
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
 	%list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
-	list_to_tuple(fmi:assemble_index(SA,[],0,[],Dq,Aq,Cq,Gq,Tq)).
+	list_to_tuple(fmi:assemble_index(SA,[],0,Dq,Aq,Cq,Gq,Tq)).
 	
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
