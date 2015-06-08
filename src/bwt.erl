@@ -8,9 +8,6 @@
 		get_suffs/1,
 		fm/1,
 		sa/1,
-		make_index/1,
-		get_ref/3,
-		get_index/1,
 		test/0
 		]).
 
@@ -19,11 +16,9 @@
 %-define(TRSH,0.8).
 
 
-%-record(fm,{f,l,d,a,c,g,t,sa}).
-
 test() ->
   %{Meta,FM} = get_index("GL000192.1"),
-  {Meta,FM} = get_index("GL000207.1"),
+  {Meta,FM} = fm_index:get_index("GL000207.1",1),
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
   Qs = [
   	"ACCCCACGTTTTTGGAGTTATATGTTGGCACTGATACTGGCCATAGAATTCCCTATGGTA",
@@ -66,63 +61,6 @@ test() ->
 
 
 
-make_index(Chrom) ->
-	ok = application:start(bwt),
-	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
-	File = filename:join(BwtFiles, "human_g1k_v37_decoy.fasta"),
-	{Pos,Len} = msw:get_reference_position(Chrom,File),
-	{Shift,Ref_seq} = msw:get_ref_seq(File,Pos,Len),
-	file:write_file(filename:join(BwtFiles,Chrom++".ref"),list_to_binary(Ref_seq)),
-
-	io:format("Removed ~p 'NNN' in the beginning~n",[Shift]),
-	io:format("Length of the ref genome: ~p~n",[length(Ref_seq)]),
-	statistics(runtime),
-	Ref_seq1 = lists:map(fun($N)->element(random:uniform(4),{$A,$C,$G,$T});
-							($B)->$C;
-							($D)->$G;
-							($R)->$A;
-							($Y)->$C;
-							($K)->$T;
-							($M)->$A;
-							($S)->$C;
-							($W)->$A;
-							($V)->$A;
-							($A)->$A;
-							($C)->$C;
-							($G)->$G;
-							($T)->$T
-						end, Ref_seq),
-	{_,T1} = statistics(runtime),
-	io:format("Mapping takes: ~pms~n",[T1]),
-	
-	FM = fm(st:append($$,Ref_seq1)),
-	%io:format("~p~n",[FM]),
-	Meta = [{pointers, fmi:get_index_pointers(FM)},{shift, Shift}],
-	Bin = term_to_binary({Meta,FM}),
-	file:write_file(filename:join(BwtFiles,Chrom++".fm"),Bin).
-
-
-
-get_index(Chrom) ->
-	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
-%% 	BwtFiles = "bwt_files/",
-	{ok,Bin} = file:read_file(filename:join(BwtFiles, Chrom++".fm")),
-	%{ok,Bin} = file:read_file(filename:join("bwt_files/", Chrom++".fm")),
-	binary_to_term(Bin).
-
-
-
-get_ref(Chrom,Pos,Len) ->
-	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
-	File = filename:join(BwtFiles, Chrom++".ref"),
-	{ok,Dev} = file:open(File,read),
-	{ok,Ref} = file:pread(Dev, Pos, Len),
-	ok = file:close(Dev),
-	binary_to_term(Ref).
-
-
-
-
 bwt(X) ->
 	T = lists:reverse([$$|lists:reverse(X)]),
 
@@ -157,7 +95,7 @@ fm(X) ->
 	io:format("Building the queues took ~p sec~n",[T3/1000]),
 
 	%list_to_tuple(add_indices(FM,[],Dq,Aq,Cq,Gq,Tq)).
-	list_to_tuple(fmi:assemble_index(SA,[],0,[],Dq,Aq,Cq,Gq,Tq)).
+	list_to_tuple(fmi:assemble_index(SA,[],0,Dq,Aq,Cq,Gq,Tq)).
 	
 	%{_,T4} = statistics(runtime),
 	%io:format("Building the index took ~p sec~n",[T4/1000]).
