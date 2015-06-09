@@ -26,7 +26,7 @@ init([]) ->
 	{_,_,C,D} = ip(),
 	NodeName = list_to_atom("erl" ++ integer_to_list(C) ++ "." ++ integer_to_list(D)),
 	navel:start0(NodeName),
-	navel:connect(application:get_env(worker_bwt_app,master_ip,{172,16,1,254})),
+	navel:connect(application:get_env(worker_bwt_app,master_ip,{104,131,82,168})),
 
 	timer:sleep(1000),
     {ok, { {one_for_one, 5, 10}, [
