@@ -87,7 +87,7 @@ handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#st
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
   MyNode = navel:get_node(),
-  lists:foreach(fun({Node,Pid}) -> navel:call_no_return(Node, worker_bwt, run, [Pid,{MyNode,self()}]) end, Workers1),
+  lists:foreach(fun({Node,Pid}) -> navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,{MyNode,self()}]) end, Workers1),
   %% TODO: demonitor the rest
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid, start_time = now()}};
 
