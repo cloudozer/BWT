@@ -22,8 +22,10 @@ start_link() ->
 
 start_link({MNode, MPid}) ->
   {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
-  ok = navel:call(MNode, master, register_workers, [MPid,[{navel:get_node(),Pid}]]),
-  {ok, Pid}.
+  case navel:call(MNode, master, register_workers, [MPid,[{navel:get_node(),Pid}]]) of
+    ok -> {ok, Pid};
+    wait -> timer:sleep(1000), exit(wait)
+  end.
 
 run(Pid, MasterPid) ->
   gen_server:cast(Pid, {run, MasterPid}).
@@ -93,7 +95,7 @@ slave_loop(MasterPid, WorkerPid, Workload=[{Chromosome,_}|_], undefined, undefin
   {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
   slave_loop(MasterPid, WorkerPid, Workload, FM, Ref, Pc,Pg,Pt,Last, Shift).
 
-slave_loop(MasterPid, WorkerPid, [], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+slave_loop(MasterPid={MNode,MPid}, WorkerPid, [], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   case gen_server:call(WorkerPid, get_workload) of
     {ok, Workload} ->
       slave_loop(MasterPid, WorkerPid, Workload, FM, Ref, Pc,Pg,Pt,Last, Shift);
@@ -102,7 +104,7 @@ slave_loop(MasterPid, WorkerPid, [], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
       slave_loop(MasterPid, WorkerPid, [], FM, Ref, Pc,Pg,Pt,Last, Shift);
     stop ->
       lager:info("Worker's slave is stopping"),
-      bye
+      ok = navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),WorkerPid}}])
   end;
 
 slave_loop(MasterPid={MNode,MPid}, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
@@ -146,7 +148,7 @@ slave_loop(MasterPid={MNode,MPid}, WorkerPid, [{Chromosome, QseqList} | Workload
     end, [],  Seeds1),
 
     case Cigars of
-      [] -> ok;
+      [] -> navel:call_no_return(MNode, gen_server, cast, [MPid, no_cigar]);
       [{Cigar,P,RefSeq}] ->
         navel:call_no_return(MNode, gen_server, cast, [MPid, {cigar, SeqName, Cigar, P, RefSeq}]);
       _ ->
