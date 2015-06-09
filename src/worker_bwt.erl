@@ -9,105 +9,61 @@
 -module(worker_bwt).
 -behaviour(gen_server).
 
--export([start_link/0, start_link/1, run/2]).
--export([init/1, terminate/2, handle_cast/2, handle_call/3]).
--export([slave_loop/5]).
+-export([start_link/0, start_link/1, run/3]).
+-export([worker_loop/10]).
 
 -include("bwt.hrl").
+
+-define(WATERLINE, 10).
 
 %% api
 
 start_link() ->
-  gen_server:start_link(?MODULE, {}, []).
+  Pid = spawn_link(?MODULE, worker_loop, [init, []]),
+  true = is_pid(Pid),
+  {ok, Pid}.
 
 start_link({MNode, MPid}) ->
-  {ok, Pid} = gen_server:start_link(?MODULE, {}, []),
+  {ok, Pid} = ?MODULE:start_link(),
   case navel:call(MNode, master, register_workers, [MPid,[{navel:get_node(),Pid}]]) of
     ok -> {ok, Pid};
     wait -> timer:sleep(1000), exit(wait)
   end.
 
-run(Pid, MasterPid) ->
-  gen_server:cast(Pid, {run, MasterPid}).
+run(Pid, Chromosome, MasterPid) ->
+  Pid ! {run, Chromosome, MasterPid}.
 
-%% callbacks
+%% state_name ::= [init|running|stopping]
 
--record(state, {master, slave, workloads = [], workload_waterline = 10, stopping = false}).
+worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
+  receive
+    {run, Chromosome, MasterPid1={MNode,MPid}} ->
+      erlang:garbage_collect(),
 
-init(_) ->
-  {ok, #state{}}.
+      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, self()}]),
 
-terminate(normal, _State) ->
-  lager:info("garbage_collection: ~p~nexact_reductions: ~p~nmemory: ~p", [erlang:statistics(garbage_collection), erlang:statistics(exact_reductions), erlang:memory()]);
-terminate(Reason, State) ->
-  lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
+      {Meta,FM} = fm_index:get_index(Chromosome, 1),
 
-handle_cast({run, MasterPid={MNode,MPid}}, S=#state{slave = undefined, workloads = [], workload_waterline = Waterline}) ->
-  erlang:garbage_collect(),
+      {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
+      Shift = proplists:get_value(shift, Meta),
 
-%%   Workload = gen_server:call(MasterPid, {get_workload, Waterline}, 60000),
-  Workload = navel:call(MNode, gen_server, call, [MPid, {get_workload, Waterline}, 60000]),
-  true = is_list(Workload),
-  SlavePid = spawn_link(?MODULE, slave_loop, [MasterPid, self(), Workload, undefined, undefined]),
-%%   gen_server:cast(MasterPid, {get_workload, Waterline, self()}),
-  navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, Waterline, self()}]),
-  {noreply, S#state{master = MasterPid, slave = SlavePid}};
+      {ok, BwtFiles} = application:get_env(bwt,bwt_files),
+      {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
 
-handle_cast({workload, stop}, S) ->
-  {noreply, S#state{stopping = true}};
-handle_cast({workload, Workload}, S = #state{workloads = WorkloadList}) when is_list(Workload) ->
-  lager:info("worker got workload ~p", [length(Workload)]),
-  {noreply, S#state{workloads = Workload ++ WorkloadList}}.
+      worker_loop(running, [], MasterPid1, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
-handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = [], stopping = true}) ->
-  lager:info("Worker is stopping"),
-  {stop, normal, stop, S};
-handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = [], workload_waterline = Waterline, master = {MNode,MPid}, stopping = false}) ->
-%%   gen_server:cast(MasterPid, {get_workload, Waterline, self()}),
-  navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, Waterline, self()}]),
-  {reply, wait, S};
-
-handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = Workloads, workload_waterline = Waterline, master = {MNode,MPid}}) ->
-  WorkLen = length(Workloads),
-
-  if WorkLen =< Waterline ->
-    %% gen_server:cast(MasterPid, {get_workload, Waterline, self()});
-    navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, Waterline, self()}]);
-    true -> ok
-  end,
-%%   {Workloads1, WorkloadsRest} = lists:split(WorkLen div 2, Workloads),
-
-  lager:info("slave get_workload ~p", [length(Workloads)]),
-%%   lager:info("slave get_workload ~p", [{length(Workloads1),length(WorkloadsRest)}]),
-
-  {reply, {ok, Workloads}, S#state{workloads = []}}.
-%%   {reply, {ok, Workloads1}, S#state{workloads = WorkloadsRest}}.
-
-%% private
-
-slave_loop(MasterPid, WorkerPid, Workload=[{Chromosome,_}|_], undefined, undefined) ->
-  {Meta,FM} = fm_index:get_index(Chromosome, 1),
-
-  {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
-  Shift = proplists:get_value(shift, Meta),
-
-  {ok, BwtFiles} = application:get_env(bwt,bwt_files),
-  {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
-  slave_loop(MasterPid, WorkerPid, Workload, FM, Ref, Pc,Pg,Pt,Last, Shift).
-
-slave_loop(MasterPid={MNode,MPid}, WorkerPid, [], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
-  case gen_server:call(WorkerPid, get_workload) of
-    {ok, Workload} ->
-      slave_loop(MasterPid, WorkerPid, Workload, FM, Ref, Pc,Pg,Pt,Last, Shift);
-    wait ->
-      timer:sleep(1000),
-      slave_loop(MasterPid, WorkerPid, [], FM, Ref, Pc,Pg,Pt,Last, Shift);
-    stop ->
-      lager:info("Worker's slave is stopping"),
-      ok = navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),WorkerPid}}])
+    Err -> throw({unsuitable, Err})
   end;
 
-slave_loop(MasterPid={MNode,MPid}, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+worker_loop(running, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+  receive
+    {workload, stop} ->
+      worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+    {workload, Workload} when is_list(Workload) ->
+      lager:info("worker got workload ~p", [length(Workload)]),
+      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift)
+  end;
+worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   erlang:garbage_collect(),
 
   Seeds = lists:foldl(
@@ -130,12 +86,12 @@ slave_loop(MasterPid={MNode,MPid}, WorkerPid, [{Chromosome, QseqList} | Workload
       {Ref1, Start_pos1} = if S > Ref_bin_size ->
         Ns = binary:copy(<<"N">>, S - Ref_bin_size),
         {<<Ref/binary, Ns/binary>>, Start_pos};
-                                 (S - Ref_len) < 0 ->
-                                   Ns = binary:copy(<<"N">>, -(S - Ref_len)),
-                                   {<<Ns/binary, Ref/binary>>, 0};
-                                 true ->
-                                   {Ref, Start_pos}
-                               end,
+                             (S - Ref_len) < 0 ->
+                               Ns = binary:copy(<<"N">>, -(S - Ref_len)),
+                               {<<Ns/binary, Ref/binary>>, 0};
+                             true ->
+                               {Ref, Start_pos}
+                           end,
 
       <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref1,
       Ref_seq1 = binary_to_list(Ref_seq),
@@ -160,4 +116,12 @@ slave_loop(MasterPid={MNode,MPid}, WorkerPid, [{Chromosome, QseqList} | Workload
 
   lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
-  slave_loop(MasterPid, WorkerPid, WorkloadRest, FM, Ref, Pc,Pg,Pt,Last, Shift).
+  worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+
+worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
+  lager:info("Worker is stopping"),
+  ok = navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
+
+
+
+
