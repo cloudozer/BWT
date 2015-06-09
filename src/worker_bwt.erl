@@ -65,11 +65,12 @@ handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads 
   navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, Waterline, self()}]),
   {reply, wait, S};
 
-handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = Workloads, workload_waterline = Waterline, master = MasterPid}) ->
+handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads = Workloads, workload_waterline = Waterline, master = {MNode,MPid}}) ->
   WorkLen = length(Workloads),
 
   if WorkLen =< Waterline ->
-    gen_server:cast(MasterPid, {get_workload, Waterline, self()});
+    %% gen_server:cast(MasterPid, {get_workload, Waterline, self()});
+    navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, Waterline, self()}]);
     true -> ok
   end,
 %%   {Workloads1, WorkloadsRest} = lists:split(WorkLen div 2, Workloads),
@@ -83,7 +84,7 @@ handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads 
 %% private
 
 slave_loop(MasterPid, WorkerPid, Workload=[{Chromosome,_}|_], undefined, undefined) ->
-  {Meta,FM} = bwt:get_index(Chromosome),
+  {Meta,FM} = fm_index:get_index(Chromosome, 1),
 
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
   Shift = proplists:get_value(shift, Meta),
@@ -104,7 +105,7 @@ slave_loop(MasterPid, WorkerPid, [], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
       bye
   end;
 
-slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+slave_loop(MasterPid={MNode,MPid}, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   erlang:garbage_collect(),
 
   Seeds = lists:foldl(
@@ -147,10 +148,10 @@ slave_loop(MasterPid, WorkerPid, [{Chromosome, QseqList} | WorkloadRest], FM, Re
     case Cigars of
       [] -> ok;
       [{Cigar,P,RefSeq}] ->
-        gen_server:cast(MasterPid, {cigar, SeqName, Cigar, P, RefSeq});
+        navel:call_no_return(MNode, gen_server, cast, [MPid, {cigar, SeqName, Cigar, P, RefSeq}]);
       _ ->
         [{TopCigar,P,RefSeq} | _] = lists:sort(fun({{R1,_},_,_}, {{R2,_},_,_}) -> R1 > R2 end, Cigars),
-        gen_server:cast(MasterPid, {cigar, SeqName, TopCigar, P, RefSeq})
+        navel:call_no_return(MNode, gen_server, cast, [MPid, {cigar, SeqName, TopCigar, P, RefSeq}])
     end
 
   end, Seeds),
