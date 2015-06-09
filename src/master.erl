@@ -119,7 +119,7 @@ handle_cast({get_workload, N, Pid}, State) ->
   Self = self(),
   spawn_link(fun() ->
     Resp = gen_server:call(Self, {get_workload, N}, 60000),
-    gen_server:cast(Pid, {workload, Resp})
+    Pid ! {workload, Resp}
   end),
   {noreply, State};
 
