@@ -23,9 +23,18 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, MasterIp} = application:get_env(bwt, master_ip),
-    MasterNode = list_to_atom("master@" ++ MasterIp),
+	{_,_,C,D} = ip(),
+	NodeName = list_to_atom("erl" ++ integer_to_list(C) ++ "." ++ integer_to_list(D)),
+	navel:start0(NodeName),
+	navel:connect(application:get_env(worker_bwt_app,master_ip,{172,16,1,254})),
+
+	timer:sleep(1000),
     {ok, { {one_for_one, 5, 10}, [
-        ?CHILD(worker_bwt, worker, [{master, MasterNode}])
+        {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}
     ]} }.
 
+ip() ->
+    {ok,Ifaddrs} = inet:getifaddrs(),
+    case [ X || {If,Props} =X <- Ifaddrs, If =/= "lo", lists:keymember(addr, 1, Props) ] of
+	[] -> unassigned;
+	[{_,Props}|_] -> proplists:get_value(addr, Props) end.

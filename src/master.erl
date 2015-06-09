@@ -20,14 +20,22 @@ test(SeqFileName, Chromosome, WorkersNum, Debug) ->
 
   ok = application:start(bwt),
 
+  %% start navel
+  navel:start(master),
   %% Create a master process
   {ok, MPid} = ?MODULE:start_link([]),
   %% Create worker processes
-  Pids = lists:map(fun(_) -> {ok, WPid} = gen_server:start_link(worker_bwt, {}, []), WPid end, lists:seq(1, WorkersNum)),
+  Node = navel:get_node(),
+  Pids = lists:map(fun(N) ->
+    NodeName = list_to_atom("erl" ++ integer_to_list(N)),
+    navel:start0(NodeName),
+    navel:connect(application:get_env(worker_bwt_app,master_ip,{127,0,0,1})),
+    {ok, WPid} = worker_bwt:start_link(),
+    {Node, WPid}
+  end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
-  ok = master:register_workers(MPid, Pids),
+  ok = navel:call(Node, ?MODULE, register_workers, [MPid,Pids]),
   %% Tell the master to run
-
   ok = ?MODULE:run(MPid, SeqFileName, Chromosome, WorkersNum).
 
 %% api
@@ -68,22 +76,19 @@ handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
 handle_call({register_workers, _}, _, S=#state{start_time=T}) when T =/= undefined ->
 	{reply, wait, S};
 handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
-  %% link and monitor new workers
-  NewWorkers = lists:map(fun(Pid)->
-                  true = link(Pid),
-                  Ref = monitor(process, Pid),
-                  {Pid, Ref}
-  end, Pids),
-  S1 = S#state{workers=NewWorkers++Workers},
+  %% monitor new workers
+  %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
+  S1 = S#state{workers=Pids++Workers},
   lager:info("The master got ~b workers", [length(S1#state.workers)]),
   {reply, ok, S1};
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) >= WorkersLimit ->
   {ok, BwtFiles} = application:get_env(bwt,bwt_files),
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
-  {Workers1, Workers2} = lists:split(WorkersLimit, Workers),
-  lists:foreach(fun({Pid,_}) -> worker_bwt:run(Pid, self()) end, Workers1),
-  %% lists:foreach(fun({Pid,Ref}) -> true = unlink(Pid), true = demonitor(Ref) end, Workers2),
+  {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
+  MyNode = navel:get_node(),
+  lists:foreach(fun({Node,Pid}) -> navel:call_no_return(Node, worker_bwt, run, [Pid,{MyNode,self()}]) end, Workers1),
+  %% TODO: demonitor the rest
   {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid, start_time = now()}};
 
 handle_call({get_workload, N}, _From, S=#state{stopping = false}) ->

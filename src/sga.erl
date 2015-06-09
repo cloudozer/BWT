@@ -59,7 +59,7 @@ get_similar(N, [], P1, Count, Dist, Acc,_) when Count >= N ->
 get_similar(_,[],_,_,_,[],_) -> 
 	%io:format(" * * No similar alignments * *~n"),
 	[];
-get_similar(_,[],_,_,_,Acc,_) -> 
+get_similar(_,[],_,_,_,Acc,_) ->
   	%io:format(" * * Similar: ~p~n",[Acc]),
 	Acc.
 

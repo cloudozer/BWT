@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Erlang
 
 .eunit
@@ -68,3 +69,18 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Ling
+
+.railing
+railing
+domain_config
+
+*.img
+
+deps
+ebin
+log
+
+*.fastq
+
