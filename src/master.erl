@@ -63,14 +63,14 @@ init(_Args) ->
 terminate(Reason, State) ->
   lager:info("Master terminated: ~p", [{Reason, State}]).
 
-handle_info({'DOWN',Ref,process,Pid,normal}, S=#state{workers = [{Pid,Ref}], start_time = StartTime, client = ClientPid}) ->
+handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
   lager:info("It's all over. ~.1f sec.", [Sec]),
   ClientPid ! {stop, Sec},
   {stop, normal, S};
-handle_info({'DOWN',Ref,process,Pid,normal}, S) ->
-  {noreply, S#state{workers = lists:delete({Pid,Ref}, S#state.workers)}}.
+handle_info({done,Pid}, S) ->
+  {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}}.
 
 
 handle_call({register_workers, _}, _, S=#state{start_time=T}) when T =/= undefined ->
@@ -129,4 +129,7 @@ handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, Stat
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
   io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
   ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq},
+  {noreply, State};
+
+handle_cast(no_cigar, State) ->
   {noreply, State}.

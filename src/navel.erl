@@ -101,6 +101,10 @@ navel(Node, Peers, Calls) ->
 					io:format("navel: unknown request: ~p\n", [Req]),
 					navel(Node, Peers, Calls) end;
 
+		
+		{tcp_closed,_Port} ->
+			%% TODO: implement link and monitor
+			ok;
 		X -> throw({todo,X}) end.
 
 dispatch(S, Msg) ->
