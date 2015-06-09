@@ -19,7 +19,7 @@
 %% api
 
 start_link() ->
-  Pid = spawn_link(?MODULE, worker_loop, [init, []]),
+  Pid = spawn_link(?MODULE, worker_loop, [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined]),
   true = is_pid(Pid),
   {ok, Pid}.
 
@@ -55,12 +55,13 @@ worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undef
     Err -> throw({unsuitable, Err})
   end;
 
-worker_loop(running, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   receive
     {workload, stop} ->
       worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
       lager:info("worker got workload ~p", [length(Workload)]),
+      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, self()}]),
       worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift)
   end;
 worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
