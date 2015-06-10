@@ -102,9 +102,9 @@ navel(Node, Peers, Calls) ->
 					navel(Node, Peers, Calls) end;
 
 		
-		{tcp_closed,_Port} ->
+		{tcp_closed,Port} ->
 			%% TODO: implement link and monitor
-			ok;
+			io:format("navel: tcp_closed (~p), ignored.~n", [Port]);
 		X -> throw({todo,X}) end.
 
 dispatch(S, Msg) ->

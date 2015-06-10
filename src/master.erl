@@ -29,7 +29,7 @@ test(SeqFileName, Chromosome, WorkersNum, Debug) ->
   Pids = lists:map(fun(N) ->
     NodeName = list_to_atom("erl" ++ integer_to_list(N)),
     navel:start0(NodeName),
-    navel:connect(application:get_env(worker_bwt_app,master_ip,{127,0,0,1})),
+    navel:connect(application:get_env(master_ip,{127,0,0,1})),
     {ok, WPid} = worker_bwt:start_link(),
     {Node, WPid}
   end, lists:seq(1, WorkersNum)),
@@ -54,7 +54,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 500, client, stopping = false, start_time}).
+-record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 200, client, stopping = false, start_time}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -83,7 +83,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   {reply, ok, S1};
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) >= WorkersLimit ->
-  {ok, BwtFiles} = application:get_env(bwt,bwt_files),
+  {ok, BwtFiles} = application:get_env(bwt_files),
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
   MyNode = navel:get_node(),
@@ -115,11 +115,11 @@ produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, chromosome
 produce_workload(_N, S = #state{fastq_eof = true}, []) ->
   {stop, S#state{stopping = true}}.
 
-handle_cast({get_workload, N, Pid}, State) ->
+handle_cast({get_workload, N, {Node,Pid}}, State) ->
   Self = self(),
   spawn_link(fun() ->
     Resp = gen_server:call(Self, {get_workload, N}, 60000),
-    Pid ! {workload, Resp}
+    navel:call_no_return(Node, erlang, send, [Pid,{workload,Resp}])
   end),
   {noreply, State};
 

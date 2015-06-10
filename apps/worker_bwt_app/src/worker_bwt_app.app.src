@@ -5,9 +5,8 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib,
-                  bwt
+                  stdlib
                  ]},
   {mod, { worker_bwt_app_app, []}},
-  {env, []}
+  {env, [{bwt_files, "bwt_files_worker"}, {fm_indices, "fm_indices"}]}
  ]}.

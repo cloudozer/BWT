@@ -11,7 +11,6 @@
 
 dev() ->
 	lager:start(),
-	ok = application:start(bwt),
 	ok = application:start(master).
 
 start(_StartType, _StartArgs) ->

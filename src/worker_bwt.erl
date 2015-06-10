@@ -7,7 +7,6 @@
 
 
 -module(worker_bwt).
--behaviour(gen_server).
 
 -export([start_link/0, start_link/1, run/3]).
 -export([worker_loop/10]).
@@ -40,14 +39,14 @@ worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undef
     {run, Chromosome, MasterPid1={MNode,MPid}} ->
       erlang:garbage_collect(),
 
-      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, self()}]),
+      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
 
       {Meta,FM} = fm_index:get_index(Chromosome, 1),
 
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
-      {ok, BwtFiles} = application:get_env(bwt,bwt_files),
+      {ok, BwtFiles} = application:get_env(bwt_files),
       {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
 
       worker_loop(running, [], MasterPid1, FM, Ref, Pc,Pg,Pt,Last, Shift);
@@ -61,12 +60,13 @@ worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) 
       worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
       lager:info("worker got workload ~p", [length(Workload)]),
-      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, self()}]),
-      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift)
+      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
+      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+    Err -> 
+      throw(Err)
   end;
 worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   erlang:garbage_collect(),
-
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
@@ -85,10 +85,10 @@ worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,
       Start_pos = (S - Ref_len) bsl 3,
 
       {Ref1, Start_pos1} = if S > Ref_bin_size ->
-        Ns = binary:copy(<<"N">>, S - Ref_bin_size),
+        Ns = list_to_binary(lists:duplicate(S - Ref_bin_size, $N)),
         {<<Ref/binary, Ns/binary>>, Start_pos};
                              (S - Ref_len) < 0 ->
-                               Ns = binary:copy(<<"N">>, -(S - Ref_len)),
+                               Ns = list_to_binary(lists:duplicate(-(S - Ref_len), $N)),
                                {<<Ns/binary, Ref/binary>>, 0};
                              true ->
                                {Ref, Start_pos}
