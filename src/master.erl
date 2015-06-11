@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([start_link/1, start_link/0, register_workers/2, run/4]).
--export([test/0, test/4]).
+-export([test/0, test/4, test_create_worker/2]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
 
 %% test
@@ -18,25 +18,27 @@ test(SeqFileName, Chromosome, WorkersNum, Debug) ->
     lager:set_loglevel(lager_console_backend, error)
   end,
 
-  ok = application:start(bwt),
-
-  %% start navel
-  navel:start(master),
-  %% Create a master process
-  {ok, MPid} = ?MODULE:start_link([]),
+  %% Start master app
+  ok = application:start(master),
   %% Create worker processes
-  Node = navel:get_node(),
   Pids = lists:map(fun(N) ->
     NodeName = list_to_atom("erl" ++ integer_to_list(N)),
-    navel:start0(NodeName),
-    navel:connect(application:get_env(master_ip,{127,0,0,1})),
-    {ok, WPid} = worker_bwt:start_link(),
-    {Node, WPid}
+    {ok, Node} = slave:start_link('127.0.0.1', NodeName, ["-pa ebin deps/*/ebin"]),
+    {_WNode, _WPid} = rpc:call(Node, ?MODULE, test_create_worker, [NodeName, N])
   end, lists:seq(1, WorkersNum)),
   %% Associate them with the master
-  ok = navel:call(Node, ?MODULE, register_workers, [MPid,Pids]),
+  ok = ?MODULE:register_workers(master,Pids),
   %% Tell the master to run
-  ok = ?MODULE:run(MPid, SeqFileName, Chromosome, WorkersNum).
+  ok = ?MODULE:run(master, SeqFileName, Chromosome, WorkersNum).
+
+test_create_worker(NodeName, N) ->
+  navel:start(NodeName, N),
+  MasterIp = {127,0,0,1},
+  navel:connect(MasterIp),
+  application:set_env(worker_bwt_app,master_ip,MasterIp),
+  application:set_env(worker_bwt_app,bwt_files,"bwt_files"),
+  {ok, WPid} = worker_bwt:start_link(),
+  {navel:get_node(), WPid}.
 
 %% api
 

@@ -46,7 +46,7 @@ worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undef
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
-      {ok, BwtFiles} = application:get_env(bwt_files),
+      {ok, BwtFiles} = application:get_env(worker_bwt_app,bwt_files),
       {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
 
       worker_loop(running, [], MasterPid1, FM, Ref, Pc,Pg,Pt,Last, Shift);
@@ -122,7 +122,3 @@ worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,
 worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
   lager:info("Worker is stopping"),
   ok = navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
-
-
-
-

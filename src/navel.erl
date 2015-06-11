@@ -1,5 +1,5 @@
 -module(navel).
--export([start/1]).
+-export([start/1, start/2]).
 -export([start0/1]).
 -export([connect/1]).
 -export([call/4]).
@@ -10,7 +10,10 @@
 -define(SOCK_OPTS, [{active,true},{packet,4},{recbuf,512*1024},{reuseaddr,true},binary]).
 
 start(Node) ->
-	spawn(fun() -> {ok,L} = gen_tcp:listen(?PROXY_TCP_PORT, ?SOCK_OPTS),
+	start(Node, 0).
+
+start(Node, PortIncrement) ->
+	spawn(fun() -> {ok,L} = gen_tcp:listen(?PROXY_TCP_PORT+PortIncrement, ?SOCK_OPTS),
 				   acceptor(L) end),
 	start0(Node).
 
