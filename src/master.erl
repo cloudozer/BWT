@@ -99,23 +99,6 @@ handle_call({get_workload, N}, _From, S=#state{stopping = false}) ->
 handle_call({get_workload, _N}, _From, S=#state{stopping = true}) ->
   {reply, stop, S}.
 
-produce_workload(N, State) ->
-  produce_workload(N, State, []).
-
-produce_workload(0, State, Acc) ->
-  {Acc, State};
-
-produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, chromosome = Chromosome, workload_size = WorkloadSize}, Acc) ->
-  case fastq:read_seqs(FqDev, WorkloadSize) of
-    {_, SeqList} ->
-      Workload = {Chromosome, SeqList},
-      produce_workload(N-1, S, [Workload | Acc]);
-    eof ->
-      {Acc, S#state{fastq_eof = true}}
-  end;
-
-produce_workload(_N, S = #state{fastq_eof = true}, []) ->
-  {stop, S#state{stopping = true}}.
 
 handle_cast({get_workload, N, {Node,Pid}}, State) ->
   Self = self(),
@@ -135,3 +118,23 @@ handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, Stat
 
 handle_cast(no_cigar, State) ->
   {noreply, State}.
+
+%% private
+
+produce_workload(N, State) ->
+  produce_workload(N, State, []).
+
+produce_workload(0, State, Acc) ->
+  {Acc, State};
+
+produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, chromosome = Chromosome, workload_size = WorkloadSize}, Acc) ->
+  case fastq:read_seqs(FqDev, WorkloadSize) of
+    {_, SeqList} ->
+      Workload = SeqList,
+      produce_workload(N-1, S, [Workload | Acc]);
+    eof ->
+      {Acc, S#state{fastq_eof = true}}
+  end;
+
+produce_workload(_N, S = #state{fastq_eof = true}, []) ->
+  {stop, S#state{stopping = true}}.
