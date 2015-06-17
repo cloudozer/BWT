@@ -8,7 +8,7 @@ start_link() ->
 
 %% callbacks
 
--record(state, {workers = [], start_time, source}).
+-record(state, {state_name = init, workers = [], start_time, source, results_counter}).
 
 init(_Args) ->
   lager:info("Start Sink"),
@@ -29,18 +29,34 @@ io:format("It's all over. ~.1f sec.~n", [Sec]),
 handle_info({done,Pid}, S) ->
   {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}}.
 
-handle_call({run, SourcePid, Workers}, _From, State) ->
-  {reply, ok, State#state{workers = Workers, start_time = now(), source = SourcePid}}.
+handle_call({run, SourcePid={SNode,SPid}, Workers}, _From, State) ->
+  navel:call_no_return(SNode, gen_server, call, [SPid, push_workload]),
+  {reply, ok, State#state{workers = Workers, start_time = now(), source = SourcePid, results_counter = 0}}.
 
-handle_cast({cigar, _, {CigarRate, _}, _, _}, State) when CigarRate < 265 ->
-  {noreply, State};
-handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, State) ->
+
+handle_cast({result, Result}, S=#state{state_name = stopping}) ->
+  process_result(Result,S),
+  {noreply, S};
+handle_cast({result, Result}, S=#state{results_counter = ResultsCounter, workers = Workers, source = {Node,Pid}}) when ResultsCounter == length(Workers) - 1 ->
+  process_result(Result,S), 
+  case navel:call(Node, gen_server, call, [Pid, push_workload]) of
+    ok -> 
+      {noreply, S#state{results_counter = 0}};
+    stopping ->
+      {noreply, S#state{results_counter = 0, state_name = stopping}}
+  end;
+handle_cast({result, Result}, S=#state{results_counter = ResultsCounter}) ->
+  process_result(Result,S),
+  {noreply, S#state{results_counter = ResultsCounter + 1}}.
+
+process_result([{cigar, _, {CigarRate, _}, _, _}|Rest], State) when CigarRate < 265 ->
+  process_result(Rest, State);
+process_result([{cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq} | Rest], State) ->
 %% handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Sink got a cigar: ~p ~p", [SeqName, Cigar]),
   io:format("Sink got a cigar: ~p ~p~n", [SeqName, Cigar]),
 %%   io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
 %%   ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq},
-  {noreply, State};
-
-handle_cast(no_cigar, State) ->
-  {noreply, State}.
+  process_result(Rest, State);
+process_result([], _S) ->
+  ok.

@@ -3,7 +3,7 @@
 
 -export([start_link/1, start_link/0, register_workers/2, run/5]).
 -export([test/4]).
--export([init/1, terminate/2, handle_info/2, handle_call/3, handle_cast/2]).
+-export([init/1, terminate/2, handle_info/2, handle_call/3]).
 
 %% test
 
@@ -75,7 +75,7 @@ run(Pid, SeqFileName, Chromosome, ClientPid, SinkPid) ->
 
 %% gen_server callbacks
 
--record(state, {state_name = init, workers = [], fastq, fastq_eof = false, chromosome, workload_size = 200, client}).
+-record(state, {state_name = init, workers = [], fastq, fastq_eof = false, chromosome, workload_size = 1000, client}).
 %% state_name ::= init|running|stopping
 
 init(_Args) ->
@@ -126,47 +126,39 @@ handle_call({run, FastqFileName, Chromosome, ClientPid, SinkPid={SNode,SPid}}, _
   {ok, BwtFiles} = application:get_env(bwt_files),
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
   MyNode = ?MODULE, %navel:get_node(),
-  Self = {MyNode,self()},
+  Self = self(),
+  SelfRef = {MyNode,Self},
   lists:foreach(fun({Node,Pid}) ->
-    navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,Self,SinkPid])
+    navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,SelfRef,SinkPid])
   end, Workers),
 
+  %% Push first workload
+  spawn_link(fun() -> ok = gen_server:call(Self, push_workload) end),
+
   %% Run the Sink
-  navel:call_no_return(SNode, gen_server, call, [SPid, {run, Self, Workers}]),
+  navel:call_no_return(SNode, gen_server, call, [SPid, {run, SelfRef, Workers}]),
 
   {reply, ok, S#state{state_name = running, fastq={FastqFileName, FastqDev}, chromosome = Chromosome, client = ClientPid}};
 
-handle_call({get_workload, N}, _From, S=#state{state_name = running}) ->
-  {Result,S1} = produce_workload(N, S),
-  {reply, Result, S1};
-handle_call({get_workload, _N}, _From, S=#state{state_name = stopping}) ->
-  {reply, stop, S}.
-
-
-handle_cast({get_workload, N, {Node,Pid}}, State) ->
-  Self = self(),
-  spawn_link(fun() ->
-    Resp = gen_server:call(Self, {get_workload, N}, 600000),
-    navel:call_no_return(Node, erlang, send, [Pid,{workload,Resp}])
-  end),
-  {noreply, State}.
+handle_call(push_workload, _From, S=#state{state_name = stopping}) ->
+  lists:foreach(fun({Node,Pid}) ->
+    navel:call_no_return(Node, erlang, send, [Pid, stop])
+  end, S#state.workers),
+  {reply, stopping, S};
+handle_call(push_workload, _From, S=#state{state_name = running, workers = Workers}) ->
+  {W,S1} = produce_workload(S),
+%ResultTest = if Result =/= [] -> [hd(Result)]; true -> [] end,
+  lists:foreach(fun({Node,Pid}) ->
+    navel:call_no_return(Node, erlang, send, [Pid, {workload, W}])
+  end, Workers),
+  {reply, ok, S1}.
 
 %% private
 
-produce_workload(N, State) ->
-  produce_workload(N, State, []).
-
-produce_workload(0, State, Acc) ->
-  {Acc, State};
-
-produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, workload_size = WorkloadSize}, Acc) ->
+produce_workload(S = #state{fastq = {_, FqDev}, fastq_eof = false, workload_size = WorkloadSize}) ->
   case fastq:read_seqs(FqDev, WorkloadSize) of
     {_, SeqList} ->
-      Workload = SeqList,
-      produce_workload(N-1, S, [Workload | Acc]);
+      {SeqList, S};
     eof ->
-      {Acc, S#state{fastq_eof = true}}
-  end;
-
-produce_workload(_N, S = #state{fastq_eof = true}, []) ->
-  {stop, S#state{state_name = stopping}}.
+      {[], S#state{fastq_eof = true, state_name = stopping}}
+  end.
