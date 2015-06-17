@@ -17,8 +17,8 @@ start_link(Host, PortInc) ->
 create_link({LNode,LPid},Name, HostPort) ->
   navel:call(LNode, gen_server, call, [LPid, {create, Name, HostPort}]).
 
-connect({LNode,LPid}, Node, IpPort) ->
-  navel:call(LNode, gen_server, call, [LPid, {connect, Node, IpPort}]),
+connect({LNode,LPid}, Node, HostPort) ->
+  navel:call(LNode, gen_server, call, [LPid, {connect, Node, HostPort}]),
   timer:sleep(500).
 
 %% private
@@ -34,12 +34,17 @@ handle_call({create, Name, {Host, PortInc}}, _From, S=#state{nodes = Nodes}) ->
   NNode = Name,% rpc:call(Node, navel, get_node, []),
   {reply, {ok, NNode}, S#state{nodes = [{NNode,Node}|Nodes]}};
 
-handle_call({connect, NNode, {Ip,Port}}, _From, S=#state{nodes = Nodes}) ->
+handle_call({connect, NNode, HostPort}, _From, S=#state{nodes = Nodes}) ->
   case proplists:get_value(NNode, Nodes) of
     undefined ->
       {reply, wrong_nnode, S};
     Node ->
-      rpc:call(Node, navel, connect, [Ip,Port]),
+      case HostPort of
+        {Host,PortInc} ->
+          rpc:call(Node, navel, connect, [Host,PortInc]);
+        Host ->
+          rpc:call(Node, navel, connect, [Host])
+      end,
       {reply, ok, S}
   end.
 
