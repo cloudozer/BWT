@@ -23,14 +23,15 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	{_,_,C,D} = ip(),
-	NodeName = list_to_atom("erl" ++ integer_to_list(C) ++ "." ++ integer_to_list(D)),
-	navel:start0(NodeName),
-	navel:connect(application:get_env(worker_bwt_app,master_ip,{104,236,121,34})),
+%% 	{_,_,C,D} = ip(),
+%% 	NodeName = list_to_atom("erl" ++ integer_to_list(C) ++ "." ++ integer_to_list(D)),
+%% 	navel:start0(NodeName),
+%% 	navel:connect(application:get_env(worker_bwt_app,master_ip,{104,236,121,34})),
 
 	timer:sleep(1000),
     {ok, { {one_for_one, 5, 10}, [
-        {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}
+        {worker_bwt, {worker_bwt, start_link, []}, permanent, 5000, worker, [worker_bwt]}
+%%         {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}
     ]} }.
 
 ip() ->

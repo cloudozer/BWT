@@ -19,6 +19,7 @@
 
 start_link() ->
   Pid = spawn_link(?MODULE, worker_loop, [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined]),
+  true = register(worker_bwt, Pid),
   true = is_pid(Pid),
   {ok, Pid}.
 
@@ -121,4 +122,4 @@ worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref,
 
 worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
   lager:info("Worker is stopping"),
-  ok = navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
+  navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),worker_bwt}}]).

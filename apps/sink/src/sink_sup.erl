@@ -1,4 +1,4 @@
--module(master_sup).
+-module(sink_sup).
 
 -behaviour(supervisor).
 
@@ -23,6 +23,6 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	navel:start(master),
-    {ok, { {one_for_one, 5, 10}, [?CHILD(master, worker)]} }.
+    navel:start(sink, 100),
+    {ok, { {one_for_one, 5, 10}, [?CHILD(sink,worker)]} }.
 
