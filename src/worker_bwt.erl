@@ -8,8 +8,8 @@
 
 -module(worker_bwt).
 
--export([start_link/0, start_link/1, run/3]).
--export([worker_loop/10]).
+-export([start_link/0, start_link/1, run/4]).
+-export([worker_loop/11]).
 
 -include("bwt.hrl").
 
@@ -26,24 +26,23 @@ start_link() ->
   true = is_pid(Pid),
   {ok, Pid}.
 
-start_link({MNode, MPid}) ->
+start_link({SoNode, SoPid}) ->
   {ok, Pid} = ?MODULE:start_link(),
-  case navel:call(MNode, master, register_workers, [MPid,[{navel:get_node(),Pid}]]) of
+  case navel:call(SoNode, master, register_workers, [SoPid,[{navel:get_node(),Pid}]]) of
     ok -> {ok, Pid};
     wait -> timer:sleep(1000), exit(wait)
   end.
 
-run(Pid, Chromosome, MasterPid) ->
-  Pid ! {run, Chromosome, MasterPid}.
+run(Pid, Chromosome, SourcePid, SinkPid) ->
+  Pid ! {run, Chromosome, SourcePid, SinkPid}.
 
 %% state_name ::= [init|running|stopping]
 
-worker_loop(init, [], undefined, undefined, undefined,undefined,undefined,undefined, undefined, 0) ->
+worker_loop(init, [], undefined, undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
   receive
-    {run, Chromosome, MasterPid1={MNode,MPid}} ->
-      %% erlang:garbage_collect(),
+    {run, Chromosome, SourcePid={SoNode,SoPid}, SinkPid} ->
 
-      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
+      navel:call_no_return(SoNode, gen_server, cast, [SoPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
 
       {Meta,FM} = fm_index:get_index(Chromosome, 1),
 
@@ -55,23 +54,24 @@ worker_loop(init, [], undefined, undefined, undefined,undefined,undefined,undefi
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
-      worker_loop(running, [], MasterPid1, FM, Ref1, Pc,Pg,Pt,Last, Shift);
+      worker_loop(running, [], SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
     Err -> throw({unsuitable, Err})
   end;
 
-worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+worker_loop(running, [], SourcePid={SoNode,SoPid}, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   receive
     {workload, stop} ->
-      worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+      worker_loop(stopping, [], SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
-      lager:info("A worker got workload ~p~n", [length(Workload)]),
-      navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
-      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+      lager:info("worker got workload ~p", [length(Workload)]),
+      navel:call_no_return(SoNode, gen_server, cast, [SoPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
+      worker_loop(running, Workload, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     Err -> 
       throw(Err)
   end;
-worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+worker_loop(running, [QseqList | WorkloadRest], SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+  erlang:garbage_collect(),
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
@@ -98,20 +98,20 @@ worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref,
     end, [],  Seeds1),
 
     case Cigars of
-      [] -> navel:call_no_return(MNode, gen_server, cast, [MPid, no_cigar]);
+      [] -> navel:call_no_return(SiNode, gen_server, cast, [SiPid, no_cigar]);
       [{Cigar,P,RefSeq}] ->
-        navel:call_no_return(MNode, gen_server, cast, [MPid, {cigar, SeqName, Cigar, P, RefSeq}]);
+        navel:call_no_return(SiNode, gen_server, cast, [SiPid, {cigar, SeqName, Cigar, P, RefSeq}]);
       _ ->
         [{TopCigar,P,RefSeq} | _] = lists:sort(fun({{R1,_},_,_}, {{R2,_},_,_}) -> R1 > R2 end, Cigars),
-        navel:call_no_return(MNode, gen_server, cast, [MPid, {cigar, SeqName, TopCigar, P, RefSeq}])
+        navel:call_no_return(SiNode, gen_server, cast, [SiPid, {cigar, SeqName, TopCigar, P, RefSeq}])
     end
 
   end, Seeds),
 
   lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
-  worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+  worker_loop(running, WorkloadRest, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
-worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
+worker_loop(stopping, [], _SourcePid, {SiNode,SiPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
   lager:info("Worker is stopping"),
   navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
