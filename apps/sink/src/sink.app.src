@@ -1,4 +1,4 @@
-{application, master,
+{application, sink,
  [
   {description, ""},
   {vsn, "1"},
@@ -7,6 +7,6 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { master_app, []}},
-  {env, [{bwt_files, "bwt_files"}, {fm_indices, "fm_indices"}]}
+  {mod, { sink_app, []}},
+  {env, []}
  ]}.

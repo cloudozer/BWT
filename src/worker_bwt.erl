@@ -115,4 +115,3 @@ worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref,
 worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
   lager:info("Worker is stopping"),
   navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
-

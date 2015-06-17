@@ -1,0 +1,12 @@
+{application, source,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { source_app, []}},
+  {env, [{bwt_files, "bwt_files"}, {fm_indices, "fm_indices"}]}
+ ]}.

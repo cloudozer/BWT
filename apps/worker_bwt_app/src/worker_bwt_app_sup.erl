@@ -30,7 +30,8 @@ init([]) ->
 
 	timer:sleep(1000),
     {ok, { {one_for_one, 5, 10}, [
-        {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}
+        {worker_bwt, {worker_bwt, start_link, []}, permanent, 5000, worker, [worker_bwt]}
+%%         {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}
     ]} }.
 
 ip() ->

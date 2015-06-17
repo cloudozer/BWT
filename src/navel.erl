@@ -1,7 +1,7 @@
 -module(navel).
 -export([start/1, start/2]).
 -export([start0/1]).
--export([connect/1]).
+-export([connect/1, connect/2]).
 -export([call/4]).
 -export([call_no_return/4]).
 -export([get_node/0]).
@@ -24,7 +24,10 @@ start0(Node) ->
 	%link(Pid).
 
 connect(IpAddr) ->
-	{ok,S} = gen_tcp:connect(IpAddr, ?PROXY_TCP_PORT, ?SOCK_OPTS),
+	connect(IpAddr, 0).
+
+connect(IpAddr, PortIncrement) ->
+	{ok,S} = gen_tcp:connect(IpAddr, ?PROXY_TCP_PORT+PortIncrement, ?SOCK_OPTS),
 	ok = gen_tcp:controlling_process(S, whereis(navel)),
 	navel ! {connected,S}.
 

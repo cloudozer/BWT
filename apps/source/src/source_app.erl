@@ -1,4 +1,4 @@
--module(master_app).
+-module(source_app).
 
 -behaviour(application).
 
@@ -12,9 +12,6 @@
 -define(SSH_PWD, "1").
 
 dev() ->
-	lager:start(),
-	navel:start(master),
-
 	case application:get_env(kernel, ssh_port) of
 		undefined -> ok;
 		{ok,SshPort} ->
@@ -27,10 +24,10 @@ dev() ->
 								 {user_dir,SshDir}]) end,
 
 	master:start_link().
-	%% ok = application:start(master).
+	%% ok = application:start(source).
 
 start(_StartType, _StartArgs) ->
-    master_sup:start_link().
+    source_sup:start_link().
 
 stop(_State) ->
     ok.
