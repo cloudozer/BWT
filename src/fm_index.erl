@@ -6,7 +6,7 @@
 -module(fm_index).
 -export([t/0,t/1,
 		make_indices/1, make_indices/2,
-		get_index/2]).
+		get_index/2, get_neo_index/2 ]).
 
 -define(OVERLAP,2). % an overlap of neibouring chunks of a chromosome
 -define(FM_FOLDER,"fm_indices/").
@@ -120,7 +120,8 @@ build_fm(_,_,Nbr,J,Chromo_name) when J == Nbr+1 ->
 build_fm(Body,Shift,Nbr,J,Chromo_name) ->
 	Chunk_size = (length(Body) + Nbr*?OVERLAP) div Nbr,
 	Start = 1+(J-1)*(Chunk_size-?OVERLAP),
-	make_index(lists:sublist(Body,Start,Chunk_size),Shift+Start,J,Chromo_name),
+	%make_index(lists:sublist(Body,Start,Chunk_size),Shift+Start,J,Chromo_name),
+	make_neo_index(lists:sublist(Body,Start,Chunk_size),Shift+Start,J,Chromo_name),
 	build_fm(Body,Shift,Nbr,J+1,Chromo_name).
 
 
@@ -140,6 +141,26 @@ make_index(Chunk,Shift,J,Chromo_name) ->
 	file:write_file(F_name++".fm",Bin).
 
 
+make_neo_index(Chunk,Shift,J,Chromo_name) ->
+
+	F_name = fm_name(Chromo_name,J),
+	%file:write_file(F_name++".ref",list_to_binary(Chunk)),
+	Ref_seq = lists:map( fun($N)->element(random:uniform(4),{$A,$C,$G,$T});
+							($B)->$C;($D)->$G;($R)->$A;
+							($Y)->$C;($K)->$T;($M)->$A;
+							($S)->$C;($W)->$A;($V)->$A;
+							($A)->$A;($C)->$C;($G)->$G;($T)->$T
+						end, Chunk),
+	SA = list_to_tuple(bwt:sa(Ref_seq)),
+	io:format("Suffix array done~n"),
+	Dict = hash:make_HT(Chromo_name,J),
+	
+	Bin = term_to_binary({Dict,SA}),
+	file:write_file(F_name++".sa",Bin).
+
+
+
+
 
 fm_name(Chrom,J) -> ?FM_FOLDER++Chrom++"_p" ++ integer_to_list(J).
 
@@ -149,16 +170,9 @@ get_index(Chrom,J) ->
 	binary_to_term(Bin).
 
 
-
-%get_ref(Chrom,Pos,Len) ->
-%	{ok, BwtFiles} = application:get_env(bwt,bwt_files),
-%	File = filename:join(BwtFiles, Chrom++".ref"),
-%	{ok,Dev} = file:open(File,read),
-%	{ok,Ref} = file:pread(Dev, Pos, Len),
-%	ok = file:close(Dev),
-%	binary_to_term(Ref).
-
-
+get_neo_index(Chrom,J) ->
+	{ok,Bin} = file:read_file(fm_name(Chrom,J)++".sa"),
+	binary_to_term(Bin).
 
 	
 

@@ -80,7 +80,7 @@ handle_call(get_workload, {SlavePid, _}, S = #state{slave = SlavePid, workloads 
 %% private
 
 slave_loop(MasterPid, WorkerPid, Workload=[{Chromosome,_}|_], undefined, undefined) ->
-  {Meta,FM} = bwt:get_index(Chromosome),
+  {Meta,FM} = fm_index:get_index(Chromosome, 1),
   {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
   Shift = proplists:get_value(shift, Meta),
 

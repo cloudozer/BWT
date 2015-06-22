@@ -5,12 +5,32 @@
 
 -module(sga).
 -export([
-		sga/6,
+		sga/6, sga1/3,
 		skip_Ns/1
 		]).
 
 -include("bwt.hrl").
 
+
+
+sga1(Dict,SA,Qseq) -> sga1(Dict,SA,Qseq,[],0,0).
+sga1(Dict,SA,Qseq,Acc,Qty,Shift) -> 
+	case skip_Ns(Qseq) of
+		no_more_subseqs -> get_similar(Qty,Acc);
+		{Skip,Qseq1} ->
+			Qlen = length(Qseq1),
+			case hash:find_seeds(SA,Dict,Qseq1) of
+				no_seeds ->
+					%io:format("Seeds not found~n"),
+					sga1(Dict,SA,lists:sublist(Qseq1,Qlen-?MIN_LEN), Acc, Qty,Shift+?MIN_LEN+Skip);
+				too_many_seeds ->
+					%io:format("Got too many seeds for a subseq: ~p~n",[Qseq]),
+					sga1(Dict,SA,lists:sublist(Qseq1,Qlen-?MIN_LEN),Acc,Qty,Shift+?MIN_LEN+Skip);
+				Seed_ends ->
+					%io:format("~p seeds found: ~p~n",[length(Seed_ends),[S+Shift||S<-Seed_ends]]),
+					sga1(Dict,SA,lists:sublist(Qseq1,Qlen-?MIN_LEN),add_seeds(Seed_ends,Acc,Shift+Skip),Qty+1,Shift+?MIN_LEN+Skip)					
+			end
+	end.
 
 
 % performs sw algorithm for a sequence Seq against reference sequence represented by FM-index
@@ -42,8 +62,9 @@ add_seeds(Seed_ends, Acc0,Shift) ->
 get_similar(0, _) -> [];
 get_similar(1, _) -> [];
 get_similar(Qty, Ls) -> 
+	%io:format("Initial list has ~p seeds~n",[length(Ls)]),
 	[P1|Ls1] = lists:sort(Ls),
-	get_similar(2+(Qty div 7), Ls1, P1, 1, 0,[], ?TOLERANCE).
+	get_similar(2+(Qty bsr 3), Ls1, P1, 1, 0,[], ?TOLERANCE).
 
 get_similar(N, [P2|Ls], P1, Count, Dist, Acc, Tol) when P2-P1 =< Tol ->
 	get_similar(N, Ls, P2, Count+1, Dist+P2-P1, Acc, Tol);

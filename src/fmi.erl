@@ -17,10 +17,6 @@
 -include("bwt.hrl").
 
 
--define(BLOCK_LEN,32).
--define(BLOCK_SHIFT,7).
--define(BLOCK_ID_MASK,2#11111).
-
 
 se_down(Ep,Ep,_,_) -> not_found;
 
