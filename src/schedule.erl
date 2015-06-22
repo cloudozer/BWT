@@ -4,69 +4,33 @@
 %
 
 -module(schedule).
--export([get_schedule/3, get_workload_and_index/3, get_genome_part_name/2]).
+-export([chunks_to_box/3]).
 
--define(QSEQ_SIZE,100).
+-define(MEM_PER_CHUNK,200).
+-define(FM_INDEX_FOLDER,"fm_indices/").
 
 
+% returns a list of list of chunks.
+chunks_to_box(ChromoLs,Box_nbr,Box_mem) ->
+	Chunks = lists:foldl(fun(Chromo,Acc) -> filelib:wildcard(Chromo++"_p*.fm",?FM_INDEX_FOLDER)++Acc
+						end, [], ChromoLs),
 
-% returns the list of lists that contain tuples (start_point, end_point)
-% each list is a schedule for a compute node
-get_workload_and_index(Index_file, Chunk_size, Nodes_nbr) ->
-	case file:open(Index_file,read) of
-		{ok,Dev} ->
-			{Workload,Partitions} = get_average_workload_and_parts(0, [], Dev, Chunk_size, Nodes_nbr),
-			file:close(Dev),
-			io:format("Average workload=~.2g~n",[Workload]),
-			{Workload,Partitions};
-			
-		{error,Reason} ->
-			io:format("index file: '~s' cannot be opened~n~p~n",[Index_file,Reason]),
-			error
-	end.
+	ChunkList = lists:sort([ {File,filelib:file_size(?FM_INDEX_FOLDER++File) bsr 20} || File <- Chunks]),
 
-			
-
-get_average_workload_and_parts(Sum, Acc, Dev, Chunk_size, Nodes_nbr) ->
-	case file:read_line(Dev) of
-		eof -> 
-			{Sum / Nodes_nbr, lists:reverse(Acc)};
-
-		{ok,Data} -> 
-			[Name,Pos,Len]=string:tokens(Data," \n"),
-			get_average_workload_and_parts(Sum+list_to_integer(Len), 
-				[{list_to_integer(Pos),list_to_integer(Len),Name}|Acc], Dev, Chunk_size, Nodes_nbr)
+	case lists:sum([ Size || {_,Size} <- ChunkList ]) bsr 10 > Box_nbr*Box_mem of
+		true -> not_enough_memory;
+		false-> distribute(lists:reverse(ChunkList),lists:duplicate(Box_nbr,[]))
 	end.
 
 
-% returns part name for a given position Pos
-get_genome_part_name(Parts, Pos) -> 
-	Parts_sorted = lists:sort(Parts),
-	get_part(Parts_sorted,Pos).
+distribute(ChunkList,Buckets) -> distribute(ChunkList,lists:sort(fun(B1,B2)-> 
+				lists:sum([ Size ||{_,Size}<-B1]) < lists:sum([ Size ||{_,Size}<-B2])
+																end,Buckets),[]).
 
-get_part([{P,Len,Name}|_],Pos) when P =< Pos, P+Len >= Pos -> {Name, (Pos-P) - (Pos-P) div 61};
-get_part([{P,Len,_}|Parts_sorted],Pos) when Pos > P+Len -> get_part(Parts_sorted,Pos);
-get_part(_,_) -> {no_name_found,undef}.
-
+distribute([{File,Size}|ChunkList],[B|Buckets],Acc) -> distribute(ChunkList,Buckets,[[{File,Size}|B]|Acc]);
+distribute([],Buckets,Acc) -> Buckets ++ Acc;
+distribute(ChunkList,[],Acc) -> distribute(ChunkList,Acc).
 
 
-get_schedule(Workload,[{Pos,Len,_}|Partitions],Chunk_size) ->
-	distribute_parts([], [], 0, Workload, Pos,Len,Partitions, Chunk_size).
-
-distribute_parts(Acc, Ls, Curr_workload, Avg_workload, 
-	Curr_pos, Rest, Partitions, Chunk_size) when Curr_workload >= Avg_workload ->
-	distribute_parts([Ls|Acc], [], 0, Avg_workload, Curr_pos, Rest, Partitions, Chunk_size);
-
-distribute_parts(Acc, Ls, Curr_workload, Avg_workload, 
-	Curr_pos, Rest, Partitions, Chunk_size) when Rest >= 1.5 * Chunk_size ->
-	distribute_parts(Acc, [{Curr_pos,Chunk_size}|Ls], Curr_workload+Chunk_size-?QSEQ_SIZE, 
-		Avg_workload, Curr_pos+Chunk_size-?QSEQ_SIZE, Rest-Chunk_size+?QSEQ_SIZE, Partitions, Chunk_size);
-
-distribute_parts(Acc, Ls, Curr_workload, Avg_workload, Curr_pos, Rest, [{Pos,Len,_}|Partitions], Chunk_size) ->
-	distribute_parts(Acc, [{Curr_pos,Rest}|Ls], Curr_workload+Rest, 
-		Avg_workload, Pos, Len, Partitions, Chunk_size);
-
-distribute_parts(Acc, Ls, _Curr_workload, _Avg_workload, Curr_pos, Rest, [], _Chunk_size) ->
-	[lists:reverse([{Curr_pos,Rest}|Ls])|Acc].
 
 
