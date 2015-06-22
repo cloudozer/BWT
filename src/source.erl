@@ -1,13 +1,13 @@
 -module(source).
 -behaviour(gen_server).
 
--export([start_link/1, start_link/0, register_workers/2, run/5]).
--export([test/4]).
+-export([start_link/1, start_link/0, register_workers/2, run/6]).
+-export([test/3]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3]).
 
 %% test
 
-test(SeqFileName, Chromosome, WorkersNum, Debug) ->
+test(SeqFileName, Chromosome, Debug) ->
   lager:start(),
   if Debug == true ->
     application:start(sasl),
@@ -37,6 +37,9 @@ test(SeqFileName, Chromosome, WorkersNum, Debug) ->
   %% Connect the Sink to the Source
   lingd:connect(LingdRef, SinkNode, {LocalIP,SourcePort}),
 
+Chunks = [1,2,3],
+WorkersNum = length(Chunks),
+
   %% Start workers
   Pids = lists:map(fun(N) ->
     %% Create a node
@@ -57,7 +60,7 @@ test(SeqFileName, Chromosome, WorkersNum, Debug) ->
   ok = navel:call(SourceNode, ?MODULE, register_workers, [source,Pids]),
 
   %% Run everything
-  ok = navel:call(SourceNode, ?MODULE, run, [source, SeqFileName, Chromosome, self(), {SinkNode,sink}]).
+  ok = navel:call(SourceNode, ?MODULE, run, [source, SeqFileName, Chromosome, Chunks, self(), {SinkNode,sink}]).
 
 %% api
 
@@ -70,8 +73,8 @@ start_link(Args) ->
 register_workers(SourcePid, Pids) ->
   gen_server:call(SourcePid, {register_workers, Pids}).
 
-run(Pid, SeqFileName, Chromosome, ClientPid, SinkPid) ->
-  gen_server:call(Pid, {run, SeqFileName, Chromosome, ClientPid, SinkPid}, infinity).
+run(Pid, SeqFileName, Chromosome, Chunks, ClientPid, SinkPid) ->
+  gen_server:call(Pid, {run, SeqFileName, Chromosome, Chunks, ClientPid, SinkPid}, infinity).
 
 %% gen_server callbacks
 
@@ -122,15 +125,15 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   lager:info("The source connected to ~b workers", [length(Workers1)]),
   {reply, ok, S#state{workers = Workers1}};
 
-handle_call({run, FastqFileName, Chromosome, ClientPid, SinkPid={SNode,SPid}}, _From, S=#state{workers=Workers}) ->
+handle_call({run, FastqFileName, Chromosome, Chunks, ClientPid, SinkPid={SNode,SPid}}, _From, S=#state{workers=Workers}) when length(Chunks) =:= length(Workers) ->
   {ok, BwtFiles} = application:get_env(bwt_files),
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
   MyNode = ?MODULE, %navel:get_node(),
   Self = self(),
   SelfRef = {MyNode,Self},
-  lists:foreach(fun({Node,Pid}) ->
-    navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,SelfRef,SinkPid])
-  end, Workers),
+  lists:foreach(fun({{Node,Pid}, Chunk}) ->
+    navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,Chunk,SelfRef,SinkPid])
+  end, lists:zip(Workers,Chunks)),
 
   %% Push first workload
   spawn_link(fun() -> ok = gen_server:call(Self, push_workload) end),
