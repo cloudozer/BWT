@@ -8,7 +8,7 @@
 
 -module(worker_bwt).
 
--export([start_link/0, start_link/1, run/4]).
+-export([start_link/0, start_link/1, run/5]).
 -export([worker_loop/11]).
 
 -include("bwt.hrl").
@@ -29,23 +29,21 @@ start_link({SoNode, SoPid}) ->
     wait -> timer:sleep(1000), exit(wait)
   end.
 
-run(Pid, Chromosome, SourcePid, SinkPid) ->
-  Pid ! {run, Chromosome, SourcePid, SinkPid}.
+run(Pid, Chromosome, Chunk, SourcePid, SinkPid) ->
+  Pid ! {run, Chromosome, Chunk, SourcePid, SinkPid}.
 
 %% state_name ::= [init|running|stopping]
 
 worker_loop(init, [], undefined, undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
   receive
-    {run, Chromosome, SourcePid={SoNode,SoPid}, SinkPid} ->
-      erlang:garbage_collect(),
-
-      {Meta,FM} = fm_index:get_index(Chromosome, 1),
+    {run, Chromosome, Chunk, SourcePid={SoNode,SoPid}, SinkPid} ->
+      {Meta,FM} = fm_index:get_index(Chromosome, Chunk),
 
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
-      {ok, BwtFiles} = application:get_env(worker_bwt_app,bwt_files),
-      {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
+      {ok, FmIndicesPath} = application:get_env(worker_bwt_app,fm_indices),
+      {ok, Ref} = file:read_file(filename:join(FmIndicesPath, Chromosome++"_p"++integer_to_list(Chunk)++".ref")),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
