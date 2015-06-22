@@ -75,7 +75,7 @@ run(Pid, SeqFileName, Chromosome, ClientPid, SinkPid) ->
 
 %% gen_server callbacks
 
--record(state, {state_name = init, workers = [], fastq, fastq_eof = false, chromosome, workload_size = 1000, client}).
+-record(state, {state_name = init, workers = [], fastq, fastq_eof = false, chromosome, workload_size = 3000, client}).
 %% state_name ::= init|running|stopping
 
 init(_Args) ->

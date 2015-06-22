@@ -13,7 +13,6 @@
 
 -include("bwt.hrl").
 
--define(WATERLINE, 10).
 -define(REF_EXTENSION_LEN, 200).
 
 %% api
@@ -52,7 +51,7 @@ worker_loop(init, [], undefined, undefined, undefined, undefined, undefined,unde
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
-      worker_loop(running, [], SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+      worker_loop(running, [], SourcePid, SinkPid, FM, Ref1, Pc,Pg,Pt,Last, Shift);
 
     Err -> throw({unsuitable, Err})
   end;
@@ -68,7 +67,6 @@ worker_loop(running, [], SourcePid={SoNode,SoPid}, SinkPid, FM, Ref, Pc,Pg,Pt,La
       throw(Err)
   end;
 worker_loop(running, QseqList, SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
-  erlang:garbage_collect(),
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
@@ -76,8 +74,6 @@ worker_loop(running, QseqList, SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg
         ResultsList -> [{{Qname,Qseq},ResultsList}|Acc]
       end
     end, [], QseqList),
-
-  Ref_bin_size = byte_size(Ref),
 
   Results = lists:foldl(fun({{SeqName, Qsec}, Seeds1}, Acc) ->
 
