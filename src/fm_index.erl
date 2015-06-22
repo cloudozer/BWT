@@ -142,7 +142,13 @@ make_index(Chunk,Shift,J,Chromo_name) ->
 
 
 
-fm_name(Chrom,J) -> ?FM_FOLDER++Chrom++"_p" ++ integer_to_list(J).
+fm_name(Chrom,J) ->
+	case application:get_env(fm_indices) of
+		{ok,Path} ->
+			filename:join(Path,Chrom)++"_p" ++ integer_to_list(J);
+		undefined ->
+			?FM_FOLDER++Chrom++"_p" ++ integer_to_list(J)
+	end.
 
 
 get_index(Chrom,J) ->

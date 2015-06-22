@@ -8,5 +8,5 @@
                   stdlib
                  ]},
   {mod, { bwt_app, []}},
-  {env, [{bwt_files, "bwt_files"}]}
+  {env, []}
  ]}.

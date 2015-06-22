@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -pa ebin deps/lager/ebin deps/goldrush/ebin -setcookie secret_gc -name master@localhost -attached
+%%! -pa ebin apps/master/ebin deps/lager/ebin deps/goldrush/ebin -name master@127.0.0.1 -attached
 
 main([]) ->
   io:format("Usage: start_local.sh SeqFileName Chromosome WorkersNumber Debug~n");
