@@ -21,6 +21,11 @@ connect({LNode,LPid}, Node, HostPort) ->
   navel:call(LNode, gen_server, call, [LPid, {connect, Node, HostPort}]),
   timer:sleep(500).
 
+broadcast(NodePids, Msg) ->
+  lists:foreach(fun({Node,Pid}) ->
+    navel:call_no_return(Node, erlang, send, [Pid,Msg])
+  end, NodePids).
+
 %% private
 
 -record(state, {nodes = []}).

@@ -13,6 +13,8 @@
 
 -include("bwt.hrl").
 
+-define(REF_EXTENSION_LEN, 200).
+
 %% api
 
 start_link() ->
@@ -44,8 +46,10 @@ worker_loop(init, [], undefined, undefined, undefined, undefined, undefined,unde
 
       {ok, BwtFiles} = application:get_env(worker_bwt_app,bwt_files),
       {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
+      Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
+      Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
-      worker_loop(running, [], SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+      worker_loop(running, [], SourcePid, SinkPid, FM, Ref1, Pc,Pg,Pt,Last, Shift);
 
     Err -> throw({unsuitable, Err})
   end;
@@ -61,7 +65,6 @@ worker_loop(running, [], SourcePid={SoNode,SoPid}, SinkPid, FM, Ref, Pc,Pg,Pt,La
       throw(Err)
   end;
 worker_loop(running, QseqList, SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
-  erlang:garbage_collect(),
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
@@ -70,26 +73,14 @@ worker_loop(running, QseqList, SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg
       end
     end, [], QseqList),
 
-  Ref_bin_size = byte_size(Ref),
-
   Results = lists:foldl(fun({{SeqName, Qsec}, Seeds1}, Acc) ->
 
     Cigars = lists:foldl(fun({S,D}, Acc) ->
 
       Ref_len = length(Qsec) + D,
-      Start_pos = (S - Ref_len) bsl 3,
+      Start_pos = S - Ref_len + ?REF_EXTENSION_LEN,
 
-      {Ref1, Start_pos1} = if S > Ref_bin_size ->
-        Ns = list_to_binary(lists:duplicate(S - Ref_bin_size, $N)),
-        {<<Ref/binary, Ns/binary>>, Start_pos};
-                             (S - Ref_len) < 0 ->
-                               Ns = list_to_binary(lists:duplicate(-(S - Ref_len), $N)),
-                               {<<Ns/binary, Ref/binary>>, 0};
-                             true ->
-                               {Ref, Start_pos}
-                           end,
-
-      <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref1,
+      <<_:Start_pos/bytes,Ref_seq:Ref_len/bytes,_/binary>> = Ref,
       Ref_seq1 = binary_to_list(Ref_seq),
 
       case sw:sw(Qsec,Ref_seq1) of
