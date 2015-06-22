@@ -49,7 +49,7 @@ handle_cast({result, Result}, S=#state{results_counter = ResultsCounter}) ->
   process_result(Result,S),
   {noreply, S#state{results_counter = ResultsCounter + 1}}.
 
-process_result([{cigar, _, {CigarRate, _}, _, _}|Rest], State) when CigarRate < 265 ->
+process_result([{cigar, _, {CigarRate, _}, _, _}|Rest], State) when CigarRate < 280 ->
   process_result(Rest, State);
 process_result([{cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq} | Rest], State) ->
 %% handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
