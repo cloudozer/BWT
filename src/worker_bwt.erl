@@ -8,7 +8,7 @@
 
 -module(worker_bwt).
 
--export([start_link/0, start_link/1, run/5]).
+-export([start_link/0, start_link/1, run/4]).
 -export([worker_loop/11]).
 
 -include("bwt.hrl").
@@ -32,21 +32,25 @@ start_link({SoNode, SoPid}) ->
     wait -> timer:sleep(1000), exit(wait)
   end.
 
-run(Pid, Chromosome, Chunk, SourcePid, SinkPid) ->
-  Pid ! {run, Chromosome, Chunk, SourcePid, SinkPid}.
+run(Pid, Chunk, SourcePid, SinkPid) ->
+  Pid ! {run, Chunk, SourcePid, SinkPid}.
 
 %% state_name ::= [init|running|stopping]
 
 worker_loop(init, [], undefined, undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
   receive
-    {run, Chromosome, Chunk, SourcePid={SoNode,SoPid}, SinkPid} ->
-      {Meta,FM} = fm_index:get_index(Chromosome, Chunk),
+    {run, {Chunk, _Mem}, SourcePid={SoNode,SoPid}, SinkPid} ->
+      ChunkBin = list_to_binary(Chunk),
+      [ChromosomeBin, ChunkIdBin, <<>>] = binary:split(ChunkBin, [<<"_p">>,<<".fm">>], [global]),
+      Chromosome = binary_to_list(ChromosomeBin),
+      ChunkId = binary_to_integer(ChunkIdBin),
+      {Meta,FM} = fm_index:get_index(Chromosome, ChunkId),
 
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
       {ok, FmIndicesPath} = application:get_env(worker_bwt_app,fm_indices),
-      {ok, Ref} = file:read_file(filename:join(FmIndicesPath, Chromosome++"_p"++integer_to_list(Chunk)++".ref")),
+      {ok, Ref} = file:read_file(filename:join(FmIndicesPath, binary:replace(ChunkBin, <<".fm">>, <<".ref">>))),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
