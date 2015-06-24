@@ -79,7 +79,19 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
   %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
   S1 = S#state{workers=Pids++Workers},
-  lager:info("The master got ~b workers", [length(S1#state.workers)]),
+  CurW = length(S1#state.workers),
+  case application:get_env(kernel,workers) of
+    undefined ->
+      lager:info("The master got ~b workers", [CurW]);
+    {ok, EnvW} ->
+      lager:info("The master got ~b/~b workers", [CurW, EnvW]),
+      if 
+        CurW == EnvW ->
+          timer:apply_after(500,gen_server,call,[master, {run, "SRR770176_1.fastq", "GL000193.1", EnvW}]);
+        true ->
+          ok
+      end
+  end,
   {reply, ok, S1};
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) >= WorkersLimit ->
@@ -118,7 +130,7 @@ produce_workload(_N, S = #state{fastq_eof = true}, []) ->
 handle_cast({get_workload, N, {Node,Pid}}, State) ->
   Self = self(),
   spawn_link(fun() ->
-    Resp = gen_server:call(Self, {get_workload, N}, 60000),
+    Resp = gen_server:call(Self, {get_workload, N}, 600000),
     navel:call_no_return(Node, erlang, send, [Pid,{workload,Resp}])
   end),
   {noreply, State};

@@ -8,5 +8,5 @@
                   stdlib
                  ]},
   {mod, { worker_bwt_app_app, []}},
-  {env, [{bwt_files, "bwt_files_worker"}, {fm_indices, "fm_indices"}]}
+  {env, [{bwt_files, "bwt_files"}, {fm_indices, "fm_indices"}]}
  ]}.
