@@ -61,7 +61,21 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
   %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
   S1 = S#state{workers=Pids++Workers},
-  lager:info("The master got ~b workers", [length(S1#state.workers)]),
+  CurrWorkers = length(S1#state.workers),
+  lager:info("The master got ~b workers", [CurrWorkers]),
+  case application:get_env(master,workers) of
+    undefined ->
+      ok;
+    {ok, ConfWorkers} ->
+      if
+        CurrWorkers == ConfWorkers ->
+          lager:info("All workers are in place, initiate align"),
+          timer:apply_after(500,gen_server,call,[master, {run, "bwt_files/SRR770176_1.fastq", "GL000193.1", ConfWorkers}]);
+        true ->
+          ok
+      end
+  end,
+
   {reply, ok, S1};
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) > 0 ->
