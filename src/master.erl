@@ -63,7 +63,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   S1 = S#state{workers=Pids++Workers},
   CurrWorkers = length(S1#state.workers),
   lager:info("The master got ~b workers", [CurrWorkers]),
-  case application:get_env(master,workers) of
+  case application:get_env(kernel,workers) of
     undefined ->
       ok;
     {ok, ConfWorkers} ->
