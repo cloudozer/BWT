@@ -63,18 +63,16 @@ worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift, 
     {workload, stop} ->
       worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory);
     {workload, Workload} when is_list(Workload) ->
-      io:format("worker got workload ~p~n", [length(Workload)]),
 %  Pid = spawn_link(?MODULE, worker_loop, [running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift]),
 %true = unregister(worker_bwt),
 %true = register(worker_bwt, Pid),
       navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
       TotalMemory1 = max(proplists:get_value(total,erlang:memory()), TotalMemory),
-      io:format("max memory: ~p~nmemory: ~p~n", [TotalMemory1,erlang:memory()]),
       worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory1);
     Err -> 
       throw(Err)
   end;
-worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory) ->
+worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory) ->
   %% erlang:garbage_collect(),
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
@@ -112,10 +110,10 @@ worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,
 
   end, Seeds),
 
-  io:format("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done~n", [self(), length(QseqList), length(Seeds)]),
+  lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
   worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, max(proplists:get_value(total,erlang:memory()), TotalMemory));
 
-worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift, _TotalMemory) ->
-  lager:info("Worker is stopping"),
+worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift, TotalMemory) ->
+  lager:info("Worker is stopping. max memory: ~p~nmemory: ~p~n", [TotalMemory,erlang:memory()]),
   navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
