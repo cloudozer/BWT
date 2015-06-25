@@ -58,7 +58,7 @@ read_seqs(Dev, N, Acc) ->
 
 
 fold(Fun, Acc, FileName) ->
-  {ok, Dev} = file:open(FileName, [read, raw, read_ahead]), 
+  {ok, Dev} = file:open(FileName, []),
   Result = fold_inner(Dev, Fun, Acc),
   ok = file:close(Dev),
   Result.
@@ -70,7 +70,7 @@ fold_inner(Dev, Fun, Acc) ->
   end.
 
 get_value(SeqName, FileName) ->
-  {ok, Dev} = file:open(FileName, [read, raw, read_ahead]),
+  {ok, Dev} = file:open(FileName, []),
   Result = get_value_inner(SeqName, Dev),
   ok = file:close(Dev),
   Result.

@@ -98,7 +98,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) >= WorkersLimit ->
   {ok, BwtFiles} = application:get_env(bwt_files),
-  {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
+  {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), []),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
   MyNode = navel:get_node(),
   lists:foreach(fun({Node,Pid}) -> navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,{MyNode,self()}]) end, Workers1),
