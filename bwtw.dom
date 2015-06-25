@@ -1,0 +1,5 @@
+name = "bwtw"
+kernel = "bwtw.img"
+extra = "-worker_bwt_app master_ip {192,168,3,2} -ipaddr 192.168.3.3 -netmask 255.255.255.0 -gateway 192.168.3.1 -home /BWT -pz /BWT/apps/master/ebin /BWT/apps/worker_bwt_app/ebin /BWT/deps/goldrush/ebin /BWT/deps/lager/ebin /BWT/ebin -eval 'worker_bwt_app_app:dev()'"
+memory = 1024
+vif = ['bridge=xenbr0']

@@ -1,6 +1,6 @@
 <<<<<<< HEAD
 # Erlang
-
+.rebar
 .eunit
 deps
 *.o

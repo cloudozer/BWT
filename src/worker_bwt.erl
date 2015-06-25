@@ -9,16 +9,17 @@
 -module(worker_bwt).
 
 -export([start_link/0, start_link/1, run/3]).
--export([worker_loop/10]).
+-export([worker_loop/11]).
 
 -include("bwt.hrl").
 
 -define(WATERLINE, 10).
+-define(REF_EXTENSION_LEN, 200).
 
 %% api
 
 start_link() ->
-  Pid = spawn_link(?MODULE, worker_loop, [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined]),
+  Pid = spawn_link(?MODULE, worker_loop, [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0]),
   true = is_pid(Pid),
   {ok, Pid}.
 
@@ -34,10 +35,10 @@ run(Pid, Chromosome, MasterPid) ->
 
 %% state_name ::= [init|running|stopping]
 
-worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
+worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined, 0) ->
   receive
     {run, Chromosome, MasterPid1={MNode,MPid}} ->
-      erlang:garbage_collect(),
+      %% erlang:garbage_collect(),
 
       navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
 
@@ -48,25 +49,33 @@ worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undef
 
       {ok, BwtFiles} = application:get_env(worker_bwt_app,bwt_files),
       {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
+      Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
+      Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
-      worker_loop(running, [], MasterPid1, FM, Ref, Pc,Pg,Pt,Last, Shift);
+      worker_loop(running, [], MasterPid1, FM, Ref1, Pc,Pg,Pt,Last, Shift, 0);
 
     Err -> throw({unsuitable, Err})
   end;
 
-worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory) ->
+  %erlang:garbage_collect(),
   receive
     {workload, stop} ->
-      worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+      worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory);
     {workload, Workload} when is_list(Workload) ->
-      lager:info("worker got workload ~p", [length(Workload)]),
+      io:format("worker got workload ~p~n", [length(Workload)]),
+%  Pid = spawn_link(?MODULE, worker_loop, [running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift]),
+%true = unregister(worker_bwt),
+%true = register(worker_bwt, Pid),
       navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
-      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+      TotalMemory1 = max(proplists:get_value(total,erlang:memory()), TotalMemory),
+      io:format("max memory: ~p~nmemory: ~p~n", [TotalMemory1,erlang:memory()]),
+      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory1);
     Err -> 
       throw(Err)
   end;
-worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
-  erlang:garbage_collect(),
+worker_loop(running, [{_Chromosome, QseqList} | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory) ->
+  %% erlang:garbage_collect(),
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
@@ -75,26 +84,14 @@ worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref,
       end
     end, [], QseqList),
 
-  Ref_bin_size = byte_size(Ref),
-
   lists:foreach(fun({{SeqName, Qsec}, Seeds1}) ->
 
     Cigars = lists:foldl(fun({S,D}, Acc) ->
 
       Ref_len = length(Qsec) + D,
-      Start_pos = (S - Ref_len) bsl 3,
+      Start_pos = S - Ref_len + ?REF_EXTENSION_LEN,
 
-      {Ref1, Start_pos1} = if S > Ref_bin_size ->
-        Ns = list_to_binary(lists:duplicate(S - Ref_bin_size, $N)),
-        {<<Ref/binary, Ns/binary>>, Start_pos};
-                             (S - Ref_len) < 0 ->
-                               Ns = list_to_binary(lists:duplicate(-(S - Ref_len), $N)),
-                               {<<Ns/binary, Ref/binary>>, 0};
-                             true ->
-                               {Ref, Start_pos}
-                           end,
-
-      <<_:Start_pos1,Ref_seq:Ref_len/bytes,_/binary>> = Ref1,
+      <<_:Start_pos/bytes,Ref_seq:Ref_len/bytes,_/binary>> = Ref,
       Ref_seq1 = binary_to_list(Ref_seq),
 
       case sw:sw(Qsec,Ref_seq1) of
@@ -115,10 +112,10 @@ worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref,
 
   end, Seeds),
 
-  lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
+  io:format("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done~n", [self(), length(QseqList), length(Seeds)]),
 
-  worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
+  worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, max(proplists:get_value(total,erlang:memory()), TotalMemory));
 
-worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
+worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift, _TotalMemory) ->
   lager:info("Worker is stopping"),
-  ok = navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
+  navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
