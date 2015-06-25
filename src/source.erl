@@ -1,13 +1,13 @@
 -module(source).
 -behaviour(gen_server).
 
--export([start_link/1, start_link/0, register_workers/2, run/6]).
+-export([start_link/1, start_link/0, register_workers/2, run/5]).
 -export([test/3]).
 -export([init/1, terminate/2, handle_info/2, handle_call/3]).
 
 %% test
 
-test(SeqFileName, Chromosome, Debug) ->
+test(SeqFileName, ChromosomeList, Debug) ->
   lager:start(),
   if Debug == true ->
     application:start(sasl),
@@ -37,30 +37,34 @@ test(SeqFileName, Chromosome, Debug) ->
   %% Connect the Sink to the Source
   lingd:connect(LingdRef, SinkNode, {LocalIP,SourcePort}),
 
-Chunks = [1,2,3],
-WorkersNum = length(Chunks),
+BoxNbr = 1,
+BoxMem = 4000,
+ChunksList = schedule:chunks_to_box(ChromosomeList,BoxNbr,BoxMem),
 
-  %% Start workers
-  Pids = lists:map(fun(N) ->
-    %% Create a node
-    NodeName = list_to_atom("erl" ++ integer_to_list(N)),
-    {ok, Node} = lingd:create_link(LingdRef, NodeName, {LocalIP, N}),
+	lists:foreach(fun(Chunks) ->
+	  %% Start workers
+	  WorkersNum = length(Chunks),
+	  Pids = lists:map(fun(N) ->
+	    %% Create a node
+	    NodeName = list_to_atom("erl" ++ integer_to_list(N)),
+	    {ok, Node} = lingd:create_link(LingdRef, NodeName, {LocalIP, N}),
 
-    %% Start worker app (connect it firstly)
-    lingd:connect(LingdRef, Node, LocalIP),
-    ok = navel:call(Node, application, start, [worker_bwt_app]),
+	    %% Start worker app (connect it firstly)
+	    lingd:connect(LingdRef, Node, LocalIP),
+	    ok = navel:call(Node, application, start, [worker_bwt_app]),
 
-    %% Connect the node to the Source and to the Sink
-    lingd:connect(LingdRef, Node, {LocalIP, SourcePort}),
-    lingd:connect(LingdRef, Node, {LocalIP, SinkPort}),
-    {NodeName, worker_bwt}
-  end, lists:seq(WorkerStartPort, WorkerStartPort+WorkersNum-1)),
+	    %% Connect the node to the Source and to the Sink
+	    lingd:connect(LingdRef, Node, {LocalIP, SourcePort}),
+	    lingd:connect(LingdRef, Node, {LocalIP, SinkPort}),
+	    {NodeName, worker_bwt}
+	  end, lists:seq(WorkerStartPort, WorkerStartPort+WorkersNum-1)),
 
-  %% Associate them with the Source
-  ok = navel:call(SourceNode, ?MODULE, register_workers, [source,Pids]),
+	  %% Associate them with the Source
+	  ok = navel:call(SourceNode, ?MODULE, register_workers, [source,Pids])
+	end, ChunksList),
 
   %% Run everything
-  ok = navel:call(SourceNode, ?MODULE, run, [source, SeqFileName, Chromosome, Chunks, self(), {SinkNode,sink}]).
+  ok = navel:call(SourceNode, ?MODULE, run, [source, SeqFileName, ChunksList, self(), {SinkNode,sink}]).
 
 %% api
 
@@ -73,12 +77,12 @@ start_link(Args) ->
 register_workers(SourcePid, Pids) ->
   gen_server:call(SourcePid, {register_workers, Pids}).
 
-run(Pid, SeqFileName, Chromosome, Chunks, ClientPid, SinkPid) ->
-  gen_server:call(Pid, {run, SeqFileName, Chromosome, Chunks, ClientPid, SinkPid}, infinity).
+run(Pid, SeqFileName, Chunks, ClientPid, SinkPid) ->
+  gen_server:call(Pid, {run, SeqFileName, Chunks, ClientPid, SinkPid}, infinity).
 
 %% gen_server callbacks
 
--record(state, {state_name = init, workers = [], fastq, fastq_eof = false, chromosome, workload_size = 3000, client}).
+-record(state, {state_name = init, workers = [], fastq, fastq_eof = false, workload_size = 3000, client}).
 %% state_name ::= init|running|stopping
 
 init(_Args) ->
@@ -102,15 +106,15 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   lager:info("The source connected to ~b workers", [length(Workers1)]),
   {reply, ok, S#state{workers = Workers1}};
 
-handle_call({run, FastqFileName, Chromosome, Chunks, ClientPid, SinkPid={SNode,SPid}}, _From, S=#state{workers=Workers}) when length(Chunks) =:= length(Workers) ->
+handle_call({run, FastqFileName, Chunks, ClientPid, SinkPid={SNode,SPid}}, _From, S=#state{workers=Workers}) ->
   {ok, BwtFiles} = application:get_env(bwt_files),
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), [read, raw, read_ahead]),
   MyNode = ?MODULE, %navel:get_node(),
   Self = self(),
   SelfRef = {MyNode,Self},
   lists:foreach(fun({{Node,Pid}, Chunk}) ->
-    navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,Chunk,SelfRef,SinkPid])
-  end, lists:zip(Workers,Chunks)),
+    navel:call_no_return(Node, worker_bwt, run, [Pid,Chunk,SelfRef,SinkPid])
+  end, lists:zip(Workers,lists:merge(Chunks))),
 
   %% Push first workload
   spawn_link(fun() -> ok = gen_server:call(Self, push_workload) end),
@@ -118,7 +122,7 @@ handle_call({run, FastqFileName, Chromosome, Chunks, ClientPid, SinkPid={SNode,S
   %% Run the Sink
   navel:call_no_return(SNode, gen_server, call, [SPid, {run, SelfRef, Workers}]),
 
-  {reply, ok, S#state{state_name = running, fastq={FastqFileName, FastqDev}, chromosome = Chromosome, client = ClientPid}};
+  {reply, ok, S#state{state_name = running, fastq={FastqFileName, FastqDev}, client = ClientPid}};
 
 handle_call(push_workload, _From, S=#state{state_name = stopping}) ->
   lists:foreach(fun({Node,Pid}) ->
