@@ -11,7 +11,9 @@
 
 dev() ->
 	lager:start(),
-	ok = application:start(master).
+	navel:start(master),
+	master:start_link().
+	%% ok = application:start(master).
 
 start(_StartType, _StartArgs) ->
     master_sup:start_link().

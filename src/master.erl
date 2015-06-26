@@ -63,12 +63,13 @@ init(_Args) ->
   {ok, #state{}}.
 
 terminate(Reason, State) ->
-  lager:info("Master terminated: ~p", [{Reason, State}]).
+  %% lager:info("Master terminated: ~p", [{Reason, State}]),
+  halt().
 
 handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
-  lager:info("It's all over. ~.1f sec.", [Sec]),
+  io:format("It's all over. ~.1f sec.~n", [Sec]),
   ClientPid ! {stop, Sec},
   {stop, normal, S};
 handle_info({done,Pid}, S) ->
@@ -97,7 +98,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   {reply, ok, S1};
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) >= WorkersLimit ->
-  {ok, BwtFiles} = application:get_env(bwt_files),
+  {ok, BwtFiles} = application:get_env(master_app, bwt_files, {ok,"bwt_files"}),
   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), []),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
   MyNode = navel:get_node(),

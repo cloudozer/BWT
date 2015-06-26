@@ -9,7 +9,7 @@
 -module(worker_bwt).
 
 -export([start_link/0, start_link/1, run/3]).
--export([worker_loop/11]).
+-export([worker_loop/10]).
 
 -include("bwt.hrl").
 
@@ -19,7 +19,7 @@
 %% api
 
 start_link() ->
-  Pid = spawn_link(?MODULE, worker_loop, [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0]),
+  Pid = spawn_link(?MODULE, worker_loop, [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0]),
   true = is_pid(Pid),
   {ok, Pid}.
 
@@ -35,7 +35,7 @@ run(Pid, Chromosome, MasterPid) ->
 
 %% state_name ::= [init|running|stopping]
 
-worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined, 0) ->
+worker_loop(init, [], undefined, undefined, undefined,undefined,undefined,undefined, undefined, 0) ->
   receive
     {run, Chromosome, MasterPid1={MNode,MPid}} ->
       %% erlang:garbage_collect(),
@@ -47,32 +47,30 @@ worker_loop(init, [], undefined, undefined, undefined, undefined,undefined,undef
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
-      {ok, BwtFiles} = application:get_env(worker_bwt_app,bwt_files),
+      {ok, BwtFiles} = application:get_env(bwt_files),
       {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
-      worker_loop(running, [], MasterPid1, FM, Ref1, Pc,Pg,Pt,Last, Shift, 0);
+      worker_loop(running, [], MasterPid1, FM, Ref1, Pc,Pg,Pt,Last, Shift);
 
     Err -> throw({unsuitable, Err})
   end;
 
-worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory) ->
+worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   %erlang:garbage_collect(),
+  %io:format("big after: ~p~n", [big()]),
   receive
     {workload, stop} ->
-      worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory);
+      worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
-%  Pid = spawn_link(?MODULE, worker_loop, [running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift]),
-%true = unregister(worker_bwt),
-%true = register(worker_bwt, Pid),
+      io:format("worker got workload ~p~n", [length(Workload)]),
       navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
-      TotalMemory1 = max(proplists:get_value(total,erlang:memory()), TotalMemory),
-      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory1);
+      worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     Err -> 
       throw(Err)
   end;
-worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift, TotalMemory) ->
+worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   %% erlang:garbage_collect(),
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
@@ -110,10 +108,11 @@ worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref,
 
   end, Seeds),
 
-  lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
+  io:format("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done~n", [self(), length(QseqList), length(Seeds)]),
 
-  worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift, max(proplists:get_value(total,erlang:memory()), TotalMemory));
+  worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
-worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift, TotalMemory) ->
-  lager:info("Worker is stopping. max memory: ~p~nmemory: ~p~n", [TotalMemory,erlang:memory()]),
+worker_loop(stopping, [], {MNode,MPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
+  lager:info("Worker is stopping"),
   navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
+
