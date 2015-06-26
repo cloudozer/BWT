@@ -62,9 +62,11 @@ init(_Args) ->
   lager:info("Started master"),
   {ok, #state{}}.
 
+terminate(normal, _State) ->
+  ok;
+%%   halt().
 terminate(Reason, State) ->
   lager:info("Master terminated: ~p", [{Reason, State}]).
-%%   halt().
 
 handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid, chromosome = Chromosome, fastq={FastqFileNam,_}, stat_workload_amount = WorkloadAmount}) ->
   Microsec = timer:now_diff(now(), StartTime),
