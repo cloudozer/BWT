@@ -47,7 +47,7 @@ worker_loop(init, [], undefined, undefined, undefined,undefined,undefined,undefi
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
-      {ok, BwtFiles} = application:get_env(bwt_files),
+      {ok, BwtFiles} = application:get_env(worker_bwt_app, bwt_files),
       {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
@@ -58,20 +58,17 @@ worker_loop(init, [], undefined, undefined, undefined,undefined,undefined,undefi
   end;
 
 worker_loop(running, [], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
-  %erlang:garbage_collect(),
-  %io:format("big after: ~p~n", [big()]),
   receive
     {workload, stop} ->
       worker_loop(stopping, [], MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
-      io:format("worker got workload ~p~n", [length(Workload)]),
+      lager:info("A worker got workload ~p~n", [length(Workload)]),
       navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
       worker_loop(running, Workload, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     Err -> 
       throw(Err)
   end;
 worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
-  %% erlang:garbage_collect(),
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
       case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
@@ -108,7 +105,7 @@ worker_loop(running, [QseqList | WorkloadRest], MasterPid={MNode,MPid}, FM, Ref,
 
   end, Seeds),
 
-  io:format("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done~n", [self(), length(QseqList), length(Seeds)]),
+  lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
   worker_loop(running, WorkloadRest, MasterPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
