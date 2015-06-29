@@ -19,7 +19,10 @@
 %% api
 
 start_link() ->
-  Pid = spawn_link(?MODULE, worker_loop, [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0]),
+  Pid = spawn_opt(?MODULE,
+				  worker_loop,
+				  [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0],
+				  [{fullsweep_after,0}]),
   true = is_pid(Pid),
   {ok, Pid}.
 

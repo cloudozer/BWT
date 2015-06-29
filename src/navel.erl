@@ -111,6 +111,10 @@ navel(Node, Peers, Calls) ->
 		X -> throw({todo,X}) end.
 
 dispatch(S, Msg) ->
+
+	case random:uniform() < 0.05 of
+		true -> garbage_collect(); _ -> ok end,
+
 	Pkt = term_to_binary(Msg),
 	%io:format("navel: dispatch pkt [~w byte(s)]\n", [byte_size(Pkt)]),
 	gen_tcp:send(S, Pkt).
