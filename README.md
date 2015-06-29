@@ -1,52 +1,37 @@
-
-# How to run DNA aligner app on a cluster.
-
-[TODO: update with LING specifics]
-
-## Checkout and build
+# Checkout and build
 	$ git clone https://github.com/cloudozer/BWT.git
 	$ cd BWT
-	$ git checkout 0.1
-	$ ./rebar get-deps compile
+	$ git checkout master
+	$ ./rebar get-deps
+	$ make
 	
 ## Getting DNA files
 1. Download an archive: https://docs.google.com/uc?id=0B2DPaltm6IwpYVFHOEZYSGpldHc&export=download
 2. Extract it to the BWT folder
 	
-## Run test on local machine
-	$ ./start_local.sh
-
-## Run test on a cluster
+## Run test on local machine using 2 workers
+	$ ./scripts/start_local.sh SRR770176_1.fastq GL000193.1 2
 
 ### Cluster's nodes requirements
 * Friendly Linux
+* Xen
 * Erlang OTP 17
 * Git
 * Internet access
 
 ### Master node Setup
 
-	$ cd BWT
-	$ erl -pa ebin deps/*/ebin apps/*/ebin -name master@%HOST_NAME% -setcookie secret_gc -eval "master_app:dev()"
+Edit domain config file 'bwtm.dom', setup expected number of workers, ssh port, etc.
+	$ sudo xl create -c bwtm.dom
 
 ### Worker node Setup
 
-Ensure that the following script runs on boot-up. Replace 'erlangonxen.org' wiht the master's hostname in apps/worker_bwt_app/src/worker_bwt_app_sup.erl.
+Edit domain config file 'bwtm.dom', setup master ip address, etc.
+	$ sudo xl create -c bwtw.dom
 
-	cd %BWT_FOLDER%
-	git pull
-	./rebar update-deps compile
-	erl -pa ebin deps/*/ebin apps/*/ebin -name erl1@%HOST_NAME% -setcookie secret_gc -eval "worker_bwt_app_app:dev()"
+# Secure Shell connection to a Ling node
+	$ ssh %NODE_HOST% -p %PORT%   (password: 1)
 
-### To run aligner on the cluster
-1. Start master and worker nodes.
-2. Run:
-
-	# from your laptop:
-	$ ./start_cluster.sh %MASTER_HOST_NAME% %WORKERS_NUMBER%
-	
-	%% or from Erlang shell of the master node
-	1> gen_server:call(master , {run, "bwt_files/SRR770176_1.fastq", "GL000193.1", %WORKERS_NUMBER%}).
 
 [Disregards Info below this line]
 
