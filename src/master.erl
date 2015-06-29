@@ -111,7 +111,8 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
 
 handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#state{workers=Workers}) when length(Workers) >= WorkersLimit ->
   {ok, BwtFiles} = application:get_env(master_app, bwt_files, {ok,"bwt_files"}),
-  {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), []),
+%%   {ok, FastqDev} = file:open(filename:join(BwtFiles, FastqFileName), []),
+  FastqDev = io_embedded:start_link({BwtFiles, FastqFileName}),
   {Workers1, _Workers2} = lists:split(WorkersLimit, Workers),
   MyNode = navel:get_node(),
   lists:foreach(fun({Node,Pid}) -> navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,{MyNode,self()}]) end, Workers1),
@@ -159,8 +160,10 @@ produce_workload(0, State, Acc) ->
   {Acc, State};
 
 produce_workload(N, S = #state{fastq = {_, FqDev}, fastq_eof = false, workload_size = WorkloadSize}, Acc) ->
+  lager:info("produce_workload ~p", [N]),
   case fastq:read_seqs(FqDev, WorkloadSize) of
     {_, SeqList} ->
+      lager:info("produce_workload SeqList ~p", [SeqList]),
       Workload = SeqList,
       produce_workload(N-1, S, [Workload | Acc]);
     eof ->
