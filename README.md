@@ -22,15 +22,18 @@
 ### Master node Setup
 
 Edit domain config file 'bwtm.dom', setup expected number of workers, ssh port, etc.
+
 	$ sudo xl create -c bwtm.dom
 
 ### Worker node Setup
 
 Edit domain config file 'bwtm.dom', setup master ip address, etc.
+
 	$ sudo xl create -c bwtw.dom
 
 # Secure Shell connection to a Ling node
-	$ ssh %NODE_HOST% -p %PORT%   (password: 1)
+
+	$ ssh %NODE_HOST% -p %PORT%   # (password: 1)
 
 
 [Disregards Info below this line]
