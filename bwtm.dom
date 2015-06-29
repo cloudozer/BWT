@@ -1,5 +1,5 @@
 name = "bwtm"
 kernel = "bwtm.img"
-extra = "-kernel workers 1 -ipaddr 192.168.3.2 -netmask 255.255.255.0 -gateway 192.168.3.1 -home /BWT -pz /BWT/apps/master/ebin /BWT/apps/worker_bwt_app/ebin /BWT/deps/goldrush/ebin /BWT/deps/lager/ebin /BWT/ebin -eval 'master_app:dev()'"
+extra = "-kernel workers 1 -kernel ssh_port 2222 -ipaddr 192.168.56.202 -netmask 255.255.255.0 -gateway 192.168.56.200 -home /BWT -pz /BWT/apps/master/ebin /BWT/apps/worker_bwt_app/ebin /BWT/deps/goldrush/ebin /BWT/deps/lager/ebin /BWT/ebin -eval 'master_app:dev()'"
 memory = 1024
 vif = ['bridge=xenbr0']
