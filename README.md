@@ -3,6 +3,7 @@
 	$ cd BWT
 	$ git checkout master
 	$ ./rebar get-deps
+	# Setup domain config files (bwtm.dom and bwtw.dom)
 	$ make
 	
 ## Getting DNA files
@@ -23,12 +24,14 @@
 
 Edit domain config file 'bwtm.dom', setup expected number of workers, ssh port, etc.
 
+	$ make
 	$ sudo xl create -c bwtm.dom
 
 ### Worker node Setup
 
 Edit domain config file 'bwtm.dom', setup master ip address, etc.
 
+	$ make
 	$ sudo xl create -c bwtw.dom
 
 # Secure Shell connection to a Ling node
