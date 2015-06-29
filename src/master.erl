@@ -70,8 +70,9 @@ handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
 
-  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~p~n~n",
+  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
   ReferenceFile = "human_g1k_v37_decoy.fasta",
+  {{Year,Month,Day},{Hour,Min,Sec1}} = erlang:localtime(),
   Statistics = [
     FastqFileNam,
     ReferenceFile,
@@ -79,7 +80,7 @@ handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client
     WorkloadAmount,
     Sec,
     S#state.workers_num,
-    calendar:now_to_local_time(now())
+    Year, Month, Day, Hour, Min, Sec1
   ],
   io:format(StatTemplate, Statistics),
 
