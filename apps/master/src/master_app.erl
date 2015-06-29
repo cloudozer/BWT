@@ -9,9 +9,23 @@
 %% Application callbacks
 %% ===================================================================
 
+-define(SSH_PWD, "1").
+
 dev() ->
 	lager:start(),
 	navel:start(master),
+
+	case application:get_env(kernel, ssh_port) of
+		undefined -> ok;
+		{ok,SshPort} ->
+			application:ensure_all_started(ssh),
+			PrivDir = code:priv_dir(master),
+			SshDir = filename:join(PrivDir, "ssh_dir"),
+			io:format("Starting ssh daemon on port ~w\n", [SshPort]),
+			ssh:daemon(SshPort, [{password,?SSH_PWD},
+								 {system_dir,SshDir},
+								 {user_dir,SshDir}]) end,
+
 	master:start_link().
 	%% ok = application:start(master).
 
