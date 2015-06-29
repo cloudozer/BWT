@@ -56,7 +56,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 
 %% gen_server callbacks
 
--record(state, {workers=[], fastq, fastq_eof = false, chromosome, workload_size = 200, stat_workload_amount = 0, client, stopping = false, start_time}).
+-record(state, {workers=[], workers_num = 0, fastq, fastq_eof = false, chromosome, workload_size = 200, stat_workload_amount = 0, client, stopping = false, start_time}).
 
 init(_Args) ->
   lager:info("Started master"),
@@ -70,7 +70,7 @@ handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
 
-  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nDate/time: ~p~n~n",
+  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~p~n~n",
   ReferenceFile = "human_g1k_v37_decoy.fasta",
   Statistics = [
     FastqFileNam,
@@ -78,6 +78,7 @@ handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client
     Chromosome,
     WorkloadAmount,
     Sec,
+    S#state.workers_num,
     calendar:now_to_local_time(now())
   ],
   io:format(StatTemplate, Statistics),
@@ -117,7 +118,7 @@ handle_call({run, FastqFileName, Chromosome, WorkersLimit}, {ClientPid,_}, S=#st
   MyNode = navel:get_node(),
   lists:foreach(fun({Node,Pid}) -> navel:call_no_return(Node, worker_bwt, run, [Pid,Chromosome,{MyNode,self()}]) end, Workers1),
   %% TODO: demonitor the rest
-  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid, start_time = now()}};
+  {reply, ok, S#state{fastq={FastqFileName, FastqDev}, chromosome = Chromosome, workers = Workers1, client = ClientPid, start_time = now(), workers_num = length(Workers1)}};
 
 handle_call({get_workload, N}, _From, S=#state{stopping = false, stat_workload_amount = WorkloadAmount}) ->
   {Result,S1} = produce_workload(N, S),
