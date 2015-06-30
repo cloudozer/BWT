@@ -38,8 +38,8 @@ init(_) ->
 terminate(Reason, State) ->
   lager:error("A worker is terminated: ~p~n~p", [Reason, State]).
 
-handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlavePid, master = MasterPid}) ->
-  %TODO gen_server:cast(MasterPid, {done, self()}),
+handle_info({'DOWN', _Ref, process, SlavePid, normal}, S = #state{slave = SlavePid, master = {MNode,MPid}}) ->
+  ok = navel:call(MNode, gen_server, call, [MPid,{done, {navel:get_node(),self()}}]),
   {stop, normal, S}.
 
 handle_cast({run, MasterPid}, S=#state{slave = undefined}) ->
