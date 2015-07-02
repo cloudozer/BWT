@@ -1,9 +1,6 @@
 -module(fastq).
 
--export([read_seq/1, read_seqs/2, read_seq_pos/1, fold/3, size/1, get_value/2, reverse_complement/1]).
-
-size(FileName) ->
-  fastq:fold(fun(_,Acc) -> 1+Acc end, 0, FileName).
+-export([read_seq/1, read_seqs/2, reverse_complement/1]).
 
 read_seq(Dev) ->
   case file:read_line(Dev) of
@@ -15,21 +12,7 @@ read_seq(Dev) ->
              lists:droplast(SeqData)},
       {ok, Seq};
     {ok, _} ->
-      read_seq_pos(Dev);
-    eof ->
-      eof
-  end.
-
-read_seq_pos(Dev) ->
-  {ok, Pos} = file:position(Dev, cur),
-  case file:read_line(Dev) of
-    {ok, [$@ | _SeqName]} ->
-      {ok, SeqData} = file:read_line(Dev),
-      _Delimiter = file:read_line(Dev),
-      _Quality = file:read_line(Dev),
-      {ok, {Pos, lists:droplast(SeqData)}};
-    {ok, _} ->
-      read_seq_pos(Dev);
+      read_seq(Dev);
     eof ->
       eof
   end.
@@ -54,33 +37,6 @@ read_seqs(Dev, N, Acc) ->
     eof ->
       {eof, Acc};
     Err -> Err
-  end.
-
-
-fold(Fun, Acc, FileName) ->
-  {ok, Dev} = file:open(FileName, [read, raw, read_ahead]), 
-  Result = fold_inner(Dev, Fun, Acc),
-  ok = file:close(Dev),
-  Result.
-
-fold_inner(Dev, Fun, Acc) ->
-  case fastq:read_seq(Dev) of
-    {ok, Seq} -> fold_inner(Dev, Fun, Fun(Seq, Acc));
-    eof -> Acc
-  end.
-
-get_value(SeqName, FileName) ->
-  {ok, Dev} = file:open(FileName, [read, raw, read_ahead]),
-  Result = get_value_inner(SeqName, Dev),
-  ok = file:close(Dev),
-  Result.
-
-get_value_inner(SeqName, Dev) ->
-  case read_seq(Dev) of
-    {ok, {SeqName1, SeqValue}} when SeqName1 == SeqName ->
-      SeqValue;
-    {ok, _} ->
-      get_value_inner(SeqName, Dev)
   end.
 
 
