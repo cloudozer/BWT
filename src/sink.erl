@@ -11,17 +11,17 @@ start_link() ->
 -record(state, {state_name = init, workers = [], start_time, source, results_counter}).
 
 init(_Args) ->
-  lager:info("Start Sink"),
+  log:info("Start Sink"),
   {ok, #state{}}.
 
 terminate(normal, _State) ->
-  lager:info("Stop Sink").
+  log:info("Stop Sink").
 
 handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_time = StartTime}) ->
 %% handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
-  lager:info("It's all over. ~.1f sec.", [Sec]),
+  log:info("It's all over. ~.1f sec.", [Sec]),
 io:format("It's all over. ~.1f sec.~n", [Sec]),
 %%   ClientPid ! {stop, Sec},
   navel:call_no_return(SNode, erlang, send, [SPid, done]),

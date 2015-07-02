@@ -10,8 +10,6 @@
 %% ===================================================================
 
 dev() ->
-    lager:start(),
-    application:start(bwt),
     application:start(worker_bwt_app).
 
 start(_StartType, _StartArgs) ->

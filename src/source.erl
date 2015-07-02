@@ -8,12 +8,10 @@
 %% test
 
 test(SeqFileName, ChromosomeList, Debug) ->
-  lager:start(),
   if Debug == true ->
-    application:start(sasl),
-    lager:set_loglevel(lager_console_backend, debug);
+    application:start(sasl);
   true ->
-    lager:set_loglevel(lager_console_backend, error)
+    ok
   end,
 
   {LocalIP, LingdPort, SourcePort, SinkPort, WorkerStartPort} = {'127.0.0.1', 10, 20, 30, 40},
@@ -90,13 +88,13 @@ run(Pid, SeqFileName, Chunks, ClientPid, SinkPid) ->
 %% state_name ::= init|running|stopping
 
 init(_Args) ->
-  lager:info("Start source"),
+  log:info("Start source"),
   {ok, #state{}}.
 
 terminate(normal, _State) ->
-  lager:info("Stop source");
+  log:info("Stop source");
 terminate(Reason, State) ->
-  lager:info("Source terminated: ~p", [{Reason, State}]).
+  log:info("Source terminated: ~p", [{Reason, State}]).
 
 handle_info(done, S) ->
   {stop, normal, S}.
@@ -107,7 +105,7 @@ handle_call({register_workers, Pids}, _From, S=#state{workers=Workers}) ->
   %% monitor new workers
   %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
   Workers1 = Pids++Workers,
-  lager:info("The source connected to ~b workers", [length(Workers1)]),
+  log:info("The source connected to ~b workers", [length(Workers1)]),
   {reply, ok, S#state{workers = Workers1}};
 
 handle_call({run, FastqFileName, Chunks, ClientPid, SinkPid={SNode,SPid}}, _From, S=#state{workers=Workers}) ->
