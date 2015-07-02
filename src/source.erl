@@ -41,7 +41,11 @@ BoxNbr = 1,
 BoxMem = 4000,
 ChunksList = schedule:chunks_to_box(ChromosomeList,BoxNbr,BoxMem),
 
-	lists:foreach(fun(Chunks) ->
+%% Workaround for latest schedule:chunks_to_box, remove all source, sink.
+ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true end, Chunks) || Chunks <- ChunksList],
+
+	lists:foreach(fun({source,_})->ignore; ({sink,_})->ignore; (Chunks) ->
+
 	  %% Start workers
 	  WorkersNum = length(Chunks),
 	  Pids = lists:map(fun(N) ->
@@ -61,10 +65,10 @@ ChunksList = schedule:chunks_to_box(ChromosomeList,BoxNbr,BoxMem),
 
 	  %% Associate them with the Source
 	  ok = navel:call(SourceNode, ?MODULE, register_workers, [source,Pids])
-	end, ChunksList),
+	end, ChunksList1),
 
   %% Run everything
-  ok = navel:call(SourceNode, ?MODULE, run, [source, SeqFileName, ChunksList, self(), {SinkNode,sink}]).
+  ok = navel:call(SourceNode, ?MODULE, run, [source, SeqFileName, ChunksList1, self(), {SinkNode,sink}]).
 
 %% api
 
