@@ -64,7 +64,7 @@ worker_loop(running, [], Chromosome, SourcePid={SoNode,SoPid}, SinkPid, FM, Ref,
     stop ->
       worker_loop(stopping, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
-      lager:info("worker got workload ~p", [length(Workload)]),
+      log:info("worker got workload ~p", [length(Workload)]),
       worker_loop(running, Workload, Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     Err -> 
       throw(Err)
@@ -108,7 +108,7 @@ worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM
   %% Send result to the Sink
   navel:call_no_return(SiNode, gen_server, cast, [SiPid, {result, Results}]),
 
-  lager:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
+  log:info("Worker ~p: -~b-> sga:sga -~b-> sw:sw -> done", [self(), length(QseqList), length(Seeds)]),
 
   worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
