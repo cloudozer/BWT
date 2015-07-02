@@ -6,4 +6,4 @@ info(Msg) ->
   info(Msg, []).
 
 info(Fmt, Args) ->
-  io:format(Fmt ++ "~n", Args).
+  ok. %% io:format(Fmt ++ "~n", Args).
