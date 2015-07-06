@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -pa ebin apps/source/ebin apps/sink/ebin deps/lager/ebin deps/goldrush/ebin -name client@127.0.0.1 -attached
+%%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -name client@127.0.0.1 -attached
 
 main([]) ->
   io:format("Usage: start_local.sh SeqFileName Chromosome Debug?~n");
@@ -37,7 +37,7 @@ test(SeqFileName, ChromosomeList, Debug) ->
   %% Start source app
   {ok, SourceNode} = lingd:create_link(LingdRef, source, {LocalIP, SourcePort}),
   lingd:connect(LingdRef, SourceNode, LocalIP),
-  ok = navel:call(SourceNode, application, start, [source]),
+  {ok,_} = navel:call(SourceNode, source, start_link, []),
 
   %% Start sink app
   {ok, SinkNode} = lingd:create_link(LingdRef, sink, {LocalIP, SinkPort}),
@@ -46,9 +46,17 @@ test(SeqFileName, ChromosomeList, Debug) ->
   %% Connect the Sink to the Source
   lingd:connect(LingdRef, SinkNode, {LocalIP,SourcePort}),
 
+  LsUrl = "http://localhost:8889/ls.json",
+  inets:start(),
+  {ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} =
+          httpc:request(get, {LsUrl, []}, [], [{body_format, binary}]),
+  LsJson = Body,
+FilesList = jsx:decode(LsJson),
+
 BoxNbr = 1,
 BoxMem = 4000,
-ChunksList = schedule:chunks_to_box(ChromosomeList,BoxNbr,BoxMem),
+ChunksList = schedule:chunks_to_box(ChromosomeList,lists:map(fun erlang:binary_to_list/1, FilesList),BoxNbr,BoxMem),
+log:info("ChunksList ~p=>~p", [{ChromosomeList,BoxNbr,BoxMem},ChunksList]),
 
 %% Workaround for latest schedule:chunks_to_box, remove all source, sink.
 ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true end, Chunks) || Chunks <- ChunksList],

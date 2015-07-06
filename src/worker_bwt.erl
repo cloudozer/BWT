@@ -35,19 +35,22 @@ run(Pid, Chunk, SourcePid, SinkPid) ->
 %% state_name ::= [init|running|stopping]
 
 worker_loop(init, [], undefined, undefined, undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
+  log:info("Start ~p", [?MODULE]),
   receive
-    {run, {Chunk, _Mem}, SourcePid={SoNode,SoPid}, SinkPid} ->
+    {run, {Chunk, _Mem}, SourcePid, SinkPid} ->
+      {ok, BaseUrl} = application:get_env(worker_bwt_app,base_url),
+
       ChunkBin = list_to_binary(Chunk),
       [ChromosomeBin, ChunkIdBin, <<>>] = binary:split(ChunkBin, [<<"_p">>,<<".fm">>], [global]),
       Chromosome = binary_to_list(ChromosomeBin),
       ChunkId = binary_to_integer(ChunkIdBin),
-      {Meta,FM} = fm_index:get_index(Chromosome, ChunkId),
+      {ok, FmIndexBin} = http:get(BaseUrl ++ Chunk),
+      {Meta,FM} = binary_to_term(FmIndexBin),
 
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
-      {ok, FmIndicesPath} = application:get_env(worker_bwt_app,fm_indices),
-      {ok, Ref} = file:read_file(filename:join(FmIndicesPath, binary:replace(ChunkBin, <<".fm">>, <<".ref">>))),
+      {ok, Ref} = http:get(BaseUrl ++ Chromosome ++ "_p" ++ integer_to_list(ChunkId) ++ ".ref"),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
@@ -56,7 +59,7 @@ worker_loop(init, [], undefined, undefined, undefined, undefined, undefined, und
     Err -> throw({unsuitable, Err})
   end;
 
-worker_loop(running, [], Chromosome, SourcePid={SoNode,SoPid}, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   receive
     stop ->
       worker_loop(stopping, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
@@ -69,14 +72,14 @@ worker_loop(running, [], Chromosome, SourcePid={SoNode,SoPid}, SinkPid, FM, Ref,
 worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   Seeds = lists:foldl(
     fun({Qname,Qseq},Acc) ->
-      case sga:sga(FM,Pc,Pg,Pt,Last,Qseq) of
+      case sga:sga(FM,Pc,Pg,Pt,Last,binary_to_list(Qseq)) of
         [] -> Acc;
         ResultsList -> [{{Qname,Qseq},ResultsList}|Acc]
       end
     end, [], QseqList),
 
-  Results = lists:foldl(fun({{SeqName, Qsec}, Seeds1}, Acc) ->
-
+  Results = lists:foldl(fun({{SeqName, QsecBin}, Seeds1}, Acc) ->
+    Qsec = binary_to_list(QsecBin),
     Cigars = lists:foldl(fun({S,D}, Acc) ->
 
       Ref_len = length(Qsec) + D,
@@ -109,6 +112,6 @@ worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM
 
   worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
-worker_loop(stopping, [], Chromosome, _SourcePid, {SiNode,SiPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
+worker_loop(stopping, [], _Chromosome, _SourcePid, {SiNode,SiPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
   log:info("Worker is stopping"),
   navel:call_no_return(SiNode, erlang, send, [SiPid, {done, {navel:get_node(),worker_bwt}}]).

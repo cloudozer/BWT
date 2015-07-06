@@ -3,14 +3,11 @@
 -behaviour(application).
 
 %% Application callbacks
--export([start/2, stop/1, dev/0]).
+-export([start/2, stop/1]).
 
 %% ===================================================================
 %% Application callbacks
 %% ===================================================================
-
-dev() ->
-	ok = application:start(source).
 
 start(_StartType, _StartArgs) ->
     source_sup:start_link().
