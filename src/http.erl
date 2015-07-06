@@ -4,7 +4,7 @@
 -export([loop/0]).
 
 start_link() ->
-  inets:start(),
+%%   inets:start(),
   Pid = spawn_link(fun loop/0),
   true = is_pid(Pid),
   {ok, Pid}.
@@ -32,8 +32,16 @@ loop() ->
   receive
     {get_async, Url, Pid} ->
       Fun = fun()->
-        {ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} =
-          httpc:request(get, {Url, []}, [], [{body_format, binary}]),
+%%         {ok, {{_Version, 200, _ReasonPhrase}, _Headers0, Body}} =
+%%           httpc:request(get, {Url, []}, [], [{body_format, binary}]),
+
+        {ok, {_Scheme, _UserInfo, Host, Port, Path, _Query}} = http_uri:parse(Url),
+        {ok, Sock} = gen_tcp:connect(Host, Port, [binary,{active,false}]),
+        ok = gen_tcp:send(Sock, "GET " ++ Path ++ " HTTP/1.1\n\rHost: " ++ Host ++ "\r\n\r\n"),
+        {ok, Bin} = do_recv(Sock, []),
+        ok = gen_tcp:close(Sock),
+        [_Headers, Body] = binary:split(Bin, <<"\r\n\r\n">>),
+
         Pid ! {http_response, Body}
       end,
       spawn_link(Fun);
@@ -42,4 +50,10 @@ loop() ->
   end.
 
 
-
+do_recv(Sock, Bs) ->
+  case gen_tcp:recv(Sock, 0) of
+    {ok, B} ->
+      do_recv(Sock, [Bs, B]);
+    {error, closed} ->
+      {ok, list_to_binary(Bs)}
+  end.
