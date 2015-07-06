@@ -11,11 +11,11 @@ start_link() ->
 -record(state, {state_name = init, workers = [], start_time, source, results_counter}).
 
 init(_Args) ->
-  log:info("Start Sink"),
+  log:info("Start ~p", [?MODULE]),
   {ok, #state{}}.
 
 terminate(normal, _State) ->
-  log:info("Stop Sink").
+  log:info("Stop ~p", [?MODULE]).
 
 handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_time = StartTime}) ->
 %% handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid}) ->
@@ -24,13 +24,13 @@ handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_t
   log:info("It's all over. ~.1f sec.", [Sec]),
 io:format("It's all over. ~.1f sec.~n", [Sec]),
 %%   ClientPid ! {stop, Sec},
-  navel:call_no_return(SNode, erlang, send, [SPid, done]),
+  navel:call_no_return(SNode, erlang, send, [SPid, sink_done]),
   {stop, normal, S};
 handle_info({done,Pid}, S) ->
   {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}}.
 
 handle_call({run, SourcePid={SNode,SPid}, Workers}, _From, State) ->
-  navel:call_no_return(SNode, gen_server, call, [SPid, push_workload]),
+  navel:call_no_return(SNode, source, push_workload, [SPid]),
   {reply, ok, State#state{workers = Workers, start_time = now(), source = SourcePid, results_counter = 0}}.
 
 
@@ -39,7 +39,7 @@ handle_cast({result, Result}, S=#state{state_name = stopping}) ->
   {noreply, S};
 handle_cast({result, Result}, S=#state{results_counter = ResultsCounter, workers = Workers, source = {Node,Pid}}) when ResultsCounter == length(Workers) - 1 ->
   process_result(Result,S), 
-  case navel:call(Node, gen_server, call, [Pid, push_workload]) of
+  case navel:call(Node, source, push_workload, [Pid]) of
     ok -> 
       {noreply, S#state{results_counter = 0}};
     stopping ->
