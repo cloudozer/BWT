@@ -4,7 +4,6 @@
 -export([loop/0]).
 
 start_link() ->
-%%   inets:start(),
   Pid = spawn_link(fun loop/0),
   true = is_pid(Pid),
   {ok, Pid}.
@@ -21,9 +20,7 @@ get_async(Url) ->
   get_async(?MODULE, Url).
 
 get(Url) ->
-  inets:start(),
-  {ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} =
-    httpc:request(get, {Url, []}, [], [{body_format, binary}]),
+  {_Headers, Body} = do_get(Url),
   {ok, Body}.
 
 %% Private
@@ -32,15 +29,7 @@ loop() ->
   receive
     {get_async, Url, Pid} ->
       Fun = fun()->
-%%         {ok, {{_Version, 200, _ReasonPhrase}, _Headers0, Body}} =
-%%           httpc:request(get, {Url, []}, [], [{body_format, binary}]),
-
-        {ok, {_Scheme, _UserInfo, Host, Port, Path, _Query}} = http_uri:parse(Url),
-        {ok, Sock} = gen_tcp:connect(Host, Port, [binary,{active,false}]),
-        ok = gen_tcp:send(Sock, "GET " ++ Path ++ " HTTP/1.1\n\rHost: " ++ Host ++ "\r\n\r\n"),
-        {ok, Bin} = do_recv(Sock, []),
-        ok = gen_tcp:close(Sock),
-        [_Headers, Body] = binary:split(Bin, <<"\r\n\r\n">>),
+        {_Headers, Body} = do_get(Url),
 
         Pid ! {http_response, Body}
       end,
@@ -48,6 +37,15 @@ loop() ->
     E ->
       throw(E)
   end.
+
+do_get(Url) ->
+  {ok, {_Scheme, _UserInfo, Host, Port, Path, _Query}} = http_uri:parse(Url),
+  {ok, Sock} = gen_tcp:connect(Host, Port, [binary,{active,false}]),
+  ok = gen_tcp:send(Sock, "GET " ++ Path ++ " HTTP/1.1\n\rHost: " ++ Host ++ "\r\n\r\n"),
+  {ok, Bin} = do_recv(Sock, []),
+  ok = gen_tcp:close(Sock),
+  [Headers, Body] = binary:split(Bin, <<"\r\n\r\n">>),
+  {Headers, Body}.
 
 
 do_recv(Sock, Bs) ->
