@@ -51,7 +51,7 @@ do_get(Url) ->
 do_recv(Sock, Bs) ->
   case gen_tcp:recv(Sock, 0) of
     {ok, B} ->
-      do_recv(Sock, [Bs, B]);
+      do_recv(Sock, [B | Bs]);
     {error, closed} ->
-      {ok, list_to_binary(Bs)}
+      {ok, list_to_binary(lists:reverse(Bs))}
   end.
