@@ -17,7 +17,6 @@ init(_Args) ->
 terminate(normal, _State) ->
   log:info("Stop ~p", [?MODULE]).
 
-
 %handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid, chromosome = Chromosome, fastq={FastqFileNam,_}, stat_workload_amount = WorkloadAmount}) ->
 %  Microsec = timer:now_diff(now(), StartTime),
 %  Sec = Microsec / 1000000,
