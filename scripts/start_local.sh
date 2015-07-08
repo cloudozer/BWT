@@ -72,12 +72,13 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 
 	    %% Start worker app (connect it firstly)
 	    lingd:connect(LingdRef, Node, LocalIP),
-	    ok = navel:call(Node, application, start, [worker_bwt_app]),
+	    ok = navel:call(Node, application, set_env, [worker_bwt_app,base_url,"http://localhost:8889/"]),
+	    {ok, WorkerPid} = navel:call(Node, worker_bwt, start_link, []),
 
 	    %% Connect the node to the Source and to the Sink
 	    lingd:connect(LingdRef, Node, {LocalIP, SourcePort}),
 	    lingd:connect(LingdRef, Node, {LocalIP, SinkPort}),
-	    {NodeName, worker_bwt}
+	    {NodeName, WorkerPid}
 	  end, lists:seq(WorkerStartPort, WorkerStartPort+WorkersNum-1)),
 
 	  %% Associate them with the Source

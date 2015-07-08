@@ -116,6 +116,6 @@ worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM
 
   worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
 
-worker_loop(stopping, [], Chromosome, _SourcePid, {SiNode,SiPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
-  lager:info("Worker is stopping"),
+worker_loop(stopping, [], _Chromosome, _SourcePid, {SiNode,SiPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
+  log:info("~p is stopping", [?MODULE]),
   navel:call_no_return(SiNode, erlang, send, [SiPid, {done, {navel:get_node(),self()}}]).
