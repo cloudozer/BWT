@@ -72,7 +72,7 @@ handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
 
-  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
+  StatTemplate = "~n~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
   ReferenceFile = "human_g1k_v37_decoy.fasta",
   {{Year,Month,Day},{Hour,Min,Sec1}} = erlang:localtime(),
   Statistics = [
@@ -140,6 +140,7 @@ handle_cast({get_workload, N, {Node,Pid}}, State) ->
   Self = self(),
   spawn_link(fun() ->
     Resp = gen_server:call(Self, {get_workload, N}, 600000),
+    io:format("."),
     navel:call_no_return(Node, erlang, send, [Pid,{workload,Resp}])
   end),
   {noreply, State};
@@ -148,7 +149,7 @@ handle_cast({cigar, _, {CigarRate, _}, _, _}, State) when CigarRate < 265 ->
   {noreply, State};
 handle_cast({cigar, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq}, State = #state{chromosome = Chromosome, client = ClientPid}) ->
   lager:info("Master got cigar: ~p ~p", [SeqName, Cigar]),
-  io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
+  io:format("~n~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
   ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq},
   {noreply, State};
 
