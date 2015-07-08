@@ -20,9 +20,10 @@
 start_link() ->
   Pid = spawn_opt(?MODULE,
 				  worker_loop,
-				  [init, [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 0],
+				  [init, [], undefined, undefined, undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined],
 				  []),
   true = is_pid(Pid),
+  true = register(?MODULE, Pid),
   {ok, Pid}.
 
 start_link({SoNode, SoPid}) ->
@@ -117,4 +118,4 @@ worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM
 
 worker_loop(stopping, [], Chromosome, _SourcePid, {SiNode,SiPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
   lager:info("Worker is stopping"),
-  navel:call_no_return(MNode, erlang, send, [MPid, {done, {navel:get_node(),self()}}]).
+  navel:call_no_return(SiNode, erlang, send, [SiPid, {done, {navel:get_node(),self()}}]).

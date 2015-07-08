@@ -33,30 +33,6 @@ init(_Args) ->
   %% Start http service
   http:start_reg_link(),
 
-handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid, chromosome = Chromosome, fastq={FastqFileNam,_}, stat_workload_amount = WorkloadAmount}) ->
-  Microsec = timer:now_diff(now(), StartTime),
-  Sec = Microsec / 1000000,
-
-  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
-  ReferenceFile = "human_g1k_v37_decoy.fasta",
-  {{Year,Month,Day},{Hour,Min,Sec1}} = erlang:localtime(),
-  Statistics = [
-    FastqFileNam,
-    ReferenceFile,
-    Chromosome,
-    WorkloadAmount,
-    Sec,
-    S#state.workers_num,
-    Year, Month, Day, Hour, Min, Sec1
-  ],
-  io:format(StatTemplate, Statistics),
-
-  ClientPid ! {stop, Sec},
-  {stop, normal, S};
-handle_info({done,Pid}, S) ->
-  {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}};
-
-handle_info(done, S) ->
   {ok, init, #state{}}.
 
 terminate(normal, _StateName, _StateData) ->
