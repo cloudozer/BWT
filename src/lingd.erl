@@ -7,8 +7,7 @@
 start_link(Host, PortInc) ->
   {ok, Node} = slave:start_link(Host, ?MODULE, ["-pa ebin deps/*/ebin apps/*/ebin"]),
   true = rpc:call(Node, navel, start, [?MODULE, PortInc]),
-  navel:connect(Host, PortInc),
-  timer:sleep(500),
+  ok = navel:connect(Host, PortInc),
   {ok, Pid} = rpc:call(Node, gen_server, start_link, [?MODULE, {}, []]),
   NNode =
     rpc:call(Node, navel, get_node, []),
@@ -18,8 +17,7 @@ create_link({LNode,LPid},Name, HostPort) ->
   navel:call(LNode, gen_server, call, [LPid, {create, Name, HostPort}]).
 
 connect({LNode,LPid}, Node, HostPort) ->
-  navel:call(LNode, gen_server, call, [LPid, {connect, Node, HostPort}]),
-  timer:sleep(500).
+  navel:call(LNode, gen_server, call, [LPid, {connect, Node, HostPort}]).
 
 broadcast(NodePids, Msg) ->
   lists:foreach(fun({Node,Pid}) ->

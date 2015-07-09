@@ -46,10 +46,10 @@ test(SeqFileName, ChromosomeList, Debug) ->
   %% Connect the Sink to the Source
   lingd:connect(LingdRef, SinkNode, {LocalIP,SourcePort}),
 
-  LsUrl = "http://localhost:8889/ls.json",
+  IndexUrl = "http://localhost:8888/fm_indices/index.json",
   inets:start(),
   {ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} =
-          httpc:request(get, {LsUrl, []}, [], [{body_format, binary}]),
+          httpc:request(get, {IndexUrl, []}, [], [{body_format, binary}]),
   LsJson = Body,
 FilesList = jsx:decode(LsJson),
 
@@ -72,7 +72,7 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 
 	    %% Start worker app (connect it firstly)
 	    lingd:connect(LingdRef, Node, LocalIP),
-	    ok = navel:call(Node, application, set_env, [worker_bwt_app,base_url,"http://localhost:8889/"]),
+	    ok = navel:call(Node, application, set_env, [worker_bwt_app,base_url,"http://localhost:8888/fm_indices/"]),
 	    {ok, WorkerPid} = navel:call(Node, worker_bwt, start_link, []),
 
 	    %% Connect the node to the Source and to the Sink
