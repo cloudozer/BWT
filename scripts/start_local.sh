@@ -25,26 +25,24 @@ test(SeqFileName, ChromosomeList, Debug) ->
     ok
   end,
 
-  {LocalIP, LingdPort, SourcePort, SinkPort, WorkerStartPort} = {'127.0.0.1', 10, 20, 30, 40},
-
   %% Start navel
   navel:start(tester),
 
   %% Start lingd daemon
-  {ok, {LingdNode,LingdPid}} = lingd:start_link(LocalIP, LingdPort),
+  {ok, {LingdNode,LingdPid}} = lingd:start_link(),
   LingdRef = {LingdNode,LingdPid},
 
   %% Start source app
-  {ok, SourceNode} = lingd:create_link(LingdRef, source, {LocalIP, SourcePort}),
-  lingd:connect(LingdRef, SourceNode, LocalIP),
-  {ok,_} = navel:call(SourceNode, source, start_link, []),
+  {ok,{SourceIp,SourcePort}} = lingd:create(LingdRef, source),
+  {ok,_} = navel:call(source, source, start_link, []),
 
   %% Start sink app
-  {ok, SinkNode} = lingd:create_link(LingdRef, sink, {LocalIP, SinkPort}),
-  lingd:connect(LingdRef, SinkNode, LocalIP),
-  ok = navel:call(SinkNode, application, start, [sink]),
+  {ok,{SinkIp,SinkPort}} = lingd:create(LingdRef, sink),
+  ok = navel:call(sink, application, start, [sink]),
   %% Connect the Sink to the Source
-  lingd:connect(LingdRef, SinkNode, {LocalIP,SourcePort}),
+  log:info("lala ~p", [{{SinkIp,SinkPort},SourceIp,SourcePort}]),
+  %ok = navel:call(sink, navel, connect, [SourceIp,SourcePort]),
+  ok = navel:call(source, navel, connect, [SinkIp,SinkPort]),
 
   IndexUrl = "http://localhost:8888/fm_indices/index.json",
   inets:start(),
@@ -68,22 +66,21 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 	  Pids = lists:map(fun(N) ->
 	    %% Create a node
 	    NodeName = list_to_atom("erl" ++ integer_to_list(N)),
-	    {ok, Node} = lingd:create_link(LingdRef, NodeName, {LocalIP, N}),
+	    {ok, _} = lingd:create(LingdRef, NodeName),
 
-	    %% Start worker app (connect it firstly)
-	    lingd:connect(LingdRef, Node, LocalIP),
-	    ok = navel:call(Node, application, set_env, [worker_bwt_app,base_url,"http://localhost:8888/fm_indices/"]),
-	    {ok, WorkerPid} = navel:call(Node, worker_bwt, start_link, []),
+	    %% Start worker app
+	    ok = navel:call(NodeName, application, set_env, [worker_bwt_app,base_url,"http://localhost:8888/fm_indices/"]),
+	    {ok, WorkerPid} = navel:call(NodeName, worker_bwt, start_link, []),
 
 	    %% Connect the node to the Source and to the Sink
-	    lingd:connect(LingdRef, Node, {LocalIP, SourcePort}),
-	    lingd:connect(LingdRef, Node, {LocalIP, SinkPort}),
+	    ok = navel:call(NodeName, navel, connect, [SourceIp,SourcePort]),
+	    ok = navel:call(NodeName, navel, connect, [SinkIp,SinkPort]),
 	    {NodeName, WorkerPid}
-	  end, lists:seq(WorkerStartPort, WorkerStartPort+WorkersNum-1)),
+	  end, lists:seq(0, WorkersNum-1)),
 
 	  %% Associate them with the Source
-	  ok = navel:call(SourceNode, source, register_workers, [source,Pids])
+	  ok = navel:call(source, source, register_workers, [source,Pids])
 	end, ChunksList1),
 
   %% Run everything
-  ok = navel:call(SourceNode, source, run, [source, SeqFileName, ChunksList1, self(), {SinkNode,sink}]).
+  ok = navel:call(source, source, run, [source, SeqFileName, ChunksList1, self(), {sink,sink}]).
