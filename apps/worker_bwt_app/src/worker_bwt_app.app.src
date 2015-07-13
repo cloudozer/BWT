@@ -8,5 +8,5 @@
                   stdlib
                  ]},
   {mod, { worker_bwt_app_app, []}},
-  {env, [{base_url, "http://localhost:8888/fm_indices/"}]}
+  {env, [{base_url, "http://192.168.56.200/BWT/fm_indices/"}]}
  ]}.

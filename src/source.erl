@@ -1,7 +1,7 @@
 -module(source).
 -behaviour(gen_fsm).
 
--export([start_link/1, start_link/0, register_workers/2, run/5, push_workload/1]).
+-export([start_link/1, start_link/0, register_workers/2, run/4, push_workload/1]).
 -export([init/1, terminate/3, handle_info/3, init/3, running/3, stopping/3]).
 
 %% api
@@ -15,30 +15,30 @@ start_link(Args) ->
 register_workers(Pid, Pids) ->
   gen_fsm:sync_send_event(Pid, {register_workers, Pids}).
 
-run(Pid, SeqFileName, Chunks, ClientPid, SinkPid) ->
-  gen_fsm:sync_send_event(Pid, {run, SeqFileName, Chunks, ClientPid, SinkPid}, infinity).
+run(Pid, SeqFileName, Chunks, SinkPid) ->
+  gen_fsm:sync_send_event(Pid, {run, SeqFileName, Chunks, SinkPid}, infinity).
 
 push_workload(Pid) ->
   gen_fsm:sync_send_event(Pid, push_workload, infinity).
 
 %% gen_fsm callbacks
 
--record(state, {workers = [], fastq, fastq_eof = false, workload_size = 3000, client, chunks, sink}).
+-record(state, {workers = [], fastq, fastq_eof = false, workload_size = 7, client, chunks, sink}).
 
 %% state ::= init|fetching_fastq|running|stopping
 
-init(_Args) ->
+init(Client={_,Pid}) ->
   log:info("Start ~p", [?MODULE]),
 
   %% Start http service
   http:start_reg_link(),
 
-  {ok, init, #state{}}.
+  {ok, init, #state{client = Client}}.
 
 terminate(normal, _StateName, _StateData) ->
   log:info("Stop ~p", [?MODULE]);
 terminate(Reason, StateName, StateData) ->
-  log:info("~p terminated: ~p", [?MODULE, {Reason, StateName, StateData}]).
+  log:info("~p terminated: ~p", [?MODULE, {Reason, StateName}]).
 
 handle_info({http_response, Bin}, fetching_fastq, S=#state{workers=Workers, chunks = Chunks, sink = SinkPid = {SNode,SPid}}) ->
   MyNode = ?MODULE, %navel:get_node(),
@@ -65,21 +65,22 @@ handle_info(sink_done, stopping, S) ->
 
 %% handle_call({register_workers, _}, _, S=#state{state_name = StateName}) when StateName =/= init ->
 %% 	{reply, wait, S};
-init({register_workers, Pids}, _From, S=#state{workers=Workers}) when Pids =/= [] ->
+init({register_workers, Pids}, _From, S=#state{workers=Workers, client = {ClientNode,ClientPid}}) when Pids =/= [] ->
   %% monitor new workers
   %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
   Workers1 = Pids++Workers,
   log:info("~p connected to ~b workers", [?MODULE, length(Workers1)]),
+navel:call_no_return(ClientNode, erlang, send, [ClientPid, workers_ready]),
   {reply, ok, init, S#state{workers = Workers1}};
 
-init({run, FastqFileUrl, Chunks, ClientPid, SinkPid}, _From, S=#state{}) ->
-
+init({run, FastqFileUrl, Chunks, SinkPid}, _From, S=#state{}) ->
   %% Async fetching of the fastq file
   http:get_async(FastqFileUrl),
 
-  {reply, ok, fetching_fastq, S#state{client = ClientPid, chunks = Chunks, sink = SinkPid}}.
+  {reply, ok, fetching_fastq, S#state{chunks = Chunks, sink = SinkPid}}.
 
 running(push_workload, _From, S=#state{workers = Workers}) ->
+log:info("running(push_workload"),
   {W,StateName,S1} = produce_workload(S),
   lists:foreach(fun({Node,Pid}) ->
     navel:call_no_return(Node, erlang, send, [Pid, {workload, W}])
@@ -107,5 +108,6 @@ produce_workload(0, Fastq, Acc) ->
 produce_workload(_Size, [<<>>], Acc) ->
   {<<>>, Acc};
 produce_workload(Size, [<<$@, SName/binary>>, SData, <<$+>>, _Quality | Fastq], Acc) ->
+log:info("produce_workload ~p", [Size]),
   Seq = {SName, SData},
   produce_workload(Size - 1, Fastq, [Seq | Acc]).
