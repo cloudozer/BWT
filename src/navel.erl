@@ -101,9 +101,12 @@ navel(Node, Peers, Calls, ClientPids) ->
 
 					navel(Node, [{RN,S}|Peers], Calls, proplists:delete(S, ClientPids));
 				{Ref,{'$call',M,F,As}} ->
-					Returns = (catch apply(M, F, As)),
-					%io:format("navel: call ~w:~w/~w\n", [M,F,length(As)]),
-					dispatch(S, {Ref,{'$returns',Returns}}),
+					%% To make calls to the navel itself
+					spawn_link(fun() ->
+						Returns = (catch apply(M, F, As)),
+						%io:format("navel: call ~w:~w/~w\n", [M,F,length(As)]),
+						dispatch(S, {Ref,{'$returns',Returns}})
+					end),
 					navel(Node, Peers, Calls, ClientPids);
 				{_Ref,{'$call_no_return',M,F,As}} ->
 					case (catch apply(M, F, As)) of
