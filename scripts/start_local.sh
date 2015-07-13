@@ -34,7 +34,7 @@ test(SeqFileName, ChromosomeList, Debug) ->
 
   %% Start source app
   {ok,{SourceIp,SourcePort}} = lingd:create(LingdRef, source),
-  {ok,_} = navel:call(source, source, start_link, []),
+  {ok,_} = navel:call(source, source, start_link, [{tester,tester}]),
 
   %% Start sink app
   {ok,{SinkIp,SinkPort}} = lingd:create(LingdRef, sink),
@@ -83,4 +83,4 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 	end, ChunksList1),
 
   %% Run everything
-  ok = navel:call(source, source, run, [source, SeqFileName, ChunksList1, self(), {sink,sink}]).
+  ok = navel:call(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]).
