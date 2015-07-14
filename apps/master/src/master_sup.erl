@@ -23,6 +23,6 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	navel:start(master),
+	%%navel:start(master),
     {ok, { {one_for_one, 5, 10}, [?CHILD(master, worker)]} }.
 
