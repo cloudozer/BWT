@@ -1,7 +1,7 @@
 -module(http).
 
 -export([get/1, start_link/0, start_reg_link/0, get_async/1, get_async/2]).
--export([loop/0]).
+-export([loop/0,get_fastq/0, get_fmindex/1]).
 
 start_link() ->
   inets:start(),
@@ -62,3 +62,14 @@ do_get(Url) ->
 %%     {error, closed} ->
 %%       {ok, list_to_binary(lists:reverse(Bs))}
 %%   end.
+
+
+
+% gets next fastq file somewhere
+get_fastq() ->
+  [batch1,batch2,batch3,batch4,batch5].
+  
+
+get_fmindex(Chunk) -> Chunk.
+
+
