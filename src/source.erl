@@ -23,7 +23,7 @@ push_workload(Pid) ->
 
 %% gen_fsm callbacks
 
--record(state, {workers = [], fastq, fastq_eof = false, workload_size = 7, client, chunks, sink}).
+-record(state, {workers = [], fastq, fastq_eof = false, workload_size = 100, client, chunks, sink}).
 
 %% state ::= init|fetching_fastq|running|stopping
 
@@ -80,7 +80,6 @@ init({run, FastqFileUrl, Chunks, SinkPid}, _From, S=#state{}) ->
   {reply, ok, fetching_fastq, S#state{chunks = Chunks, sink = SinkPid}}.
 
 running(push_workload, _From, S=#state{workers = Workers}) ->
-log:info("running(push_workload"),
   {W,StateName,S1} = produce_workload(S),
   lists:foreach(fun({Node,Pid}) ->
     navel:call_no_return(Node, erlang, send, [Pid, {workload, W}])
@@ -108,6 +107,5 @@ produce_workload(0, Fastq, Acc) ->
 produce_workload(_Size, [<<>>], Acc) ->
   {<<>>, Acc};
 produce_workload(Size, [<<$@, SName/binary>>, SData, <<$+>>, _Quality | Fastq], Acc) ->
-log:info("produce_workload ~p", [Size]),
   Seq = {SName, SData},
   produce_workload(Size - 1, Fastq, [Seq | Acc]).
