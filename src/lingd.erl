@@ -20,15 +20,17 @@ start_link(OsType={_,_}) ->
   State = #state{},
   {ok, Node} = slave:start_link(State#state.host, ?MODULE, [State#state.slave_opts]),
   PortInc = State#state.port_increment,
-  true = rpc:call(Node, navel, start, [?MODULE, PortInc]),
+  {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
   ok = navel:connect(State#state.host, PortInc),
-  {ok, Pid} = rpc:call(Node, gen_fsm, start_link, [?MODULE,  {OsType,#state{port_increment = PortInc + 1}}, []]),
-  NNode = rpc:call(Node, navel, get_node, []),
+timer:sleep(1000),
+  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {OsType,#state{port_increment = PortInc + 1}}, []]),
+  NNode = ?MODULE, %%rpc:call(Node, navel, get_node, []),   % returns {badrpc,{'EXIT',{noproc,{gen_server,call,[navel,get_node]}}}
   {ok, {NNode, Pid}}.
 
 create({LNode,LPid},Name) ->
   {ok, {Host,PortInc}} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name}]),
   ok = navel:connect(Host,PortInc),
+timer:sleep(1000),
   {ok, {Host,PortInc}}.
 
 %% broadcast(NodePids, Msg) ->
@@ -46,7 +48,7 @@ init({{_,_}, State}) ->
 
 slave({create, Name}, _From, S=#state{host = Host, port_increment = PortInc}) ->
   {ok, Node} = slave:start_link(Host, Name, [S#state.slave_opts]),
-  true = rpc:call(Node, navel, start, [Name, PortInc]),
+  {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
   {reply, {ok, {Host,PortInc}}, slave, S#state{port_increment = PortInc + 1}}.
 
   

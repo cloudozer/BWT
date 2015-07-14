@@ -25,6 +25,8 @@ test(SeqFileName, ChromosomeList, Debug) ->
     ok
   end,
 
+  true = register(tester, self()),
+
   %% Start navel
   navel:start(tester),
 
@@ -83,4 +85,6 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 	end, ChunksList1),
 
   %% Run everything
-  ok = navel:call(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]).
+  %%ok = navel:call(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]).
+  %% {"init terminating in do_boot",{{badmatch,{ok,{'$call_no_return',erlang,send,[tester,workers_ready]}}},[{navel,sort_mail,1,[{file,"src/navel.erl"},{line,156}]}]}}
+  navel:call_no_return(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]).
