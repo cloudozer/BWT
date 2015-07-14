@@ -18,7 +18,7 @@ start_SF(Schedule) -> start_SF(Schedule,[],[]).
 start_SF([{Box_id,Alq,Chunk_files}|Schedule],Alqs,SFs) -> 
 	SFs1 = lists:foldl( fun(Chunk,Acc)-> 
 			SF = spawn(?MODULE,seed_finder,[Chunk,Alq,self()]),
-			[SF|Acc]
+			[{Box_id,SF}|Acc]
 						end, SFs,Chunk_files),
 	start_SF(Schedule,[Alq|Alqs],SFs1);
 
@@ -37,6 +37,7 @@ seed_finder(Chunk,Alq,R_source,FM) ->
 		quit -> ok;
 		{data,Batch} ->
 			% find seeds functions
+			io:format("seed finder ~p got ~p~n",[Chunk,Batch]),
 			Alq ! {Chunk,[1,2,3,4,5]}, % sends seeds
 			seed_finder(Chunk,Alq,R_source,FM)
 	end.

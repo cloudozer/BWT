@@ -19,7 +19,7 @@ start_cluster(Boxes,ChromoLs) ->
 			io:format("Not enough memory~n");
 
 		Schedule ->
-			Sink = sink:start_sink(),
+			Sink = sink:start_sink(Schedule),
 			Schedule1 = alq:start_alq(lists:zip(Boxes,Schedule),Sink), % {Box_id,Alq,Chunk_files}
 			{Alqs, SFs} = sf:start_SF(Schedule1),
 

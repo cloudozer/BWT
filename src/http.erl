@@ -1,7 +1,7 @@
 -module(http).
 
 -export([get/1, start_link/0, start_reg_link/0, get_async/1, get_async/2]).
--export([loop/0,get_fastq/0, get_fmindex/1]).
+-export([loop/0,get_fastq/0, get_fmindex/1, get_refseq/1]).
 
 start_link() ->
   inets:start(),
@@ -72,4 +72,6 @@ get_fastq() ->
 
 get_fmindex(Chunk) -> Chunk.
 
+
+get_refseq(Chunks) -> Chunks.
 
