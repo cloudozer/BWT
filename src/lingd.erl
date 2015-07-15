@@ -23,9 +23,9 @@ start_link({xen,ling}) ->
   PortInc = State#state.port_increment,
 log:info("starting navel ~p", [[?MODULE, PortInc]]),
   {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
-timer:sleep(3000),
+timer:sleep(1000),
 log:info("connecting..."),
-  ok = navel:connect(State#state.host, PortInc),
+  ok = navel:connect({State#state.host, PortInc}),
 log:info("connected?"),
 timer:sleep(1000),
   {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [{local, ?MODULE}, ?MODULE, {{xen,ling},#state{port_increment = PortInc + 1, port = PortInc}}, []]),
@@ -36,8 +36,8 @@ start_link(OsType={_,_}) ->
   {ok, Node} = slave:start_link(State#state.host, ?MODULE, [State#state.slave_opts]),
   PortInc = State#state.port_increment,
   {ok,_} = rpc:call(Node, navel_sup, start_link, [?MODULE, PortInc]),
-  ok = navel:connect(State#state.host, PortInc),
-timer:sleep(1000),
+  ok = navel:connect({State#state.host, PortInc}),
+%timer:sleep(1000),
   {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {OsType,#state{port_increment = PortInc + 1}}, []]),
   NNode = ?MODULE, %%rpc:call(Node, navel, get_node, []),   % returns {badrpc,{'EXIT',{noproc,{gen_server,call,[navel,get_node]}}}
   {ok, {NNode, Pid}}.
@@ -82,7 +82,7 @@ slave({create, Name}, _From, S=#state{host = Host, port_increment = PortInc}) ->
 ling({create, Name}, From, S) ->
   Host = {192,168,56,200},
   NameBin = list_to_binary(atom_to_list(Name)),
-  Extra = list_to_binary(io_lib:format("-dhcp -home /BWT -pz /BWT/ebin -eval 'ok = application:start(sasl), navel:start(~w), ok = navel:connect(~w,~w), timer:sleep(5000), ok = navel:call(~w, lingd, ling_up, [~w,lingd:ip()]).'", [Name, Host, S#state.port, ?MODULE, term_to_binary(From)])),
+  Extra = list_to_binary(io_lib:format("-dhcp -home /BWT -pz /BWT/ebin -eval 'ok = application:start(sasl), navel:start(~w), ok = navel:connect({~w,~w}), timer:sleep(1000), ok = navel:call(~w, lingd, ling_up, [~w,lingd:ip()]).'", [Name, Host, S#state.port, ?MODULE, term_to_binary(From)])),
 log:info("ling create ~p", [Extra]),
   egator:create(NameBin, <<"/home/yatagan/BWT/BWT.img">>, [{memory, 512},{extra, Extra}], []),
   {next_state, ling, S};

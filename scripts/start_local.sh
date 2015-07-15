@@ -43,12 +43,13 @@ log:info("started source."),
   %% Start sink app
   {ok,SinkHost} = lingd:create(LingdRef, sink),
 log:info("starting sink app"),
-  ok = navel:call(sink, application, start, [sink]),
+  %WTF {error,{"no such file or directory","sink.app"}} ok = navel:call(sink, application, start, [sink]), 
+  {ok,_} = navel:call(sink, sink, start_link, []),
 log:info("connecting sink to source"),
   %% Connect the Sink to the Source
   ok = navel:call(sink, navel, connect, [SourceHost]),
 
-  IndexUrl = "http://localhost:8888/fm_indices/index.json",
+  IndexUrl = "http://localhost/BWT/fm_indices/index.json",
   inets:start(),
   {ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} =
           httpc:request(get, {IndexUrl, []}, [], [{body_format, binary}]),
@@ -71,9 +72,9 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 	    %% Create a node
 	    NodeName = list_to_atom("erl" ++ integer_to_list(N)),
 	    {ok, _} = lingd:create(LingdRef, NodeName),
-
+log:info("created worker ~p", [NodeName]),
 	    %% Start worker app
-	    ok = navel:call(NodeName, application, set_env, [worker_bwt_app,base_url,"http://localhost:8888/fm_indices/"]),
+	    ok = navel:call(NodeName, application, set_env, [worker_bwt_app,base_url,"http://192.168.56.200/BWT/fm_indices/"]),
 	    {ok, WorkerPid} = navel:call(NodeName, worker_bwt, start_link, []),
 
 	    %% Connect the node to the Source and to the Sink
@@ -89,4 +90,9 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
   %% Run everything
   %%ok = navel:call(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]).
   %% {"init terminating in do_boot",{{badmatch,{ok,{'$call_no_return',erlang,send,[tester,workers_ready]}}},[{navel,sort_mail,1,[{file,"src/navel.erl"},{line,156}]}]}}
-  navel:call_no_return(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]).
+  navel:call_no_return(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]),
+
+
+  receive
+    done -> ok
+  end.
