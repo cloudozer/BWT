@@ -31,7 +31,13 @@
 start(Node) -> start(Node, 0).
 
 start(Node, PortInc) ->
+	spawn(fun() -> print_stats() end),
     gen_server:start_link({local, ?SERVER}, ?MODULE, [Node,PortInc], []).
+
+print_stats() ->
+	%ling:experimental(gc, 1),
+	timer:sleep(1000),
+	print_stats().
 
 start0(Node) -> start(Node).	%%OBSOLETE
 
@@ -40,9 +46,8 @@ connect(Addr) ->
 	Postman = spawn(fun() -> nice_postman(S) end),
 	door_bell(Postman).
 
-door_bell(Postman) -> door_bell(Postman, false).
-door_bell(Postman, Intro) ->
-	gen_server:call(?SERVER, {door_bell,Postman,Intro}).
+door_bell(Postman) ->
+	gen_server:call(?SERVER, {door_bell,Postman}).
 
 introduce(Homie, Name) ->
 	gen_server:call(?SERVER, {introduce,Homie,Name}).
@@ -78,20 +83,13 @@ init([Node,PortInc]) ->
 handle_call(get_node, _From, #nv{node =MyNode} =St) ->
 	{reply,MyNode,St};
 
-handle_call({door_bell,Homie,false}, _From, #nv{hood =Hood} =St) ->
+handle_call({door_bell,Homie}, _From, #nv{hood =Hood} =St) ->
 	true = link(Homie),
     {reply,ok,St#nv{hood =[{noname,Homie}|Hood]}};
-handle_call({door_bell,Homie,true}, From, #nv{hood =Hood} =St) ->
-	true = link(Homie),
-    {noreply,St#nv{hood =[{noname,Homie,From}|Hood]}};
 
 handle_call({introduce,Homie,Name}, _From, #nv{hood =Hood} =St) ->
-	case lists:keytake(Homie, 2, Hood) of
-		{value,{noname,_},Hood1} ->
-			{reply,ok,St#nv{hood =[{Name,Homie}|Hood1]}};
-		{value,{noname,_,From},Hood1} ->
-			gen_server:reply(From, ok),
-			{reply,ok,St#nv{hood =[{Name,Homie}|Hood1]}} end;
+	{value,{noname,_},Hood1} = lists:keytake(Homie, 2, Hood),
+	{reply,ok,St#nv{hood =[{Name,Homie}|Hood1]}};
 
 handle_call({expose,Name}, _From, #nv{hood =Hood} =St) ->
 	case lists:keyfind(Name, 1, Hood) of
