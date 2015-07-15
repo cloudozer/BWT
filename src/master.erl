@@ -59,6 +59,7 @@ run(Pid, SeqFileName, Chromosome, WorkersLimit) ->
 -record(state, {workers=[], workers_num = 0, fastq, fastq_eof = false, chromosome, workload_size = 200, stat_workload_amount = 0, client, stopping = false, start_time}).
 
 init(_Args) ->
+  navel:start(master),
   lager:info("Started master"),
   {ok, #state{}}.
 

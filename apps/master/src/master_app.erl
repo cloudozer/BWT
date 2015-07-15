@@ -13,7 +13,6 @@
 
 dev() ->
 	lager:start(),
-	navel:start(master),
 
 	case application:get_env(kernel, ssh_port) of
 		undefined -> ok;
