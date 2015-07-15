@@ -38,7 +38,10 @@ seed_finder(Chunk,Alq,R_source,FM) ->
 		{data,Batch} ->
 			% find seeds functions
 			io:format("seed finder ~p got ~p~n",[Chunk,Batch]),
-			Alq ! {Chunk,[1,2,3,4,5]}, % sends seeds
+			% need to extract Reads from Batch
+			Read = "ACGTTGTA",
+
+			Alq ! {Read,Chunk,[{1,0},{2,1},{3,0},{4,0},{5,0}]}, % sends seeds
 			seed_finder(Chunk,Alq,R_source,FM)
 	end.
 

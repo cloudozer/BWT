@@ -16,15 +16,12 @@
 % starts Alq in each box if there is one or more seed_finder
 start_alq(Schedule,Sink) -> start_alq(Schedule,Sink,[]).
 
-start_alq([{Box_id,Chunks}|Schedule],Sink,Acc) ->
-	case remove_source_sink(Chunks) of
-		[] -> start_alq(Schedule,Sink,Acc);
-		Ls ->
-			A = spawn(?MODULE,alq,[Ls,Sink]),
-			start_alq(Schedule,Sink,[{Box_id,A,[ C ||{C,_} <- Ls]}|Acc])
-	end;
+start_alq([{Box_id,Chunks}|Schedule],Sink,Acc) ->	
+	A = spawn(?MODULE,alq,[Chunks,Sink]),
+	start_alq(Schedule,Sink,[{Box_id,A,[ C ||{C,_} <- Chunks]}|Acc]);
 
 start_alq([],_,Acc) -> Acc.
+
 
 
 
@@ -43,6 +40,7 @@ alq_in(Refs,?CIGAR_MAKER_NBR,Sink) ->
 			terminate_cm(?CIGAR_MAKER_NBR);
 
 		fastq_done ->
+			io:format("Alq: got fastq_done from r_source~n"),
 			confirm_fastq_done(?CIGAR_MAKER_NBR,Sink)
 	end.
 
@@ -53,6 +51,7 @@ alq_out(Refs,?CIGAR_MAKER_NBR,Sink,Read,Chunk,[{Pos,D}|Seeds]) ->
 	receive
 		{Pid,ready} -> 
 			Pid ! {Ref,Read,Chunk,Pos,D},
+			io:format("Alq: send seed to aligning~n"),
 			alq_out(Refs,?CIGAR_MAKER_NBR,Sink,Read,Chunk,Seeds)
 	end;
 alq_out(Refs,?CIGAR_MAKER_NBR,Sink,_Read,_Chunk,[]) -> alq_in(Refs,?CIGAR_MAKER_NBR,Sink).
@@ -62,6 +61,7 @@ alq_out(Refs,?CIGAR_MAKER_NBR,Sink,_Read,_Chunk,[]) -> alq_in(Refs,?CIGAR_MAKER_
 
 confirm_fastq_done(0,Sink) -> 
 	Sink ! fastq_done,
+	io:format("Alq confirmed that fastq_done~n"),
 	cm:start_cigar_makers(?CIGAR_MAKER_NBR,Sink);
 confirm_fastq_done(N,Sink) ->
 	receive
@@ -75,11 +75,6 @@ terminate_cm(N) ->
 	receive
 		{Pid,ready} -> Pid ! quit, terminate_cm(N-1)
 	end.
-
-
-
-remove_source_sink(Chunks) ->
-	lists:keydelete(sink,1,lists:keydelete(source,1,Chunks)).
 
 
 
