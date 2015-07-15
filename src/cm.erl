@@ -21,10 +21,13 @@ cigar_maker(Alq, Sink) ->
 	receive
 		quit -> ok;
 		{_Ref,Read,Chunk,Pos,_D} -> 
-			io:format("CM: got read. Aligned. Sent to Sink~n"),
+			io:format("CM: got read. Aligned: "),
 			% run SW and send results to Sink
-			{Score,CIGAR} = {250, "151M"},
-
-			Sink ! {Read,Chunk,Pos,Score,CIGAR},
+			case sw:sw(120,100) of
+				no_match -> io:format("no_match~n");
+				{Score,CIGAR} -> 
+					io:format("~p, ~p~n",[Score,CIGAR]),
+					Sink ! {Read,Chunk,Pos,Score,CIGAR}
+			end,
 			spawn(?MODULE,cigar_maker,[Alq,Sink])
 	end.
