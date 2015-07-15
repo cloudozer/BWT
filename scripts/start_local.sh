@@ -28,23 +28,25 @@ test(SeqFileName, ChromosomeList, Debug) ->
   true = register(tester, self()),
 
   %% Start navel
-  navel:start(tester),
+  navel_sup:start_link(tester),
 
   %% Start lingd daemon
-  {ok, {LingdNode,LingdPid}} = lingd:start_link(),
+  {ok, {LingdNode,LingdPid}} = lingd:start_link({xen,ling}),
   LingdRef = {LingdNode,LingdPid},
 
   %% Start source app
-  {ok,{SourceIp,SourcePort}} = lingd:create(LingdRef, source),
+log:info("starting source.."),
+  {ok,SourceHost} = lingd:create(LingdRef, source),
+log:info("started source."),
   {ok,_} = navel:call(source, source, start_link, [{tester,tester}]),
 
   %% Start sink app
-  {ok,{SinkIp,SinkPort}} = lingd:create(LingdRef, sink),
+  {ok,SinkHost} = lingd:create(LingdRef, sink),
+log:info("starting sink app"),
   ok = navel:call(sink, application, start, [sink]),
+log:info("connecting sink to source"),
   %% Connect the Sink to the Source
-  log:info("lala ~p", [{{SinkIp,SinkPort},SourceIp,SourcePort}]),
-  %ok = navel:call(sink, navel, connect, [SourceIp,SourcePort]),
-  ok = navel:call(source, navel, connect, [SinkIp,SinkPort]),
+  ok = navel:call(sink, navel, connect, [SourceHost]),
 
   IndexUrl = "http://localhost:8888/fm_indices/index.json",
   inets:start(),
@@ -75,8 +77,8 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 	    {ok, WorkerPid} = navel:call(NodeName, worker_bwt, start_link, []),
 
 	    %% Connect the node to the Source and to the Sink
-	    ok = navel:call(NodeName, navel, connect, [SourceIp,SourcePort]),
-	    ok = navel:call(NodeName, navel, connect, [SinkIp,SinkPort]),
+	    ok = navel:call(NodeName, navel, connect, [SourceHost]),
+	    ok = navel:call(NodeName, navel, connect, [SinkHost]),
 	    {NodeName, WorkerPid}
 	  end, lists:seq(0, WorkersNum-1)),
 

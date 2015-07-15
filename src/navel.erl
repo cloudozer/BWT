@@ -43,7 +43,7 @@ connect(Addr, PortInc) ->
 	{ok,S} = gen_tcp:connect(Addr, ?PROXY_TCP_PORT+PortInc, ?SOCK_OPTS),
 	log:info("navel connected ~p", [{Addr, PortInc, S}]),
 	Postman = spawn(fun() -> nice_postman(S) end),
-%% 	gen_tcp:controlling_process(S, Postman),
+ 	gen_tcp:controlling_process(S, Postman),
 	door_bell(Postman).
 
 door_bell(Postman) ->
@@ -80,7 +80,7 @@ init([Node,PortInc]) ->
 %% 	link(Monitor),
 
 	Acceptor = spawn_link(fun() ->
-    link(Monitor),
+ %   link(Monitor),
 		acceptor(L) end),
 %% gen_tcp:controlling_process(L, Acceptor),
 	{ok,#nv{node =Node}}.
@@ -97,6 +97,7 @@ handle_call({introduce,Homie,Name}, _From, #nv{hood =Hood} =St) ->
 	{reply,ok,St#nv{hood =[{Name,Homie}|Hood1]}};
 
 handle_call({expose,Name}, _From, #nv{hood =Hood} =St) ->
+log:info("naver expose ~p", [{Name,Hood}]),
 	case lists:keyfind(Name, 1, Hood) of
 		false -> {reply,{error,not_connected},St};
 		{_,Homie} -> {reply,{ok,Homie},St} end.
