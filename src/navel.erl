@@ -156,15 +156,28 @@ sort_mail(S) ->
 		{_From,{call_no_return,M,F,As}} ->
 			ok = send_message(S, {'$call_no_return',M,F,As}),
 			sort_mail(S)
-		after 100 -> postman(S) end.
+		after 0 -> postman(S) end.
+
+
+%% Message encoding:
+%%
+%%	<<MsgSz:32,PadSz:16,Padding:PadSz,Payload>>
+%%
+%% MsgSz 	- the size of the message without the MsgSz field
+%% PadSz	- the size of the Padding field
+%% Payload	- an Erlang term encoded using term_to_binary()
+%%
+%% The purpose of the padding is to align the message to CHUNK_SIZE
+%%
 
 receive_message(Sock) -> receive_message(Sock, infinity).
 receive_message(Sock, Timeout) ->
 	case gen_tcp:recv(Sock, 4, Timeout) of
-		{ok,<<Sz:32>>} ->
-			{ok,Chunks} = chunks(Sock, Sz),
-			Msg = binary_to_term(list_to_binary(Chunks)),
-			io:format("navel: receive ~P\n", [Msg,12]),
+		{ok,<<MsgSz:32>>} ->
+			{ok,Chunks} = chunks(Sock, MsgSz),
+			<<PadSz:16,_Padding:PadSz/binary,Payload/binary>> = list_to_binary(Chunks),
+			Msg = binary_to_term(Payload),
+			%%io:format("navel: receive ~P\n", [Msg,12]),
 			{ok,Msg};
 		{error,timeout} -> undefined end.
 
@@ -176,8 +189,11 @@ chunks(Sock, Sz, Acc) ->
 	chunks(Sock, Sz - Sz1, [Bin|Acc]).
 
 send_message(Sock, Term) ->
-	io:format("navel: send ~P\n", [Term,12]),
-	Bin = term_to_binary(Term),
-	Sz = byte_size(Bin),
-	ok = gen_tcp:send(Sock, <<Sz:32,Bin/binary>>).
+	%%io:format("navel: send ~P\n", [Term,12]),
+	Payload = term_to_binary(Term),
+	NumChunks = (4 + 2 + byte_size(Payload) + ?CHUNK_SIZE-1) div ?CHUNK_SIZE,
+	MsgSz = NumChunks * ?CHUNK_SIZE - 4,
+	PadSz = MsgSz - 2 - byte_size(Payload),
+	Pkt = <<MsgSz:32,PadSz:16,0:PadSz/unit:8,Payload/binary>>,
+	ok = gen_tcp:send(Sock, Pkt).
 
