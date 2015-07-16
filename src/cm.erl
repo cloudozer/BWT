@@ -19,7 +19,6 @@ start_cigar_makers(N,Sink) ->
 cigar_maker(Alq, Sink) ->
 	Alq ! {self(),ready},
 	receive
-		quit -> ok;
 		{_Ref,Read,Chunk,Pos,_D} -> 
 			io:format("CM: got read. Aligned: "),
 			% run SW and send results to Sink
@@ -29,5 +28,7 @@ cigar_maker(Alq, Sink) ->
 					io:format("~p, ~p~n",[Score,CIGAR]),
 					Sink ! {Read,Chunk,Pos,Score,CIGAR}
 			end,
-			spawn(?MODULE,cigar_maker,[Alq,Sink])
+			spawn(?MODULE,cigar_maker,[Alq,Sink]);
+
+		quit -> ok	
 	end.
