@@ -13,7 +13,7 @@
 %% ------------------------------------------------------------------
 
 -export([start/1,start0/1,start/2]).
--export([connect/1, connect/2]).
+-export([connect/1]).
 -export([get_node/0]).
 -export([call/4,call_no_return/4]).
 
@@ -35,19 +35,17 @@ start(Node, PortInc) ->
 
 start0(Node) -> start(Node).	%%OBSOLETE
 
-connect(Addr) ->
-	connect(Addr, 0).
-
-connect(Addr, PortInc) ->
-	log:info("navel connect ~p", [{Addr, PortInc}]),
+connect({Addr,PortInc}) ->
 	{ok,S} = gen_tcp:connect(Addr, ?PROXY_TCP_PORT+PortInc, ?SOCK_OPTS),
-	log:info("navel connected ~p", [{Addr, PortInc, S}]),
 	Postman = spawn(fun() -> nice_postman(S) end),
-%% 	gen_tcp:controlling_process(S, Postman),
-	door_bell(Postman).
+	gen_tcp:controlling_process(S, Postman),
+	door_bell(Postman);
+connect(Addr) ->
+	connect({Addr,0}).
 
-door_bell(Postman) ->
-	gen_server:call(?SERVER, {door_bell,Postman}).
+door_bell(Postman) -> door_bell(Postman, false).
+door_bell(Postman, Intro) ->
+	gen_server:call(?SERVER, {door_bell,Postman,Intro}).
 
 introduce(Homie, Name) ->
 	gen_server:call(?SERVER, {introduce,Homie,Name}).
@@ -70,31 +68,34 @@ call_no_return(Node, M, F, As) ->
 
 init([Node,PortInc]) ->
 %	process_flag(trap_exit, true),
-
-  log:info("init listen ~p", [PortInc]),
 	{ok,L} = gen_tcp:listen(?PROXY_TCP_PORT+PortInc, ?SOCK_OPTS),
 
-	Monitor =
-	spawn_link(fun() -> process_flag(trap_exit, true),
-						receive X -> io:format("MONITOR: ~p\n", [X]) end end),
-%% 	link(Monitor),
+	%%Monitor =
+	%%spawn_link(fun() -> process_flag(trap_exit, true),
+	%%					receive X -> io:format("MONITOR: ~p\n", [X]) end end),
+	%%link(Monitor),
 
-	Acceptor = spawn_link(fun() ->
-    link(Monitor),
-		acceptor(L) end),
-%% gen_tcp:controlling_process(L, Acceptor),
+	Acceptor = spawn_link(fun() -> acceptor(L) end),
+	gen_tcp:controlling_process(L, Acceptor),
 	{ok,#nv{node =Node}}.
 
 handle_call(get_node, _From, #nv{node =MyNode} =St) ->
 	{reply,MyNode,St};
 
-handle_call({door_bell,Homie}, _From, #nv{hood =Hood} =St) ->
+handle_call({door_bell,Homie,false}, _From, #nv{hood =Hood} =St) ->
 	true = link(Homie),
     {reply,ok,St#nv{hood =[{noname,Homie}|Hood]}};
+handle_call({door_bell,Homie,true}, From, #nv{hood =Hood} =St) ->
+	true = link(Homie),
+    {noreply,St#nv{hood =[{noname,Homie,From}|Hood]}};
 
 handle_call({introduce,Homie,Name}, _From, #nv{hood =Hood} =St) ->
-	{value,{noname,_},Hood1} = lists:keytake(Homie, 2, Hood),
-	{reply,ok,St#nv{hood =[{Name,Homie}|Hood1]}};
+	case lists:keytake(Homie, 2, Hood) of
+		{value,{noname,_},Hood1} ->
+			{reply,ok,St#nv{hood =[{Name,Homie}|Hood1]}};
+		{value,{noname,_,From},Hood1} ->
+			gen_server:reply(From, ok),
+			{reply,ok,St#nv{hood =[{Name,Homie}|Hood1]}} end;
 
 handle_call({expose,Name}, _From, #nv{hood =Hood} =St) ->
 	case lists:keyfind(Name, 1, Hood) of
@@ -120,7 +121,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 acceptor(L) ->
 	{ok,S} = gen_tcp:accept(L),
-	Postman = spawn(fun() -> timer:sleep(100), nice_postman(S) end),
+	Postman = spawn(fun() -> nice_postman(S) end),
 	door_bell(Postman),
 	acceptor(L).
 
@@ -167,7 +168,7 @@ receive_message(Sock, Timeout) ->
 		{ok,<<Sz:32>>} ->
 			{ok,Chunks} = chunks(Sock, Sz),
 			Msg = binary_to_term(list_to_binary(Chunks)),
-			%io:format("navel: receive ~P\n", [Msg,12]),
+			io:format("navel: receive ~P\n", [Msg,12]),
 			{ok,Msg};
 		{error,timeout} -> undefined end.
 
@@ -179,7 +180,7 @@ chunks(Sock, Sz, Acc) ->
 	chunks(Sock, Sz - Sz1, [Bin|Acc]).
 
 send_message(Sock, Term) ->
-	%io:format("navel: send ~P\n", [Term,12]),
+	io:format("navel: send ~P\n", [Term,12]),
 	Bin = term_to_binary(Term),
 	Sz = byte_size(Bin),
 	ok = gen_tcp:send(Sock, <<Sz:32,Bin/binary>>).

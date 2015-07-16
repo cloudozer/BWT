@@ -8,10 +8,10 @@ main([]) ->
   io:format("Usage: start_cluster.sh Chromosome, FastqFile, MasterIp, WorkersNumber~n"),
 
 
-  true = navel:start(client),
+  {ok,_} = navel:start(client),
   true = register(client, self()),
 
-  egator:create(<<"source">>, <<"/home/yatagan/BWT/BWT.img">>, [{memory, 512},{extra, <<"-dhcp -home /BWT -pz /BWT/ebin -eval 'navel:start(source), ok = navel:connect({192,168,56,200}), navel:call_no_return(client, erlang, send, [client, source_came]).'">>}], []),
+%  egator:create(<<"source">>, <<"/home/yatagan/BWT/BWT.img">>, [{memory, 512},{extra, <<"-dhcp -home /BWT -pz /BWT/ebin -eval 'navel:start(source), ok = navel:connect({192,168,56,200}), navel:call_no_return(client, erlang, send, [client, source_came]).'">>}], []),
 
   starter(#state{}).
  

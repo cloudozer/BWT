@@ -41,6 +41,8 @@ terminate(Reason, StateName, StateData) ->
   log:info("~p terminated: ~p", [?MODULE, {Reason, StateName}]).
 
 handle_info({http_response, Bin}, fetching_fastq, S=#state{workers=Workers, chunks = Chunks, sink = SinkPid = {SNode,SPid}}) ->
+
+log:info("handle_info({http_response"),
   MyNode = ?MODULE, %navel:get_node(),
   Self = self(),
   SelfRef = {MyNode,Self},
@@ -74,6 +76,9 @@ navel:call_no_return(ClientNode, erlang, send, [ClientPid, workers_ready]),
   {reply, ok, init, S#state{workers = Workers1}};
 
 init({run, FastqFileUrl, Chunks, SinkPid}, _From, S=#state{}) ->
+
+log:info("sorce run"),
+
   %% Async fetching of the fastq file
   http:get_async(FastqFileUrl),
 
