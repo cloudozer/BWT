@@ -58,10 +58,9 @@ do_get(Url) ->
 do_recv(Sock, Bs) ->
   case gen_tcp:recv(Sock, 0) of
     {ok, B} ->
-log:info("do_recv ~p", [size(list_to_binary([B | Bs]))]),
       do_recv(Sock, [B | Bs]);
     {error, closed} ->
-log:info("do_recv done ~p", [size(Bs)]),
+log:info("do_recv reverse..."),
       {ok, list_to_binary(lists:reverse(Bs))}
   end.
 

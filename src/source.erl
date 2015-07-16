@@ -23,7 +23,7 @@ push_workload(Pid) ->
 
 %% gen_fsm callbacks
 
--record(state, {workers = [], fastq, fastq_eof = false, workload_size = 100, client, chunks, sink}).
+-record(state, {workers = [], fastq, fastq_eof = false, workload_size = 1000, client, chunks, sink}).
 
 %% state ::= init|fetching_fastq|running|stopping
 
@@ -40,7 +40,7 @@ terminate(normal, _StateName, _StateData) ->
 terminate(Reason, StateName, StateData) ->
   log:info("~p terminated: ~p", [?MODULE, {Reason, StateName}]).
 
-handle_info({http_response, Bin}, fetching_fastq, S=#state{workers=Workers, chunks = Chunks, sink = SinkPid = {SNode,SPid}}) ->
+handle_info({http_response, Bin}, fetching_fastq, S=#state{workers=Workers, chunks = Chunks, sink = SinkPid = {SNode,SPid}, client = Client}) ->
 
 log:info("handle_info({http_response"),
   MyNode = ?MODULE, %navel:get_node(),
@@ -54,13 +54,13 @@ log:info("handle_info({http_response"),
   spawn_link(fun() -> ok = push_workload(Self) end),
 
   %% Run the Sink
-  navel:call_no_return(SNode, gen_server, call, [SPid, {run, SelfRef, Workers}]),
+  navel:call_no_return(SNode, gen_server, call, [SPid, {run, SelfRef, Workers, Client}]),
 
-  log:info("Splitting... ~p", [size(Bin)]),
-  Fastq = binary:split(Bin, <<$\n>>, [global]),
-  log:info("Done splitting"),
+  %log:info("Splitting... ~p", [size(Bin)]),
+  %Fastq = binary:split(Bin, <<$\n>>, [global]),
+  %log:info("Done splitting"),
 
-  {next_state, running, S#state{fastq = Fastq}};
+  {next_state, running, S#state{fastq = Bin}};
 
 handle_info(sink_done, stopping, S) ->
   {stop, normal, S}.
@@ -109,8 +109,14 @@ produce_workload(S = #state{fastq = Fastq, workload_size = WorkloadSize}) ->
 
 produce_workload(0, Fastq, Acc) ->
   {Fastq, Acc};
-produce_workload(_Size, [<<>>], Acc) ->
+%produce_workload(_Size, [<<>>], Acc) ->
+produce_workload(_Size, <<>>, Acc) ->
   {<<>>, Acc};
-produce_workload(Size, [<<$@, SName/binary>>, SData, <<$+>>, _Quality | Fastq], Acc) ->
+%produce_workload(Size, [<<$@, SName/binary>>, SData, <<$+>>, _Quality | Fastq], Acc) ->
+produce_workload(Size, Bin, Acc) ->
+  [<<$@, SName/binary>>, Bin1] = binary:split(Bin, <<$\n>>),
+  [SData, Bin2] = binary:split(Bin1, <<$\n>>),
+  [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
+  [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
   Seq = {SName, SData},
-  produce_workload(Size - 1, Fastq, [Seq | Acc]).
+  produce_workload(Size - 1, Bin4, [Seq | Acc]).

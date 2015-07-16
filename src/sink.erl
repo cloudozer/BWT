@@ -8,7 +8,7 @@ start_link() ->
 
 %% callbacks
 
--record(state, {state_name = init, workers = [], start_time, source, results_counter}).
+-record(state, {state_name = init, workers = [], start_time, source, results_counter, client}).
 
 init(_Args) ->
   log:info("Start ~p", [?MODULE]),
@@ -40,7 +40,7 @@ terminate(normal, _State) ->
 %handle_info({done,Pid}, S) ->
 %  {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}};
 
-handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_time = StartTime}) ->
+handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_time = StartTime, client = {CNode,CPid}}) ->
 %% handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
@@ -48,13 +48,14 @@ handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_t
 io:format("It's all over. ~.1f sec.~n", [Sec]),
 %%   ClientPid ! {stop, Sec},
   navel:call_no_return(SNode, erlang, send, [SPid, sink_done]),
+  navel:call_no_return(CNode, erlang, send, [CPid, sink_done]),
   {stop, normal, S};
 handle_info({done,Pid}, S) ->
   {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}}.
 
-handle_call({run, SourcePid={SNode,SPid}, Workers}, _From, State) ->
+handle_call({run, SourcePid={SNode,SPid}, Workers, Client}, _From, State) ->
   navel:call_no_return(SNode, source, push_workload, [SPid]),
-  {reply, ok, State#state{workers = Workers, start_time = now(), source = SourcePid, results_counter = 0}}.
+  {reply, ok, State#state{workers = Workers, start_time = now(), source = SourcePid, results_counter = 0, client = Client}}.
 
 
 handle_cast({result, Result}, S=#state{state_name = stopping}) ->

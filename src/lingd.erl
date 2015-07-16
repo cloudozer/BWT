@@ -2,20 +2,16 @@
 -behaviour(gen_fsm).
 
 
--export([start_link/0, start_link/1, create/2, ling_up/2]).
--export([init/1, slave/3, ling/3]).
+-export([start_link/1, create/2, create/3, ling_up/2, destroy/1]).
+-export([init/1, beam/3, ling/3]).
 -export([ip/0]).
 
--record(state, {host = '127.0.0.1', port, port_increment = 10, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin"}).
+-record(state, {host = '127.0.0.1', port, port_increment = 10, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin", instances = []}).
 
 
 %% lingd API
 
-start_link() ->
-  OsType = erlang:system_info(os_type),
-  start_link(OsType).
-
-start_link({xen,ling}) ->
+start_link(ling) ->
   %{ok, Pid} = gen_fsm:start_link(?MODULE, {{xen,ling},#state{}}, []),
   State = #state{},
   {ok, Node} = slave:start_link(State#state.host, ?MODULE, [State#state.slave_opts]),
@@ -28,23 +24,25 @@ log:info("connecting..."),
   ok = navel:connect({State#state.host, PortInc}),
 log:info("connected?"),
 timer:sleep(1000),
-  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [{local, ?MODULE}, ?MODULE, {{xen,ling},#state{port_increment = PortInc + 1, port = PortInc}}, []]),
+  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [{local, ?MODULE}, ?MODULE, {ling,#state{port_increment = PortInc + 1, port = PortInc}}, []]),
   Node1 = navel:call(?MODULE, navel, get_node, []),
   {ok, {Node1,Pid}};
-start_link(OsType={_,_}) ->
+start_link(beam) ->
   State = #state{},
   {ok, Node} = slave:start_link(State#state.host, ?MODULE, [State#state.slave_opts]),
   PortInc = State#state.port_increment,
-  {ok,_} = rpc:call(Node, navel_sup, start_link, [?MODULE, PortInc]),
+  {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
   ok = navel:connect({State#state.host, PortInc}),
-%timer:sleep(1000),
-  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {OsType,#state{port_increment = PortInc + 1}}, []]),
-  NNode = ?MODULE, %%rpc:call(Node, navel, get_node, []),   % returns {badrpc,{'EXIT',{noproc,{gen_server,call,[navel,get_node]}}}
+timer:sleep(1000),
+  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {beam,#state{port_increment = PortInc + 1}}, []]),
+  NNode = navel:call(?MODULE, navel, get_node, []),
   {ok, {NNode, Pid}}.
 
 create({LNode,LPid},Name) ->
-log:info("create ~p", [{{LNode,LPid},Name}]),
-  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name}, infinity]),
+  create({LNode,LPid},Name,[]).
+
+create({LNode,LPid},Name,Opts) ->
+  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name, Opts}, 30000]),
 log:info("created ~p", [Host]),
   ok = navel:connect(Host),
 timer:sleep(1000),
@@ -53,6 +51,9 @@ timer:sleep(1000),
 ling_up(CallerBin, Host) ->
   log:info("lingd ling_up ~p", [{binary_to_term(CallerBin), Host}]),
   gen_fsm:sync_send_event(?MODULE, {ling_up, CallerBin, Host}).
+
+destroy({LNode,LPid}) ->
+  navel:call(LNode, gen_fsm, sync_send_event, [LPid, destroy, 30000]).
 
 %% Delete me
 ip() ->
@@ -68,26 +69,32 @@ ip() ->
 
 %% private
 
-init({{xen,ling}, State}) ->
-  {ok, ling, State};
+init({VM, State}) when ling == VM; beam == VM ->
+  {ok, VM, State}.
 
-init({{_,_}, State}) ->
-  {ok, slave, State}.
-
-slave({create, Name}, _From, S=#state{host = Host, port_increment = PortInc}) ->
+beam({create, Name, _Opts}, _From, S=#state{host = Host, port_increment = PortInc}) ->
   {ok, Node} = slave:start_link(Host, Name, [S#state.slave_opts]),
   {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
-  {reply, {ok, {Host,PortInc}}, slave, S#state{port_increment = PortInc + 1}}.
+  {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
 
-ling({create, Name}, From, S) ->
+beam(destroy, _From, S) ->
+  %% TODO implement me
+  {reply, ok, beam, S}.
+
+ling({create, Name, Opts}, From, S = #state{instances = Instances}) ->
   Host = {192,168,56,200},
   NameBin = list_to_binary(atom_to_list(Name)),
   Extra = list_to_binary(io_lib:format("-dhcp -home /BWT -pz /BWT/ebin -eval 'ok = application:start(sasl), navel:start(~w), ok = navel:connect({~w,~w}), timer:sleep(1000), ok = navel:call(~w, lingd, ling_up, [~w,lingd:ip()]).'", [Name, Host, S#state.port, ?MODULE, term_to_binary(From)])),
 log:info("ling create ~p", [Extra]),
-  egator:create(NameBin, <<"/home/yatagan/BWT/BWT.img">>, [{memory, 512},{extra, Extra}], []),
-  {next_state, ling, S};
+  egator:create(NameBin, <<"/home/yatagan/BWT/BWT.img">>, [{memory, proplists:get_value(memory, Opts, 512)},{extra, Extra}], []),
+  {next_state, ling, S#state{instances = [NameBin | Instances]}};
 
 ling({ling_up, CallerBin, Host}, _From, S) ->
   Caller = binary_to_term(CallerBin),
   gen_fsm:reply(Caller, {ok, Host}),
-  {reply, ok, ling, S}. 
+  {reply, ok, ling, S};
+
+ling(destroy, _From, S = #state{instances = Instances}) ->
+log:info("lingd destroy ~p", [Instances]),
+  lists:foreach(fun(Ins) -> log:info("destroying ~p...", [Ins]), timer:sleep(5000), egator:destroy(Ins, []), log:info("done") end, Instances),
+  {reply, ok, ling, S}.
