@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Erlang
 .rebar
 .eunit
@@ -83,4 +82,6 @@ ebin
 log
 
 *.fastq
+
+bwt_files_worker
 
