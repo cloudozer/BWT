@@ -8,7 +8,7 @@
 
 -module(worker_bwt).
 
--export([start_link/0, start_link/1, run/4]).
+-export([start_link/3]).
 -export([worker_loop/12]).
 
 -include("bwt.hrl").
@@ -17,13 +17,10 @@
 
 %% api
 
-start_link() ->
-  Pid = spawn_opt(?MODULE,
-				  worker_loop,
-				  [init, [], undefined, undefined, undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined],
+start_link(Chunk, SourcePid, SinkPid) ->
+  Pid = spawn_opt(?MODULE, worker_loop,
+				  [init, [], Chunk, SourcePid, SinkPid, undefined, undefined, undefined,undefined,undefined,undefined, undefined],
 				  []),
-  true = is_pid(Pid),
-  true = register(?MODULE, Pid),
   {ok, Pid}.
 
 start_link({SoNode, SoPid}) ->
@@ -39,48 +36,43 @@ log:info("run? ~p", [{Pid, Chunk, SourcePid, SinkPid}]),
 
 %% state_name ::= [init|running|stopping]
 
-worker_loop(init, [], undefined, undefined, undefined, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
+worker_loop(init, [], {Chunk, _Mem}, SourcePid, SinkPid, undefined, undefined, undefined,undefined,undefined,undefined, undefined) ->
   log:info("Start ~p", [?MODULE]),
-  receive
-    {run, {Chunk, _Mem}, SourcePid, SinkPid} ->
       {ok, BaseUrl} = application:get_env(worker_bwt_app,base_url),
-log:info("BaseUrl ~p", [BaseUrl]),
       ChunkBin = list_to_binary(Chunk),
-log:info("f0 ~p", [ChunkBin]),
       [ChromosomeBin, ChunkIdFmBin] = binary:split(ChunkBin, <<"_p">>),
       [ChunkIdBin, <<>>] = binary:split(ChunkIdFmBin, <<".fm">>),
-log:info("f1 ~p", [{ChromosomeBin,ChunkIdBin}]),
       Chromosome = binary_to_list(ChromosomeBin),
-log:info("f2"),
       ChunkId = binary_to_integer(ChunkIdBin),
-log:info("gettin ~p", [BaseUrl ++ Chunk]),
       {ok, FmIndexBin} = http:get(BaseUrl ++ Chunk),
-log:info("f2 ~p", [size(FmIndexBin)]),
       {Meta,FM} = binary_to_term(FmIndexBin),
 
-log:info("f3"),
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
 
-log:info("f4 ~p" ,[ BaseUrl ++ Chromosome ++ "_p" ++ integer_to_list(ChunkId) ++ ".ref"]),
       {ok, Ref} = http:get(BaseUrl ++ Chromosome ++ "_p" ++ integer_to_list(ChunkId) ++ ".ref"),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
-log:info("loaded"),
-      worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref1, Pc,Pg,Pt,Last, Shift);
-
-    Err -> throw({unsuitable, Err})
-  end;
+{SNode,SPid} = SourcePid,
+log:info("f0"),
+spawn(fun() -> 
+log:info("f1"),
+true = register(?MODULE, self()),
+log:info("f2"),
+ok = navel:call(SNode, source, worker_ready, [SPid, {navel:get_node(), ?MODULE}]),
+log:info("f3"),
+      worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref1, Pc,Pg,Pt,Last, Shift)
+end);
 
 worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
+log:info("f4"),
   receive
     stop ->
       worker_loop(stopping, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
       log:info("worker got workload ~p", [length(Workload)]),
-      worker_loop(running, Workload, Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
-    Err -> 
-      throw(Err)
+log:info("memory ~p", [erlang:memory()]),
+      worker_loop(running, Workload, Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift)
   end;
 worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
   Seeds = lists:foldl(
@@ -127,4 +119,4 @@ worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM
 
 worker_loop(stopping, [], _Chromosome, _SourcePid, {SiNode,SiPid}, _FM, _Ref, _Pc,_Pg,_Pt,_Last, _Shift) ->
   log:info("~p is stopping", [?MODULE]),
-  navel:call_no_return(SiNode, erlang, send, [SiPid, {done, {navel:get_node(),self()}}]).
+  navel:call_no_return(SiNode, erlang, send, [SiPid, {done, {navel:get_node(),?MODULE}}]).

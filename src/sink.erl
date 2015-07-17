@@ -51,6 +51,7 @@ io:format("It's all over. ~.1f sec.~n", [Sec]),
   navel:call_no_return(CNode, erlang, send, [CPid, sink_done]),
   {stop, normal, S};
 handle_info({done,Pid}, S) ->
+log:info("sink handle_info({done ~p", [{Pid, S#state.workers}]),
   {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}}.
 
 handle_call({run, SourcePid={SNode,SPid}, Workers, Client}, _From, State) ->
@@ -62,6 +63,8 @@ handle_cast({result, Result}, S=#state{state_name = stopping}) ->
   process_result(Result,S),
   {noreply, S};
 handle_cast({result, Result}, S=#state{results_counter = ResultsCounter, workers = Workers, source = {Node,Pid}}) when ResultsCounter == length(Workers) - 1 ->
+
+log:info("memory ~p", [erlang:memory()]),
   process_result(Result,S), 
   case navel:call(Node, source, push_workload, [Pid]) of
     ok -> 

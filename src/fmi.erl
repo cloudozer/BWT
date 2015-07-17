@@ -24,7 +24,7 @@
 
 se_down(Ep,Ep,_,_) -> not_found;
 
-se_down(Sp,Ep,C2,FM) -> 
+se_down(Sp,Ep,C2,FM) when Sp < Ep -> 
 	case element(Sp,FM) of
 		{_,C2,P,_} -> P;
 		{_,_,_,_} -> se_down(Sp+1,Ep,C2,FM)

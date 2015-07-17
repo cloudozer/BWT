@@ -134,7 +134,7 @@ postman(S) ->
 	case receive_message(S, 0) of
 		{ok,{'$iam',RemoteName}} ->
 			{ok,{{A,B,C,D},P}} = inet:peername(S),
-			%io:format("navel: connected to ~w at ~w.~w.~w.~w:~w\n", [RemoteName,A,B,C,D,P]),
+			io:format("navel: connected to ~w at ~w.~w.~w.~w:~w\n", [RemoteName,A,B,C,D,P]),
 			introduce(self(), RemoteName),
 			postman(S);
 		{ok,{'$call',M,F,As}} ->
@@ -168,7 +168,7 @@ receive_message(Sock, Timeout) ->
 		{ok,<<Sz:32>>} ->
 			{ok,Chunks} = chunks(Sock, Sz),
 			Msg = binary_to_term(list_to_binary(Chunks)),
-			%io:format("navel: receive ~P\n", [Msg,12]),
+			io:format("navel: receive ~P\n", [Msg,12]),
 			{ok,Msg};
 		{error,timeout} -> undefined end.
 
@@ -180,7 +180,7 @@ chunks(Sock, Sz, Acc) ->
 	chunks(Sock, Sz - Sz1, [Bin|Acc]).
 
 send_message(Sock, Term) ->
-	%io:format("navel: send ~P\n", [Term,12]),
+	io:format("navel: send ~P\n", [Term,12]),
 	Bin = term_to_binary(Term),
 	Sz = byte_size(Bin),
 	ok = gen_tcp:send(Sock, <<Sz:32,Bin/binary>>).

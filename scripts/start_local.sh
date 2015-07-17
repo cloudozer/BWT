@@ -47,12 +47,12 @@ test(SeqFileName, ChromosomeList, HttpHost, Debug, VM) ->
 
   %% Start source app
 log:info("starting source.."),
-  {ok,SourceHost} = lingd:create(LingdRef, source, [{memory,800}]),
+  {ok,SourceHost} = lingd:create(LingdRef, source, [{memory,2024}]),
 log:info("started source."),
   {ok,_} = navel:call(source, source, start_link, [{tester,tester}]),
 
   %% Start sink app
-  {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory, 200}]),
+  {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory, 1024}]),
 log:info("starting sink app"),
   %WTF {error,{"no such file or directory","sink.app"}} ok = navel:call(sink, application, start, [sink]), 
   {ok,_} = navel:call(sink, sink, start_link, []),
@@ -76,23 +76,21 @@ log:info("ChunksList ~p=>~p", [{ChromosomeList,BoxNbr,BoxMem},ChunksList]),
 ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true end, Chunks) || Chunks <- ChunksList],
 
 	lists:foreach(fun({source,_})->ignore; ({sink,_})->ignore; (Chunks) ->
-
+log:info("Chunks ~p", [Chunks]),
 	  %% Start workers
-	  WorkersNum = length(Chunks),
-	  Pids = lists:map(fun(N) ->
+	  Pids = lists:map(fun(Chunk={ChunkName,_}) ->
 	    %% Create a node
-	    NodeName = list_to_atom("erl" ++ integer_to_list(N)),
-	    {ok, _} = lingd:create(LingdRef, NodeName, [{memory, 1800}]),
-log:info("created worker ~p", [NodeName]),
+	    NodeName = list_to_atom(lists:filter(fun($_)->false;($.)->false;(_)->true end,ChunkName)),
+	    {ok, _} = lingd:create(LingdRef, NodeName, [{memory, 4024}]),
 	    %% Start worker app
 	    ok = navel:call(NodeName, application, set_env, [worker_bwt_app,base_url,"http://" ++ HttpHost ++ "/fm_indices/"]),
-	    {ok, WorkerPid} = navel:call(NodeName, worker_bwt, start_link, []),
+	    {ok, WorkerPid} = navel:call(NodeName, worker_bwt, start_link, [Chunk, {source, source}, {sink,sink}]),
 
 	    %% Connect the node to the Source and to the Sink
 	    ok = navel:call(NodeName, navel, connect, [SourceHost]),
 	    ok = navel:call(NodeName, navel, connect, [SinkHost]),
-	    {NodeName, WorkerPid}
-	  end, lists:seq(0, WorkersNum-1)),
+	    {NodeName, worker_bwt}
+	  end, Chunks),
 
 	  %% Associate them with the Source
 	  ok = navel:call(source, source, register_workers, [source,Pids])
