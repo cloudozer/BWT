@@ -19,7 +19,7 @@ start_link(ling) ->
   PortInc = State#state.port_increment,
 log:info("starting navel ~p", [[?MODULE, PortInc]]),
   {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
-timer:sleep(2000),
+timer:sleep(1000),
 log:info("connecting..."),
   ok = navel:connect({State#state.host, PortInc}),
 log:info("connected?"),
@@ -33,7 +33,7 @@ start_link(beam) ->
   PortInc = State#state.port_increment,
   {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
   ok = navel:connect({State#state.host, PortInc}),
-timer:sleep(2000),
+timer:sleep(1000),
   {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {beam,#state{port_increment = PortInc + 1}}, []]),
   NNode = navel:call(?MODULE, navel, get_node, []),
   {ok, {NNode, Pid}}.
@@ -45,7 +45,7 @@ create({LNode,LPid},Name,Opts) ->
   {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name, Opts}, 30000]),
 log:info("created ~p", [Host]),
   ok = navel:connect(Host),
-timer:sleep(2000),
+%timer:sleep(2000),
   {ok, Host}.
 
 ling_up(CallerBin, Host) ->

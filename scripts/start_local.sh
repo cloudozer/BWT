@@ -76,11 +76,10 @@ log:info("ChunksList ~p=>~p", [{ChromosomeList,BoxNbr,BoxMem},ChunksList]),
 ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true end, Chunks) || Chunks <- ChunksList],
 
 	lists:foreach(fun({source,_})->ignore; ({sink,_})->ignore; (Chunks) ->
-log:info("Chunks ~p", [Chunks]),
 	  %% Start workers
 	  Pids = lists:map(fun(Chunk={ChunkName,_}) ->
 	    %% Create a node
-	    NodeName = list_to_atom(lists:filter(fun($_)->false;($.)->false;(_)->true end,ChunkName)),
+	    NodeName = list_to_atom("chunk_" ++ lists:filter(fun($.)->false;(_)->true end,ChunkName)),
 	    {ok, _} = lingd:create(LingdRef, NodeName, [{memory, 4024}]),
 	    %% Start worker app
 	    ok = navel:call(NodeName, application, set_env, [worker_bwt_app,base_url,"http://" ++ HttpHost ++ "/fm_indices/"]),
@@ -96,10 +95,12 @@ log:info("Chunks ~p", [Chunks]),
 	  ok = navel:call(source, source, register_workers, [source,Pids])
 	end, ChunksList1),
 
+  SeqFileNameUrl = "http://" ++ filename:join(HttpHost, SeqFileName),
+
   %% Run everything
-  %%ok = navel:call(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]).
+  %%ok = navel:call(source, source, run, [source, SeqFileNameUrl, ChunksList1, {sink,sink}]).
   %% {"init terminating in do_boot",{{badmatch,{ok,{'$call_no_return',erlang,send,[tester,workers_ready]}}},[{navel,sort_mail,1,[{file,"src/navel.erl"},{line,156}]}]}}
-  navel:call_no_return(source, source, run, [source, SeqFileName, ChunksList1, {sink,sink}]),
+  navel:call_no_return(source, source, run, [source, SeqFileNameUrl, ChunksList1, {sink,sink}]),
 
 
   receive
