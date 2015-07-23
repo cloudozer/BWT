@@ -44,9 +44,20 @@ handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_t
 %% handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
+  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
+  ReferenceFile = "human_g1k_v37_decoy.fasta",
+  {{Year,Month,Day},{Hour,Min,Sec1}} = erlang:localtime(),
+%  Statistics = [
+%    FastqFileNam,
+%    ReferenceFile,
+%    Chromosome,
+%    WorkloadAmount,
+%    Sec,
+%    S#state.workers_num,
+%    Year, Month, Day, Hour, Min, Sec1
+%  ],
+%  io:format(StatTemplate, Statistics),
   log:info("It's all over. ~.1f sec.", [Sec]),
-io:format("It's all over. ~.1f sec.~n", [Sec]),
-%%   ClientPid ! {stop, Sec},
   navel:call_no_return(SNode, erlang, send, [SPid, sink_done]),
   navel:call_no_return(CNode, erlang, send, [CPid, sink_done]),
   {stop, normal, S};
@@ -78,7 +89,8 @@ process_result([{cigar, _, _, {CigarRate, _}, _, _}|Rest], State) when CigarRate
   process_result(Rest, State);
 process_result([{cigar, Chromosome, SeqName, Cigar = {CigarRate, CigarValue}, Pos, RefSeq} | Rest], State) ->
    io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
-%%   ClientPid ! {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq},
+   {CNode,CPid} = State#state.client,
+   navel:call_no_return(CNode, erlang, send, [CPid, {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq}]), 
   process_result(Rest, State);
 process_result([], _S) ->
   ok.
