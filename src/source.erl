@@ -26,7 +26,7 @@ worker_ready(Pid, WorkerPid) ->
 
 %% gen_fsm callbacks
 
--record(state, {workers = [], workers_ready = [], fastq, fastq_eof = false, workload_size = 1000, client, chunks, sink}).
+-record(state, {workers = [], workers_ready = [], fastq, fastq_eof = false, workload_size = 2000, client, chunks, sink}).
 
 %% state ::= init|running|stopping
 
@@ -97,7 +97,6 @@ stopping(push_workload, _From, S) ->
 %% private
 
 produce_workload(S = #state{fastq = Fastq, workload_size = WorkloadSize}) ->
-log:info("memory ~p", [erlang:memory()]),
   case produce_workload(WorkloadSize, Fastq, []) of
     {<<>>, SeqList} ->
       {SeqList, stopping, S#state{fastq = <<>>}};

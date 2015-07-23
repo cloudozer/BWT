@@ -46,25 +46,18 @@ test(SeqFileName, ChromosomeList, HttpHost, Debug, VM) ->
   LingdRef = {LingdNode,LingdPid},
 
   %% Start source app
-log:info("starting source.."),
   {ok,SourceHost} = lingd:create(LingdRef, source, [{memory,2024}]),
-log:info("started source."),
   {ok,_} = navel:call(source, source, start_link, [{tester,tester}]),
 
   %% Start sink app
   {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory, 1024}]),
-log:info("starting sink app"),
   %WTF {error,{"no such file or directory","sink.app"}} ok = navel:call(sink, application, start, [sink]), 
   {ok,_} = navel:call(sink, sink, start_link, []),
-log:info("connecting sink to source"),
   %% Connect the Sink to the Source
   ok = navel:call(sink, navel, connect, [SourceHost]),
 
   IndexUrl = "http://" ++ HttpHost ++ "/fm_indices/index.json",
-  inets:start(),
-  {ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} =
-          httpc:request(get, {IndexUrl, []}, [], [{body_format, binary}]),
-  LsJson = Body,
+{ok,LsJson} = http:get(IndexUrl),
 FilesList = jsx:decode(LsJson),
 
 BoxNbr = 1,
@@ -80,7 +73,7 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 	  Pids = lists:map(fun(Chunk={ChunkName,_}) ->
 	    %% Create a node
 	    NodeName = list_to_atom("chunk_" ++ lists:filter(fun($.)->false;(_)->true end,ChunkName)),
-	    {ok, _} = lingd:create(LingdRef, NodeName, [{memory, 4024}]),
+	    {ok, _} = lingd:create(LingdRef, NodeName, [{memory, 2048}]),
 	    %% Start worker app
 	    ok = navel:call(NodeName, application, set_env, [worker_bwt_app,base_url,"http://" ++ HttpHost ++ "/fm_indices/"]),
 	    {ok, WorkerPid} = navel:call(NodeName, worker_bwt, start_link, [Chunk, {source, source}, {sink,sink}]),

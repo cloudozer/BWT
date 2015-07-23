@@ -53,25 +53,23 @@ worker_loop(init, [], {Chunk, _Mem}, SourcePid, SinkPid, undefined, undefined, u
       {ok, Ref} = http:get(BaseUrl ++ Chromosome ++ "_p" ++ integer_to_list(ChunkId) ++ ".ref"),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
-{SNode,SPid} = SourcePid,
-log:info("f0"),
-spawn(fun() -> 
-log:info("f1"),
-true = register(?MODULE, self()),
-log:info("f2"),
-ok = navel:call(SNode, source, worker_ready, [SPid, {navel:get_node(), ?MODULE}]),
-log:info("f3"),
-      worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref1, Pc,Pg,Pt,Last, Shift)
-end);
+      {SNode,SPid} = SourcePid,
+      Pid = spawn(fun() -> 
+%	process_flag(suppress_gc, true),
+	receive ready -> ok end,
+        true = register(?MODULE, self()),
+        ok = navel:call(SNode, source, worker_ready, [SPid, {navel:get_node(), ?MODULE}]),
+        worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref1, Pc,Pg,Pt,Last, Shift)
+      end),
+      Pid ! ready;
 
 worker_loop(running, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift) ->
-log:info("f4"),
   receive
     stop ->
       worker_loop(stopping, [], Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift);
     {workload, Workload} when is_list(Workload) ->
       log:info("worker got workload ~p", [length(Workload)]),
-log:info("memory ~p", [erlang:memory()]),
+      log:info("memory ~p", [erlang:memory()]),
       worker_loop(running, Workload, Chromosome, SourcePid, SinkPid, FM, Ref, Pc,Pg,Pt,Last, Shift)
   end;
 worker_loop(running, QseqList, Chromosome, SourcePid, SinkPid={SiNode,SiPid}, FM, Ref, Pc,Pg,Pt,Last, Shift) ->

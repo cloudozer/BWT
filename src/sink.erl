@@ -63,8 +63,6 @@ handle_cast({result, Result}, S=#state{state_name = stopping}) ->
   process_result(Result,S),
   {noreply, S};
 handle_cast({result, Result}, S=#state{results_counter = ResultsCounter, workers = Workers, source = {Node,Pid}}) when ResultsCounter == length(Workers) - 1 ->
-
-log:info("memory ~p", [erlang:memory()]),
   process_result(Result,S), 
   case navel:call(Node, source, push_workload, [Pid]) of
     ok -> 
