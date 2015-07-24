@@ -18,12 +18,12 @@
 
 
 t() ->
-	N = 1000,
+	N = 5000,
 	t(os:timestamp(), N,0). 
 	
 t(T1, 0, J) -> 
 	T2 = os:timestamp(),
-	io:format("SW took ~pms; found ~p matches~n",[timer:now_diff(T2,T1) div 1000, J ]);
+	io:format("SW took ~ps; found ~p matches~n",[timer:now_diff(T2,T1) / 1000000, J ]);
 t(T1, N, J) ->
 	CIGAR = sw(150,170),
 	case CIGAR of
