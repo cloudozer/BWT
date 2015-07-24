@@ -1,3 +1,12 @@
+
+sudo ./gator --listen
+
+python3 -m http.server 8888
+
+make && ./scripts/start_local.sh bwt_files/SRR770176_1.fastq_tiny 21 10.0.0.1:8888 "[{vm,ling}]"
+
+
+
 # Checkout and build
 	$ git clone https://github.com/cloudozer/BWT.git
 	$ cd BWT

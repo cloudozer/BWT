@@ -4,7 +4,6 @@
 -export([loop/0,get_fastq/0, get_fmindex/1, get_refseq/1]).
 
 start_link() ->
-%  inets:start(),
   Pid = spawn_link(fun loop/0),
   true = is_pid(Pid),
   {ok, Pid}.
@@ -21,7 +20,6 @@ get_async(Url) ->
   get_async(?MODULE, Url).
 
 get(Url) ->
-%  inets:start(), %% TODO: do something
   {_Headers, Body} = do_get(Url),
   {ok, Body}.
 
@@ -49,19 +47,11 @@ do_get(Url) ->
   [Headers, Body] = binary:split(Bin, <<"\r\n\r\n">>),
   {Headers, Body}.
 
-%do_get(Url) ->
-%  {ok, {{_Version, 200, _ReasonPhrase}, Headers, Body}} =
-%    httpc:request(get, {Url, []}, [], [{body_format, binary}]),
-%  {Headers, Body}.
-
-
 do_recv(Sock, Bs) ->
   case gen_tcp:recv(Sock, 0) of
     {ok, B} ->
-log:info("do_recv ~p", [size(list_to_binary([B | Bs]))]),
       do_recv(Sock, [B | Bs]);
     {error, closed} ->
-log:info("do_recv done ~p", [size(Bs)]),
       {ok, list_to_binary(lists:reverse(Bs))}
   end.
 

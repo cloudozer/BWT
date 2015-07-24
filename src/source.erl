@@ -1,7 +1,7 @@
 -module(source).
 -behaviour(gen_fsm).
 
--export([start_link/1, start_link/0, register_workers/2, run/4, push_workload/1]).
+-export([start_link/1, start_link/0, register_workers/2, run/4, push_workload/1, worker_ready/2]).
 -export([init/1, terminate/3, handle_info/3, init/3, running/3, stopping/3]).
 
 %% api
@@ -21,11 +21,14 @@ run(Pid, SeqFileName, Chunks, SinkPid) ->
 push_workload(Pid) ->
   gen_fsm:sync_send_event(Pid, push_workload, infinity).
 
+worker_ready(Pid, WorkerPid) ->
+  gen_fsm:sync_send_event(Pid, {worker_ready, WorkerPid}).
+
 %% gen_fsm callbacks
 
--record(state, {workers = [], fastq, fastq_eof = false, workload_size = 100, client, chunks, sink}).
+-record(state, {workers = [], workers_ready = [], fastq, fastq_eof = false, workload_size = 2000, client, chunks, sink}).
 
-%% state ::= init|fetching_fastq|running|stopping
+%% state ::= init|running|stopping
 
 init(Client={_,Pid}) ->
   log:info("Start ~p", [?MODULE]),
@@ -40,49 +43,43 @@ terminate(normal, _StateName, _StateData) ->
 terminate(Reason, StateName, StateData) ->
   log:info("~p terminated: ~p", [?MODULE, {Reason, StateName}]).
 
-handle_info({http_response, Bin}, fetching_fastq, S=#state{workers=Workers, chunks = Chunks, sink = SinkPid = {SNode,SPid}}) ->
+handle_info({http_response, Bin}, init, S) ->
+  {next_state, init, S#state{fastq = Bin}};
 
-log:info("handle_info({http_response"),
+handle_info(sink_done, stopping, S) ->
+  {stop, normal, S}.
+
+init({register_workers, Pids}, _From, S=#state{workers=Workers, client = {ClientNode,ClientPid}}) when Pids =/= [] ->
+  %% monitor new workers
+  %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
+log:info("init({register_workers ~p", [{Pids,Workers}]),
+  Workers1 = Pids++Workers,
+  log:info("~p connected to ~b workers", [?MODULE, length(Workers1)]),
+
+navel:call_no_return(ClientNode, erlang, send, [ClientPid, workers_ready]),
+
+  {reply, ok, init, S#state{workers = Workers1}};
+
+init({run, FastqFileUrl, Chunks, SinkPid}, _From, S=#state{}) ->
+  %% Async fetching of the fastq file
+  http:get_async(FastqFileUrl),
+  {reply, ok, init, S#state{chunks = Chunks, sink = SinkPid}};
+
+init({worker_ready, Pid}, _From, S = #state{workers = Workers, workers_ready = WorkersReady, client = Client, sink = {SNode,SPid}}) when length(Workers)-1 == length(WorkersReady) ->
+
   MyNode = ?MODULE, %navel:get_node(),
   Self = self(),
   SelfRef = {MyNode,Self},
-  lists:foreach(fun({{Node,Pid}, Chunk}) ->
-    navel:call_no_return(Node, worker_bwt, run, [Pid,Chunk,SelfRef,SinkPid])
-  end, lists:zip(Workers,lists:merge(Chunks))),
 
   %% Push first workload
   spawn_link(fun() -> ok = push_workload(Self) end),
 
   %% Run the Sink
-  navel:call_no_return(SNode, gen_server, call, [SPid, {run, SelfRef, Workers}]),
+  navel:call_no_return(SNode, gen_server, call, [SPid, {run, SelfRef, Workers, Client}]),
+  {reply, ok, running, S#state{workers_ready = [Pid | WorkersReady]}};
 
-  log:info("Splitting... ~p", [size(Bin)]),
-  Fastq = binary:split(Bin, <<$\n>>, [global]),
-  log:info("Done splitting"),
-
-  {next_state, running, S#state{fastq = Fastq}};
-
-handle_info(sink_done, stopping, S) ->
-  {stop, normal, S}.
-
-%% handle_call({register_workers, _}, _, S=#state{state_name = StateName}) when StateName =/= init ->
-%% 	{reply, wait, S};
-init({register_workers, Pids}, _From, S=#state{workers=Workers, client = {ClientNode,ClientPid}}) when Pids =/= [] ->
-  %% monitor new workers
-  %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
-  Workers1 = Pids++Workers,
-  log:info("~p connected to ~b workers", [?MODULE, length(Workers1)]),
-navel:call_no_return(ClientNode, erlang, send, [ClientPid, workers_ready]),
-  {reply, ok, init, S#state{workers = Workers1}};
-
-init({run, FastqFileUrl, Chunks, SinkPid}, _From, S=#state{}) ->
-
-log:info("sorce run"),
-
-  %% Async fetching of the fastq file
-  http:get_async(FastqFileUrl),
-
-  {reply, ok, fetching_fastq, S#state{chunks = Chunks, sink = SinkPid}}.
+init({worker_ready, Pid}, _From, S = #state{workers_ready = WorkersReady}) ->
+  {reply, ok, init, S#state{workers_ready = [Pid | WorkersReady]}}.
 
 running(push_workload, _From, S=#state{workers = Workers}) ->
   {W,StateName,S1} = produce_workload(S),
@@ -109,8 +106,14 @@ produce_workload(S = #state{fastq = Fastq, workload_size = WorkloadSize}) ->
 
 produce_workload(0, Fastq, Acc) ->
   {Fastq, Acc};
-produce_workload(_Size, [<<>>], Acc) ->
+%produce_workload(_Size, [<<>>], Acc) ->
+produce_workload(_Size, <<>>, Acc) ->
   {<<>>, Acc};
-produce_workload(Size, [<<$@, SName/binary>>, SData, <<$+>>, _Quality | Fastq], Acc) ->
+%produce_workload(Size, [<<$@, SName/binary>>, SData, <<$+>>, _Quality | Fastq], Acc) ->
+produce_workload(Size, Bin, Acc) ->
+  [<<$@, SName/binary>>, Bin1] = binary:split(Bin, <<$\n>>),
+  [SData, Bin2] = binary:split(Bin1, <<$\n>>),
+  [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
+  [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
   Seq = {SName, SData},
-  produce_workload(Size - 1, Fastq, [Seq | Acc]).
+  produce_workload(Size - 1, Bin4, [Seq | Acc]).
