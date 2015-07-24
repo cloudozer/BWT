@@ -13,7 +13,7 @@
 
 
 
-% performs sw algorithm for a sequence Seq against reference sequence represented by FM-index
+% finds seeds for a sequence Qseq against reference sequence represented by FM-index
 sga(FM,Pc,Pg,Pt,Last,Qseq) -> sga(FM,Pc,Pg,Pt,Last,Qseq,[],0,0).
 sga(FM,Pc,Pg,Pt,Last,Qseq,Acc,Qty,Shift) -> 
 	case skip_Ns(Qseq) of

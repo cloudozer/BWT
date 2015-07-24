@@ -4,7 +4,8 @@
 %
 
 -module(bwt).
--export([bwt/1,
+-export([t/0,
+		bwt/1,
 		get_suffs/1,
 		fm/1,
 		sa/1,
@@ -14,6 +15,21 @@
 -include("bwt.hrl").
 
 %-define(TRSH,0.8).
+
+t() ->
+	N = 20000,
+	{Meta,FM} = fm_index:get_index("21",1),
+	{Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
+	T1 = os:timestamp(),
+	t(T1,N,FM,Pc,Pg,Pt,Last,0).
+t(T1,0,_FM,_Pc,_Pg,_Pt,_Last,Acc) ->
+	T2 = os:timestamp(),
+	io:format("Seeds finding took ~psec; ~p Seeds found~n",
+		[timer:now_diff(T2,T1)/1000000, Acc]);
+t(T1,N,FM,Pc,Pg,Pt,Last,Acc) ->
+	Qseq = sw:rand_seq(150),
+	Seeds = sga:sga(FM,Pc,Pg,Pt,Last,Qseq),
+	t(T1,N-1,FM,Pc,Pg,Pt,Last,Acc+length(Seeds)).
 
 
 test() ->

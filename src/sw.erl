@@ -36,7 +36,7 @@ rand_seq(N)->
 	rand_seq([],N).
 rand_seq(Acc,0) -> Acc;
 rand_seq(Acc,N) -> 
-	case random:uniform() < 0.1 of
+	case random:uniform() < 0.0 of
 		true ->
 			rand_seq([lists:nth(random:uniform(10),[$Y,$R,$B,$D,$K,$M,$N,$S,$V,$W])|Acc], N-1);
 		_ ->
@@ -61,7 +61,7 @@ sw(Qseq,Ref,F) ->
 	Lq = length(Qseq),
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	Thershold = -?MATCH*(Lq div 2),
+	Thershold = -?MATCH*(Lq div 9),
 	build_tab(F,Tab0,Ref,Qseq,[],0,Thershold).
 
 
