@@ -6,8 +6,7 @@
 
 -module(sw).
 -export([
-		t/1,
-		t_e/0,
+		t/0,
 		sw/2,
 		sw/3,
 		sigma/2,
@@ -17,24 +16,27 @@
 -include("bwt.hrl").
 
 
-t_e() ->
-	eflame:apply(?MODULE, t, [100]).
 
-t(0) -> ok;
-t(N) ->
-	CIGAR = sw(55,120),
+t() ->
+	N = 5000,
+	t(os:timestamp(), N,0). 
+	
+t(T1, 0, J) -> 
+	T2 = os:timestamp(),
+	io:format("SW took ~ps; found ~p matches~n",[timer:now_diff(T2,T1) / 1000000, J ]);
+t(T1, N, J) ->
+	CIGAR = sw(150,170),
 	case CIGAR of
-		no_match -> ok;
-		_ -> io:format("~p~n",[CIGAR])
-	end,
-	t(N-1).
-
+		no_match -> t(T1,N-1,J);
+		_ -> t(T1,N-1,J+1)
+	end.
+	
 
 rand_seq(N)->
 	rand_seq([],N).
 rand_seq(Acc,0) -> Acc;
 rand_seq(Acc,N) -> 
-	case random:uniform() < 0.1 of
+	case random:uniform() < 0.0 of
 		true ->
 			rand_seq([lists:nth(random:uniform(10),[$Y,$R,$B,$D,$K,$M,$N,$S,$V,$W])|Acc], N-1);
 		_ ->
@@ -59,7 +61,7 @@ sw(Qseq,Ref,F) ->
 	Lq = length(Qseq),
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	Thershold = -?MATCH*(Lq div 6),
+	Thershold = -?MATCH*(Lq div 9),
 	build_tab(F,Tab0,Ref,Qseq,[],0,Thershold).
 
 
