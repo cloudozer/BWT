@@ -44,22 +44,8 @@ handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_t
 %% handle_info({done,Pid}, S=#state{workers = [Pid], start_time = StartTime, client = ClientPid}) ->
   Microsec = timer:now_diff(now(), StartTime),
   Sec = Microsec / 1000000,
-  StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
-  ReferenceFile = "human_g1k_v37_decoy.fasta",
-  {{Year,Month,Day},{Hour,Min,Sec1}} = erlang:localtime(),
-%  Statistics = [
-%    FastqFileNam,
-%    ReferenceFile,
-%    Chromosome,
-%    WorkloadAmount,
-%    Sec,
-%    S#state.workers_num,
-%    Year, Month, Day, Hour, Min, Sec1
-%  ],
-%  io:format(StatTemplate, Statistics),
   log:info("It's all over. ~.1f sec.", [Sec]),
-  navel:call_no_return(SNode, erlang, send, [SPid, sink_done]),
-  navel:call_no_return(CNode, erlang, send, [CPid, sink_done]),
+  navel:call_no_return(SNode, erlang, send, [SPid, {sink_done, Sec}]),
   {stop, normal, S};
 handle_info({done,Pid}, S) ->
 log:info("sink handle_info({done ~p", [{Pid, S#state.workers}]),

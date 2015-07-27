@@ -39,12 +39,14 @@ test(SeqFileName, ChromosomeList, HttpHost, VM) ->
   {ok, {LingdNode,LingdPid}} = lingd:start_link(VM),
   LingdRef = {LingdNode,LingdPid},
 
+  log:info("Create instances..."),
+
   %% Start source app
-  {ok,SourceHost} = lingd:create(LingdRef, source, [{memory,512}]),
+  {ok,SourceHost} = lingd:create(LingdRef, source, [{memory,2048}]),
   {ok,_} = navel:call(source, source, start_link, [{tester,tester}]),
 
   %% Start sink app
-  {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory, 50}]),
+  {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory, 128}]),
   %WTF {error,{"no such file or directory","sink.app"}} ok = navel:call(sink, application, start, [sink]), 
   {ok,_} = navel:call(sink, sink, start_link, []),
   %% Connect the Sink to the Source
@@ -67,7 +69,7 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
 	  Pids = lists:map(fun(Chunk={ChunkName,_}) ->
 	    %% Create a node
 	    NodeName = list_to_atom("chunk_" ++ lists:filter(fun($.)->false;(_)->true end,ChunkName)),
-	    {ok, _} = lingd:create(LingdRef, NodeName, [{memory, 512}]),
+	    {ok, _} = lingd:create(LingdRef, NodeName, [{memory, 2048}]),
 	    %% Start worker app
 	    ok = navel:call(NodeName, application, set_env, [worker_bwt_app,base_url,"http://" ++ HttpHost ++ "/fm_indices/"]),
 	    {ok, _WorkerPid} = navel:call(NodeName, worker_bwt, start_link, [Chunk, {source, source}, {sink,sink}]),
@@ -89,12 +91,17 @@ ChunksList1 = [lists:filter(fun({source,_})->false; ({sink,_})->false; (_)->true
   %% {"init terminating in do_boot",{{badmatch,{ok,{'$call_no_return',erlang,send,[tester,workers_ready]}}},[{navel,sort_mail,1,[{file,"src/navel.erl"},{line,156}]}]}}
   navel:call_no_return(source, source, run, [source, SeqFileNameUrl, ChunksList1, {sink,sink}]),
 
-
+Wait = fun Wait() ->
   receive
     {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq} ->
-      io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]);
-    sink_done -> 
-      log:info("sink_done. destroy instances..."), 
+      io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
+      Wait();
+    {source_sink_done, Sec, WorkersNum, ReadsNum} -> 
+      {{Year,Month,Day},{Hour,Min,Sec1}} = erlang:localtime(),
+      StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
+      io:format(StatTemplate, [SeqFileName, "human_g1k_v37_decoy.fasta", ChromosomeList, ReadsNum, Sec, WorkersNum, Year, Month, Day, Hour, Min, Sec1]), 
       ok = lingd:destroy(LingdRef),
       halt(0)
-  end.
+  end
+end,
+Wait().

@@ -26,7 +26,7 @@ worker_ready(Pid, WorkerPid) ->
 
 %% gen_fsm callbacks
 
--record(state, {workers = [], workers_ready = [], fastq, fastq_eof = false, workload_size = 2000, client, chunks, sink}).
+-record(state, {workers = [], workers_ready = [], fastq, fastq_eof = false, workload_size = 2000, client, chunks, sink, reads_num = 0}).
 
 %% state ::= init|running|stopping
 
@@ -46,13 +46,13 @@ terminate(Reason, StateName, StateData) ->
 handle_info({http_response, Bin}, init, S) ->
   {next_state, init, S#state{fastq = Bin}};
 
-handle_info(sink_done, stopping, S) ->
+handle_info({sink_done,Sec}, stopping, S=#state{client = {ClientNode,ClientPid}, workers=Workers, reads_num = ReadsNum}) ->
+  navel:call(ClientNode, erlang, send, [ClientPid, {source_sink_done, Sec, length(Workers), ReadsNum}]),
   {stop, normal, S}.
 
 init({register_workers, Pids}, _From, S=#state{workers=Workers, client = {ClientNode,ClientPid}}) when Pids =/= [] ->
   %% monitor new workers
   %TODO lists:foreach(fun(Pid)->true = link(Pid) end, Pids),
-log:info("init({register_workers ~p", [{Pids,Workers}]),
   Workers1 = Pids++Workers,
   log:info("~p connected to ~b workers", [?MODULE, length(Workers1)]),
 
@@ -96,12 +96,12 @@ stopping(push_workload, _From, S) ->
 
 %% private
 
-produce_workload(S = #state{fastq = Fastq, workload_size = WorkloadSize}) ->
+produce_workload(S = #state{fastq = Fastq, workload_size = WorkloadSize, reads_num = ReadsNum}) ->
   case produce_workload(WorkloadSize, Fastq, []) of
     {<<>>, SeqList} ->
       {SeqList, stopping, S#state{fastq = <<>>}};
     {Fastq1, SeqList} ->
-      {SeqList, running, S#state{fastq = Fastq1}}
+      {SeqList, running, S#state{fastq = Fastq1, reads_num = ReadsNum + length(SeqList)}}
   end.
 
 produce_workload(0, Fastq, Acc) ->
