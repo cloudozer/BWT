@@ -46,12 +46,11 @@ worker_loop(init, [], undefined, undefined, undefined,undefined,undefined,undefi
       navel:call_no_return(MNode, gen_server, cast, [MPid, {get_workload, ?WATERLINE, {navel:get_node(),self()}}]),
 
       {Meta,FM} = fm_index:get_index(Chromosome, 1),
-
       {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
       Shift = proplists:get_value(shift, Meta),
-
-      {ok, BwtFiles} = application:get_env(worker_bwt_app, bwt_files),
-      {ok, Ref} = file:read_file(filename:join(BwtFiles, Chromosome++".ref")),
+      {ok, FmIndices} = application:get_env(worker_bwt_app, fm_indices),
+      %% !Hardcoded
+      {ok, Ref} = file:read_file(filename:join(FmIndices, Chromosome++"_p1.ref")),
       Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
       Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
