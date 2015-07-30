@@ -3,6 +3,7 @@
 
 
 -export([start_link/1, create/2, create/3, ling_up/2, destroy/1]).
+-export([connect/0]).
 -export([init/1, beam/3, ling/3]).
 -export([ip/0]).
 
@@ -49,6 +50,9 @@ ling_up(CallerBin, Host) ->
 
 destroy({LNode,LPid}) ->
   navel:call(LNode, gen_fsm, sync_send_event, [LPid, destroy, 30000]).
+
+connect() ->
+  navel:connect({'127.0.0.1', 10}).
 
 %% Delete me
 ip() ->
