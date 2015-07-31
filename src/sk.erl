@@ -36,9 +36,10 @@ sink(R_source,J,Alq_nbr,Acc) ->
 	receive
 		quit -> ok;
 
-		{_Read,_Chunk,_Pos,_Score,_CIGAR}=Rec ->
+		{SeqName,Chunk,Pos,Score,CIGAR,RefSeq}=Rec ->
 			% output
 			io:format("Sink: got SAM line~n"),
+			io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chunk, Pos, CIGAR, Score, RefSeq]),
 			sink(R_source,J,Alq_nbr,[Rec|Acc]);
 			
 		fastq_done -> 

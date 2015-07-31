@@ -33,12 +33,13 @@ start_SF([],_,_,_,Alqs,SFs) ->
 
 
 
-seed_finder(Chunk,Alq,R_source,HttpStorage) ->
+seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source,HttpStorage) ->
 	{ok, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ binary_to_list(Chunk)),
 	{Meta,FM} = binary_to_term(FmIndexBin),
 
 	{Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
-	io:format("~p", [{Pc,Pg,Pt,Last}]),
+	Shift = proplists:get_value(shift, Meta),
+	navel:call_no_return(AlqN, erlang, send, [AlqP, {shift,Chunk,Shift}]),
 	seed_finder(Chunk,Alq,R_source,FM,Pc,Pg,Pt,Last).
 
 seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Pc,Pg,Pt,Last) ->
@@ -47,8 +48,7 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Pc,Pg,Pt,Last) ->
 		quit -> ok;
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
-			% find seeds functions
-			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
+%% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
 
 			lists:foreach(
 				fun({_Qname,Qseq}=Read) ->

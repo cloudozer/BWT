@@ -19,4 +19,6 @@
 
 -define(UNDEF,0).
 
+-define(QSEC_LENGTH, 151).
+
 
