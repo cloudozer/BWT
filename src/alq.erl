@@ -5,8 +5,8 @@
 %
 
 -module(alq).
--export([start_alq/5,
-		alq/5
+-export([start_alq/4,
+		alq/3
 		]).
 
 -define(CIGAR_MAKER_NBR,4).
@@ -17,77 +17,73 @@
 
 
 % starts Alq in each box if there is one or more seed_finder
-start_alq(Schedule,SinkHost,Sink,Lingd,HttpStorage) -> start_alq(Schedule,SinkHost,Sink,Lingd,HttpStorage,[]).
+start_alq(Schedule,SinkHost,Sink,Lingd) -> start_alq(Schedule,SinkHost,Sink,Lingd,[]).
 
-start_alq([{Box_id,Chunks}|Schedule],SinkHost,Sink,Lingd,HttpStorage,Acc) ->
+start_alq([{Box_id,Chunks}|Schedule],SinkHost,Sink,Lingd,Acc) ->
 	NodeName = list_to_atom("alq_" ++ Box_id),
 	{ok,AlqHost} = lingd:create(Lingd, NodeName, [{memory, 128}]),
 	ok = navel:call(NodeName,navel,connect,[SinkHost]),
 	ok = navel:call(NodeName,lingd,connect,[]),
-	A = navel:call(NodeName,erlang,spawn,[?MODULE,alq,[Chunks,Sink,SinkHost,Lingd,HttpStorage]]),
-	start_alq(Schedule,SinkHost,Sink,Lingd,HttpStorage,[{Box_id,{AlqHost,{NodeName,A}},[ C ||{C,_} <- Chunks]}|Acc]);
+	A = navel:call(NodeName,erlang,spawn,[?MODULE,alq,[Sink,SinkHost,Lingd]]),
+	start_alq(Schedule,SinkHost,Sink,Lingd,[{Box_id,{AlqHost,{NodeName,A}},[ C ||{C,_} <- Chunks]}|Acc]);
 
-start_alq([],_,_,_,_,Acc) -> Acc.
-
-
+start_alq([],_,_,_,Acc) -> Acc.
 
 
-alq(Chunks,Sink,SinkHost,Lingd,HttpStorage) ->
-  Refs = lists:map(fun({Chunk,_}) ->
-    FileName = re:replace(Chunk, ".fm", ".ref", [{return, list}]),
-    {ok, Ref} = http:get(HttpStorage ++ "/fm_indices/" ++ FileName),
-    Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
-    Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
-    {Chunk,Ref1}
-  end, Chunks),
-	%% spawn N cigar_makers
+alq(Sink,SinkHost,Lingd) ->
+  	%% spawn N cigar_makers
 	cm:start_cigar_makers(?CIGAR_MAKER_NBR,Sink,SinkHost,Lingd),
-	alq_in(Refs,?CIGAR_MAKER_NBR,Sink).
+	cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[]).
 
-alq_in(Refs,?CIGAR_MAKER_NBR,Sink) ->
+
+cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[]) ->
 	receive
-    {shift,Chunk,Shift} ->
-      {Chunk, Ref} = lists:keyfind(Chunk, 1, Refs),
-      Refs1 = lists:keyreplace(Chunk, 1, Refs, {Chunk, Ref, Shift}),
-      alq_in(Refs1,?CIGAR_MAKER_NBR,Sink);
-
-		{Read,Chunk,Seeds} -> 
-			alq_out(Refs,?CIGAR_MAKER_NBR,Sink,Read,Chunk,Seeds);
-
-		quit ->
-			terminate_cm(?CIGAR_MAKER_NBR);
-
-		fastq_done ->
-			io:format("Alq: got fastq_done from r_source~n"),
-			confirm_fastq_done(?CIGAR_MAKER_NBR,Sink)
-	end.
-
-
-
-alq_out(Refs,?CIGAR_MAKER_NBR,Sink,Read,Chunk,[{Pos,D}|Seeds]) ->
-  {Ref,Shift} = get_ref(Refs,Chunk,Pos,D),
-	receive
-		{Pid,ready} -> 
-			Pid ! {Ref,Read,Chunk,Pos,D,Shift},
-%% 			io:format("Alq: send seed to aligning~n"),
-			alq_out(Refs,?CIGAR_MAKER_NBR,Sink,Read,Chunk,Seeds)
+		quit -> terminate_cm(?CIGAR_MAKER_NBR);
+		{_Read_name,_Chromo,_Read,_Ref_seeds}=Task -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task],[]);
+		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid])		
 	end;
-alq_out(Refs,?CIGAR_MAKER_NBR,Sink,_Read,_Chunk,[]) -> alq_in(Refs,?CIGAR_MAKER_NBR,Sink).
 
-
-
-
-confirm_fastq_done(0,Sink={N,P}) ->
-	navel:call_no_return(N,erlang,send,[P,fastq_done]),
-	io:format("Alq confirmed that fastq_done~n");
-%% 	cm:start_cigar_makers(?CIGAR_MAKER_NBR,Sink);
-confirm_fastq_done(N,Sink) ->
+cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid|CMs]) ->
 	receive
-		{Pid,ready} ->
-			% destroy cm instance
-			Pid ! quit,
-			confirm_fastq_done(N-1,Sink)
+		quit -> terminate_cm(?CIGAR_MAKER_NBR);
+
+		{Read_name,Chromo,Read,[{Pos,Ref}]} -> 
+			Pid ! {Ref,Read,Read_name,Chromo,Pos},
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[CMs]);
+
+		{Read_name,Chromo,Read,[{Pos,Ref}|Ref_seeds]} -> 
+			Pid ! {Ref,Read,Read_name,Chromo,Pos},
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,Ref_seeds}],[CMs]);
+
+		{Pid1,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid1,Pid|CMs]);
+
+		fastq_done when length([Pid|CMs]) =:= ?CIGAR_MAKER_NBR ->
+			{N,P} = Sink,
+			navel:call_no_return(N,erlang,send,[P,fastq_done]),
+			io:format("Alq confirmed that fastq_done~n")
+	end;
+
+cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,[{Pos,Ref}|Ref_seeds]}|Tasks],[]) ->
+	receive
+		quit -> terminate_cm(?CIGAR_MAKER_NBR);
+
+		{_Read_name,_Chromo,_Read,_Ref_seeds}=Task -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks],[]);
+
+		{Pid,ready} -> 
+			Pid ! {Ref,Read,Read_name,Chromo,Pos},
+			case Ref_seeds of
+				[] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,[]);
+				_ -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,Ref_seeds}|Tasks],[])
+			end
+	end;
+
+cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,[{Pos,Ref}|Ref_seeds]}|Tasks],[Pid|CMs]) ->
+	Pid ! {Ref,Read,Read_name,Chromo,Pos},
+	case Ref_seeds of
+		[] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs);
+		_ -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,Ref_seeds}|Tasks],CMs)
 	end.
+
 
 
 
@@ -97,15 +93,4 @@ terminate_cm(N) ->
 		{Pid,ready} -> Pid ! quit, terminate_cm(N-1)
 	end.
 
-
-
-% reads the reference sequence from Chunk at position Pos
-get_ref(Refs,Chunk,Pos,D) ->
-  {Chunk,Ref,Shift} = lists:keyfind(Chunk,1,Refs),
-  Ref_len = ?QSEC_LENGTH + D,
-  Start_pos = Pos - Ref_len + ?REF_EXTENSION_LEN,
-
-  <<_:Start_pos/bytes,Ref_seq:Ref_len/bytes,_/binary>> = Ref,
-  Ref_seq1 = binary_to_list(Ref_seq),
-  {Ref_seq1,Shift}.
 
