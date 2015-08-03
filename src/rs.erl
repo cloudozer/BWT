@@ -41,7 +41,7 @@ start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
       io:format("Sink started. Sink pid: ~p~nSchedule:~p~n",[Sink,Schedule2]),
 
       %% Create just one alq
-      Schedule3 = alq:start_alq(Schedule2,SinkHost,Sink,LingdRef,HttpStorage), % {Box_id,Alq,Chunk_files}
+      Schedule3 = alq:start_alq(Schedule2,SinkHost,Sink,LingdRef), % {Box_id,Alq,Chunk_files}
       io:format("Alq started. New Schedule: ~p~n",[Schedule3]),
 
       {Alqs, SFs} = sf:start_SF(Schedule3,LingdRef,HttpStorage,Self),
