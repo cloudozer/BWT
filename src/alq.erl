@@ -9,7 +9,7 @@
 		alq/5
 		]).
 
--define(CIGAR_MAKER_NBR,4).
+-define(CIGAR_MAKER_NBR,8).
 -define(REF_EXTENSION_LEN, 200).
 
 -include("bwt.hrl").
@@ -21,7 +21,7 @@ start_alq(Schedule,SinkHost,Sink,Lingd,HttpStorage) -> start_alq(Schedule,SinkHo
 
 start_alq([{Box_id,Chunks}|Schedule],SinkHost,Sink,Lingd,HttpStorage,Acc) ->
 	NodeName = list_to_atom("alq_" ++ Box_id),
-	{ok,AlqHost} = lingd:create(Lingd, NodeName, [{memory, 128}]),
+	{ok,AlqHost} = lingd:create(Lingd, NodeName, [{memory, 3548}]),
 	ok = navel:call(NodeName,navel,connect,[SinkHost]),
 	ok = navel:call(NodeName,lingd,connect,[]),
 	A = navel:call(NodeName,erlang,spawn,[?MODULE,alq,[Chunks,Sink,SinkHost,Lingd,HttpStorage]]),

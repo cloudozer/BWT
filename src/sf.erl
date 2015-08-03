@@ -18,7 +18,7 @@ start_SF(Schedule,Lingd,HttpStorage,Source) -> start_SF(Schedule,Lingd,HttpStora
 start_SF([{Box_id,Alq={AlqHost,_},Chunk_files}|Schedule],Lingd,HttpStorage,Source,Alqs,SFs) ->
 	SFs1 = lists:foldl( fun(Chunk,Acc)->
 		  NodeName = list_to_atom("chunk_" ++ lists:filter(fun($.) -> false;(_) -> true end, binary_to_list(Chunk))),
-		  {ok,_} = lingd:create(Lingd, NodeName, [{memory, 128}]),
+		  {ok,_} = lingd:create(Lingd, NodeName, [{memory, 2024}]),
 		%% self?
 		  ok = navel:call(NodeName, navel, connect, [AlqHost]),
 			SF = navel:call(NodeName, erlang, spawn, [?MODULE,seed_finder,[Chunk,Alq,Source,HttpStorage]]),
