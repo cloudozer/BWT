@@ -36,7 +36,7 @@ start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
       Self = {navel:get_node(),self()},
 
       %% Start sink app
-      {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory, 128}]),
+      {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory,1024}]),
       {_Box,Sink,Schedule2} = navel:call(sink, sk, start_sink, [Schedule1,Self]),
       io:format("Sink started. Sink pid: ~p~nSchedule:~p~n",[Sink,Schedule2]),
 
@@ -49,8 +49,9 @@ start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
 
       SeqFileNameUrl = HttpStorage ++ "/" ++ SeqFileName,
       {ok,Reads} = http:get(SeqFileNameUrl),
-
-			r_source(Reads,Alqs,SFs,length(SFs),Sink)
+StartTime = now(),
+			r_source(Reads,Alqs,SFs,length(SFs),Sink),
+io:format("Fastq complited within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
 	end.
 
 produce_workload(N, Fastq) ->
