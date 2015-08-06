@@ -10,7 +10,6 @@
 		seed_finder/4
 		]).
 
--include("bwt.hrl").
 
 -define(REF_EXTENSION_LEN, 200).
 
@@ -61,7 +60,7 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shif
 				fun({Qname,Qseq}) ->
 					Seeds = sga:sga(FM,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
 					Seeds1 = lists:map(fun({SeedEnd,D}) ->
-						Ref_len = ?QSEC_LENGTH + D,
+						Ref_len = size(Qseq) + D,
 						GlobalPos = SeedEnd - Ref_len + Shift,
 						Start_pos = SeedEnd - Ref_len + ?REF_EXTENSION_LEN,
 

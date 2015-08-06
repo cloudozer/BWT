@@ -1,16 +1,1 @@
-[
-"21_p1.fm",
-"21_p1.ref",
-"21_p2.fm",
-"21_p2.ref",
-"21_p3.fm",
-"21_p3.ref",
-"22_p1.fm",
-"22_p1.ref",
-"22_p2.fm",
-"22_p2.ref",
-"22_p3.fm",
-"22_p3.ref",
-"GL000193.1_p1.fm",
-"GL000193.1_p1.ref",
-]
+["21_p1.fm", "12_p7.fm", "19_p1.ref", "4_p9.ref", "19_p2.fm", "5_p11.ref", "22_p3.ref", "chr17_p6.fm", "chr17_p4.ref", "3_p8.ref", "22_p2.ref", "5_p7.fm", "2_p15.ref", "3_p5.ref", "3_p7.ref", "20_p3.ref", "13_p5.fm", "GL000193.1_p1.ref", "11_p1.ref", "3_p12.ref", "2_p14.ref", "index.json", "2_p3.fm", "12_p5.fm", "13_p1.fm", "0_p1.fm", "19_p2.ref", "11_p4.ref", "11_p5.fm", "21_p3.fm", "12_p1.ref", "1_p1.fm", "3_p6.fm", "2_p7.ref", "10_p6.ref", "10_p2.ref", "1_p10.fm", "3_p10.ref", "12_p4.ref", "19_p4.ref", "4_p4.ref", "5_p9.fm", "chr17_p4.fm", "14_p5.fm", "1_p5.fm", "3_p2.ref", "19_p3.fm", "14_p2.fm", "GL000193.1_p1.fm", "4_p3.fm", "5_p4.ref", "15_p3.fm", "1_p3.ref", "13_p2.fm", "10_p5.fm", "4_p8.fm", "20_p1.fm", "3_p3.fm", "4_p8.ref", "3_p6.ref", "15_p5.fm", "3_p2.fm", "10_p7.ref", "chr17_p2.ref", "2_p12.fm", "20_p4.ref", "12_p8.ref", "11_p7.ref", "11_p8.fm", "11_p6.fm", "2_p2.fm", "10_p5.ref", "19_p3.ref", "2_p9.fm", "5_p5.fm", "0_p1.ref", "3_p11.fm", "10_p3.fm", "4_p2.ref", "2_p14.fm", "4_p6.ref", "3_p1.ref", "3_p4.ref", "6_p1.ref", "3_p3.ref", "10_p6.fm", "11_p5.ref", "14_p3.fm", "14_p4.ref", "2_p6.fm", "1_p14.fm", "2_p8.fm", "2_p11.fm", "15_p4.fm", "13_p6.fm", "4_p12.ref", "5_p7.ref", "1_p14.ref", "12_p3.ref", "21_p3.ref", "20_p2.ref", "5_p3.ref", "2_p9.ref", "2_p11.ref", "3_p4.fm", "13_p6.ref", "1_p12.fm", "5_p4.fm", "13_p4.ref", "4_p11.ref", "5_p9.ref", "22_p1.fm", "4_p5.ref", "13_p4.fm", "4_p1.ref", "2_p10.ref", "12_p6.ref", "5_p2.ref", "chr17_p3.fm", "10_p1.fm", "15_p2.ref", "chr17_p5.fm", "4_p3.ref", "13_p3.ref", "4_p5.fm", "2_p4.ref", "15_p1.fm", "15_p5.ref", "12_p2.ref", "11_p9.ref", "5_p6.ref", "12_p8.fm", "1_p3.fm", "4_p11.fm", "21_p2.ref", "3_p12.fm", "21_p2.fm", "10_p8.fm", "2_p4.fm", "1_p2.ref", "11_p4.fm", "2_p10.fm", "12_p4.fm", "11_p6.ref", "2_p15.fm", "11_p3.fm", "1_p1.ref", "chr17_p3.ref", "3_p11.ref", "2_p12.ref", "19_p1.fm", "1_p7.fm", "12_p5.ref", "chr17_p1.fm", "2_p5.ref", "2_p7.fm", "2_p1.ref", "chr17_p1.ref", "5_p6.fm", "11_p1.fm", "GL000192.1_p1.ref", "12_p2.fm", "10_p9.ref", "5_p1.ref", "chr17_p2.fm", "2_p5.fm", "5_p8.fm", "14_p6.fm", "14_p2.ref", "15_p2.fm", "5_p3.fm", "2_p2.ref", "14_p5.ref", "4_p6.fm", "5_p8.ref", "14_p6.ref", "20_p4.fm", "14_p3.ref", "1_p13.fm", "1_p12.ref", "3_p10.fm", "4_p1.fm", "1_p2.fm", "11_p2.ref", "1_p4.fm", "4_p10.fm", "2_p1.fm", "4_p7.fm", "3_p7.fm", "1_p15.ref", "15_p4.ref", "21_p1.ref", "2_p13.fm", "chr17_p6.ref", "5_p10.ref", "20_p3.fm", "6_p1.fm", "3_p9.fm", "5_p1.fm", "1_p15.fm", "1_p11.fm", "1_p9.ref", "14_p4.fm", "13_p2.ref", "1_p8.fm", "10_p8.ref", "11_p2.fm", "4_p7.ref", "11_p3.ref", "4_p2.fm", "6_p2.ref", "1_p8.ref", "19_p4.fm", "10_p4.ref", "4_p9.fm", "13_p1.ref", "1_p6.fm", "14_p1.ref", "20_p1.ref", "12_p3.fm", "1_p10.ref", "2_p8.ref", "1_p5.ref", "22_p1.ref", "1_p7.ref", "12_p1.fm", "2_p13.ref", "1_p4.ref", "20_p2.fm", "5_p10.fm", "GL000192.1_p1.fm", "4_p10.ref", "1_p13.ref", "2_p3.ref", "22_p2.fm", "4_p12.fm", "10_p7.fm", "10_p4.fm", "11_p9.fm", "2_p6.ref", "3_p5.fm", "1_p9.fm", "4_p4.fm", "3_p8.fm", "10_p3.ref", "11_p7.fm", "5_p5.ref", "5_p11.fm", "15_p3.ref", "10_p1.ref", "10_p9.fm", "14_p1.fm", "3_p1.fm", "chr17_p5.ref", "12_p6.fm", "22_p3.fm", "11_p8.ref", "5_p2.fm", "12_p7.ref", "10_p2.fm", "15_p1.ref", "1_p6.ref", "3_p9.ref", "13_p3.fm", "1_p11.ref", "13_p5.ref"]

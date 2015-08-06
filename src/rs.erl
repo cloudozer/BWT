@@ -12,8 +12,6 @@
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
 
--include("bwt.hrl").
-
 
 start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
   % TODO: refactor it
@@ -67,8 +65,6 @@ produce_workload(Size, Bin, Acc) ->
   [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
   [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
   Seq = {SName, SData},
-  %% assert
-  ?QSEC_LENGTH = size(SData),
   produce_workload(Size - 1, Bin4, [Seq | Acc]).
 
 

@@ -9,7 +9,7 @@
 		alq/3
 		]).
 
--define(CIGAR_MAKER_NBR,8).
+-define(CIGAR_MAKER_NBR,6).
 
 -include("bwt.hrl").
 
