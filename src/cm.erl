@@ -23,19 +23,17 @@ start_cigar_makers(N,Sink,SinkHost,LingdRef) ->
 
 
 cigar_maker({AlqN,AlqP}=Alq, Sink={SinkN,SinkP}) ->
-	navel:call_no_return(AlqN,erlang,send,[AlqP,{self(),ready}]),
+	navel:call_no_return(AlqN,erlang,send,[AlqP,{{navel:get_node(),self()},ready}]),
 	receive
-		{Ref,Read={SeqName, QsecBin},Chunk,Pos,D,Shift} = M ->
-%% 			io:format("CM: got read. Aligned: "),
+		{Ref,QsecBin,SeqName,Chunk,Pos} = M ->
+%% 			io:format("CM: got read. Aligned: ", []),
 			% run SW and send results to Sink
-      Ref_len = ?QSEC_LENGTH + D,
       Qsec = binary_to_list(QsecBin),
       case sw:sw(Qsec,Ref) of
         no_match -> ok;%io:format("no_match~n");
         {Score,CIGAR} ->
           io:format("CM cigar: ~p, ~p~n",[Score,CIGAR]),
-          Pos1 = Pos - Ref_len + Shift,
-          navel:call_no_return(SinkN, erlang, send, [SinkP, {SeqName,Chunk,Pos1,Score,CIGAR,Ref}])
+          navel:call_no_return(SinkN, erlang, send, [SinkP, {SeqName,Chunk,Pos,Score,CIGAR,Ref}])
       end,
 
 			spawn(?MODULE,cigar_maker,[Alq,Sink]);

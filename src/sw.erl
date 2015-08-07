@@ -61,7 +61,7 @@ sw(Qseq,Ref,F) ->
 	Lq = length(Qseq),
 	%%%%%% {Header,[column]}
 	Tab0 = [ [{0,undef}] || _ <- lists:seq(0,length(Ref)) ],
-	Thershold = -?MATCH*(Lq div 9),
+	Thershold = -?MATCH*(Lq div 11),
 	build_tab(F,Tab0,Ref,Qseq,[],0,Thershold).
 
 

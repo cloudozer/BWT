@@ -26,7 +26,7 @@ worker_ready(Pid, WorkerPid) ->
 
 %% gen_fsm callbacks
 
--record(state, {workers = [], workers_ready = [], fastq, fastq_eof = false, workload_size = 2000, client, chunks, sink, reads_num = 0}).
+-record(state, {workers = [], workers_ready = [], fastq, fastq_eof = false, workload_size = 1000, client, chunks, sink, reads_num = 0}).
 
 %% state ::= init|running|stopping
 

@@ -12,8 +12,6 @@
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
 
--include("bwt.hrl").
-
 
 start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
   % TODO: refactor it
@@ -36,12 +34,12 @@ start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
       Self = {navel:get_node(),self()},
 
       %% Start sink app
-      {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory, 128}]),
+      {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory,1024}]),
       {_Box,Sink,Schedule2} = navel:call(sink, sk, start_sink, [Schedule1,Self]),
       io:format("Sink started. Sink pid: ~p~nSchedule:~p~n",[Sink,Schedule2]),
 
       %% Create just one alq
-      Schedule3 = alq:start_alq(Schedule2,SinkHost,Sink,LingdRef,HttpStorage), % {Box_id,Alq,Chunk_files}
+      Schedule3 = alq:start_alq(Schedule2,SinkHost,Sink,LingdRef), % {Box_id,Alq,Chunk_files}
       io:format("Alq started. New Schedule: ~p~n",[Schedule3]),
 
       {Alqs, SFs} = sf:start_SF(Schedule3,LingdRef,HttpStorage,Self),
@@ -49,8 +47,9 @@ start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
 
       SeqFileNameUrl = HttpStorage ++ "/" ++ SeqFileName,
       {ok,Reads} = http:get(SeqFileNameUrl),
-
-			r_source(Reads,Alqs,SFs,length(SFs),Sink)
+StartTime = now(),
+			r_source(Reads,Alqs,SFs,length(SFs),Sink),
+io:format("Fastq complited within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
 	end.
 
 produce_workload(N, Fastq) ->
@@ -66,8 +65,6 @@ produce_workload(Size, Bin, Acc) ->
   [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
   [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
   Seq = {SName, SData},
-  %% assert
-  ?QSEC_LENGTH = size(SData),
   produce_workload(Size - 1, Bin4, [Seq | Acc]).
 
 
