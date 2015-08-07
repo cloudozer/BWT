@@ -129,6 +129,8 @@ make_index(Chunk,Shift,J,Chromo_name) ->
 	F_name = fm_name(Chromo_name,J),
 	ok = file:write_file(F_name++".ref",list_to_binary(Chunk)),
 	Ref_seq = lists:map( fun($N)->element(random:uniform(4),{$A,$C,$G,$T});
+							($n)->element(random:uniform(4),{$A,$C,$G,$T});
+							($a)->$A;($c)->$C;($g)->$G;($t)->$T;
 							($B)->$C;($D)->$G;($R)->$A;
 							($Y)->$C;($K)->$T;($M)->$A;
 							($S)->$C;($W)->$A;($V)->$A;
