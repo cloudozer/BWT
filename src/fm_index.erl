@@ -128,12 +128,12 @@ make_index(Chunk,Shift,J,Chromo_name) ->
 
 	F_name = fm_name(Chromo_name,J),
 	ok = file:write_file(F_name++".ref",list_to_binary(Chunk)),
-	Ref_seq = lists:map( fun(N) when $N == N; $n == N->element(random:uniform(4),{$A,$C,$G,$T});
+	Ref_seq = lists:map( fun($a)->$A;($c)->$C;($g)->$G;($t)->$T;
+							(N) when $N == N; $n == N->element(random:uniform(4),{$A,$C,$G,$T});
 							($B)->$C;($D)->$G;($R)->$A;
 							($Y)->$C;($K)->$T;($M)->$A;
 							($S)->$C;($W)->$A;($V)->$A;
 							($A)->$A;($C)->$C;($G)->$G;($T)->$T;
-							($a)->$A;($c)->$C;($g)->$G;($t)->$T;
 							(Err)->io:format("Unknown symbol ~p~n", [Err]), error(Err)
 						end, Chunk),
 	FM = bwt:fm(st:append($$,Ref_seq)),

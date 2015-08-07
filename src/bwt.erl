@@ -9,7 +9,8 @@
 		get_suffs/1,
 		fm/1,
 		sa/1,
-		test/0
+		test/0,
+		test_mm9/0
 		]).
 
 -include("bwt.hrl").
@@ -74,6 +75,21 @@ test() ->
   ],
 
   lists:foreach(fun(Qseq) -> {T,_}=timer:tc(sga,sga,[FM,Pc,Pg,Pt,Last,Qseq]), io:format("~p <--> ~b~n", [Qseq,T]) end, Qs).
+
+
+test_mm9() ->
+  {Meta,FM} = fm_index:get_index("chr17",1),
+  {Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
+  Qs = [
+		"TCTCCCATCATTCATTATACCTTTTCTGCACCCCTG",
+		"GGGTGGTTGTAAACAGCAGGCAGATGTGAGAAATGC",
+		"GACTCCCTAAACTTCCTTCTGAGGGACACAAATCAA",
+		"GCGGGGTGGGGAGCTTGGAGCCAGCTGTAGGCAGGG",
+		"TACTAGTGGCACCTCCCTGGGCTAAGACTCGGCTAG"
+  ],
+
+  lists:foreach(fun(Qseq) -> {T,Seeds}=timer:tc(sga,sga,[FM,Pc,Pg,Pt,Last,Qseq]), io:format("~p <--> ~b, Seeds: ~p~n", [Qseq,T,Seeds]) end, Qs).
+
 
 
 
