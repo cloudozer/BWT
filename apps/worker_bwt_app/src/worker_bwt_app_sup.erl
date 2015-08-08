@@ -23,12 +23,13 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	{_,_,C,D} = ip(),
-	NodeName = list_to_atom("erl" ++ integer_to_list(C) ++ "." ++ integer_to_list(D)),
-	navel:start0(NodeName),
-	navel:connect(application:get_env(worker_bwt_app,master_ip,{192,168,56,200})),
+	MyDomid = xenstore:domid(),
+	NodeName = list_to_atom("erl" ++ integer_to_list(MyDomid)),
+	navel:start(NodeName),
 
-	timer:sleep(1000),
+	{ok,MasterDomid} = application:get_env(worker_bwt_app, master_domid),
+	ok = navel:connect(MasterDomid),
+
     {ok, { {one_for_one, 5, 10}, [
         {worker_bwt, {worker_bwt, start_link, [{master,master}]}, permanent, 5000, worker, [worker_bwt]}
     ]} }.

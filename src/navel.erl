@@ -2,9 +2,7 @@
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
 
--define(PROXY_TCP_PORT, 9223).
--define(SOCK_OPTS, [{active,true},{reuseaddr,true},binary]).
--define(CHUNK_SIZE, 1440).
+-define(CHUNK_SIZE, 4000).
 
 -define(RESTART_AFTER, 1000).
 
@@ -14,7 +12,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start/1,start0/1,start/2]).
+-export([start/1]).
 -export([connect/1]).
 -export([get_node/0]).
 -export([call/4,call_no_return/4]).
@@ -30,23 +28,18 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start(Node) -> start(Node, 0).
-
-start(Node, PortInc) ->
+start(Node) ->
 	spawn(fun() -> print_stats() end),
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [Node,PortInc], []).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [Node], []).
 
 print_stats() ->
 	%ling:experimental(gc, 1),
 	timer:sleep(1000),
 	print_stats().
 
-start0(Node) -> start(Node).	%%OBSOLETE
-
-connect(Addr) ->
-	{ok,S} = gen_tcp:connect(Addr, ?PROXY_TCP_PORT, ?SOCK_OPTS),
-	Postman = spawn(fun() -> nice_postman(S) end),
-	ok = gen_tcp:controlling_process(S, Postman),
+connect(Domid) ->
+	Postman = spawn(fun() -> {ok,T} = tube:open(Domid),
+							 nice_postman(T) end),
 	door_bell(Postman, true).
 
 door_bell(Postman) -> door_bell(Postman, false).
@@ -78,16 +71,15 @@ call_no_return(Node, M, F, As) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
-init([Node,PortInc]) ->
+init([Node]) ->
 	process_flag(trap_exit, true),
-	{ok,L} = gen_tcp:listen(?PROXY_TCP_PORT+PortInc, ?SOCK_OPTS),
 
-	%%Monitor =
-	%%spawn_link(fun() -> process_flag(trap_exit, true),
-	%%					receive X -> io:format("MONITOR: ~p\n", [X]) end end),
-	%%link(Monitor),
+	Monitor =
+	spawn_link(fun() -> process_flag(trap_exit, true),
+						receive X -> io:format("MONITOR: ~p\n", [X]) end end),
+	link(Monitor),
 
-	_Acceptor = spawn_link(fun() -> acceptor(L) end),
+	_Acceptor = spawn_link(fun() -> acceptor() end),
 	{ok,#nv{node =Node}}.
 
 handle_call(get_node, _From, #nv{node =MyNode} =St) ->
@@ -139,106 +131,98 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-acceptor(L) ->
-	{ok,S} = gen_tcp:accept(L),
+acceptor() ->
+	{ok,S} = tube:accept(),
 	Postman = spawn(fun() -> nice_postman(S) end),
-	ok = gen_tcp:controlling_process(S, Postman),
+	true = port_connect(S, Postman),
 	door_bell(Postman),
-	acceptor(L).
+	acceptor().
 
 nice_postman(S) ->
 	MyNode = get_node(),
-	send_message(S, {'$iam',MyNode}),
-	postman(S).
+	ok = tube:can_send_async(S),
+	Outgoing = message_chunks({'$iam',MyNode}),
+	postman(S, Outgoing).
 
-postman(S) -> postman(S, 0, 0, [], nocall, 0).
+postman(S, Outgoing) -> postman(S, [], nocall, Outgoing, 0, 0).
 
-rookie_postman(S, ExpSz, IncSz, Chips, Call) ->
+rookie_postman(S, Chips, Call, Outgoing, CanSend) ->
 	receive take_over -> ok end,
-	postman(S, ExpSz, IncSz, Chips, Call, 0).
+	postman(S, Chips, Call, Outgoing, CanSend, 0).
 
 forward_mail(Addressee) ->
 	receive X -> Addressee ! X, forward_mail(Addressee)
 			after 0 -> done end.
 
-postman(S, ExpSz, IncSz, Chips, Call, N) when N >= ?RESTART_AFTER ->
-	Rookie = spawn(fun() -> rookie_postman(S, ExpSz, IncSz, Chips, Call) end),
+postman(S, Chips, Call, Outgoing, CanSend, N) when N >= ?RESTART_AFTER ->
+	Rookie = spawn(fun() -> rookie_postman(S, Chips, Call, Outgoing, CanSend) end),
 	substitute(self(), Rookie),
-	ok = gen_tcp:controlling_process(S, Rookie),
+	true = port_connect(S, Rookie),
 	forward_mail(Rookie),
+	unlink(S),
 	%%io:format("navel: restarted ~w as ~w\n", [self(),Rookie]),
 	Rookie ! take_over;
 
-postman(S, ExpSz, IncSz, Chips, Call, N) ->
+postman(S, Chips, Call, [X|Outgoing], CanSend, N) when CanSend > 0 ->
+	true = port_command(S, X),
+	if CanSend =:= 1 -> ok = tube:can_send_async(S);
+				true -> ok end,
+	postman(S, Chips, Call, Outgoing, CanSend-1, N);
+
+postman(S, Chips, Call, Outgoing, CanSend, N) ->
 	receive
 		{From,{call,M,F,As}} ->
 			true = Call =:= nocall,
-			ok = send_message(S, {'$call',M,F,As}),
-			postman(S, ExpSz, IncSz, Chips, From, N+1);
+			Chunks = message_chunks({'$call',M,F,As}),
+			postman(S, Chips, From, q(Chunks, Outgoing), CanSend, N+1);
 		{_From,{call_no_return,M,F,As}} ->
-			ok = send_message(S, {'$call_no_return',M,F,As}),
-			postman(S, ExpSz, IncSz, Chips, Call, N+1);
-		{tcp,S,Chip} ->
-			{ExpSz1,IncSz1,Chips1,Call1} = incoming(S, Chip, ExpSz, IncSz, Chips, Call),
-			postman(S, ExpSz1, IncSz1, Chips1, Call1, N+1);
-		{tcp_closed,S} -> signoff(self()) end.
+			Chunks = message_chunks({'$call_no_return',M,F,As}),
+			postman(S, Chips, Call, q(Chunks, Outgoing), CanSend, N+1);
 
-incoming(S, Chip, 0, _IncSz, Chips, Call) ->
-	case merge(Chip, Chips) of
-		<<ExpSz:32,Data/binary>> -> incoming(S, Data, ExpSz, 0, [], Call);
-		Bin -> {0,byte_size(Bin),[Bin],Call} end;
+		{S,{data,<<0,Chip/binary>>}} ->
+			postman(S, [Chip|Chips], Call, Outgoing, CanSend, N);
+		{S,{data,<<255,Chip/binary>>}} ->
+			X = list_to_binary(lists:reverse([Chip|Chips])),
+			action(S, binary_to_term(X), Call, Outgoing, CanSend, N);
 
-incoming(S, Chip, ExpSz, IncSz, Chips, Call) when IncSz+byte_size(Chip) >= ExpSz ->
-	<<MsgBin:ExpSz/binary,More/binary>> = merge(Chip, Chips),
-	<<PadSz:16,_:PadSz/binary,Payload/binary>> = MsgBin,
-	Call1 = action(S, binary_to_term(Payload), Call),
-	incoming(S, More, 0, 0, [], Call1);
+		{can_send,S,NumSlots} ->
+			postman(S, Chips, Call, Outgoing, NumSlots, N) end.
 
-incoming(_S, Chip, ExpSz, IncSz, Chips, Call) ->
-	{ExpSz,IncSz+byte_size(Chip),[Chip|Chips],Call}.
+q(More, Queue) -> lists:append(Queue, More).
 
-merge(Chip, Chips) -> list_to_binary(lists:reverse([Chip|Chips])).
-
-action(S, {'$iam',RemoteName}, Call) ->
-	{ok,{{A,B,C,D},P}} = inet:peername(S),
-	io:format("navel: connected to ~s at ~w.~w.~w.~w:~w \n", [RemoteName,A,B,C,D,P]),
+action(S, {'$iam',RemoteName}, Call, Outgoing, CanSend, N) ->
+	io:format("navel: connected to ~s\n", [RemoteName]),
 	introduce(self(), RemoteName),
-	Call;
+	postman(S, [], Call, Outgoing, CanSend, N+1);
 
-action(S, {'$call',M,F,As}, Call) ->
+action(S, {'$call',M,F,As}, Call, Outgoing, CanSend, N) ->
 	Returns = (catch apply(M, F, As)),
-	send_message(S, {'$returns',Returns}),
-	Call;
+	Chunks = message_chunks({'$returns',Returns}),
+	postman(S, [], Call, q(Chunks, Outgoing), CanSend, N+1);
 
-action(_S, {'$call_no_return',M,F,As}, Call) ->
+action(S, {'$call_no_return',M,F,As}, Call, Outgoing, CanSend, N) ->
 	case (catch apply(M, F, As)) of
 		{'EXIT',Reason} ->
 			io:format("navel: exception caught while calling ~w:~w/~w: ~p\n",
-					[M,F,length(As),Reason]), Call;
-		_ -> Call end;
+					[M,F,length(As),Reason]);
+		_ -> ok end,
+	postman(S, [], Call, Outgoing, CanSend, N+1);
 
-action(_S, {'$returns',Returns}, Call) ->
-	true = Call =/= nocall,
+action(S, {'$returns',Returns}, Call, Outgoing, CanSend, N) when Call =/= nocall ->
 	Call ! {returns,Returns},
-	nocall.
+	postman(S, [], nocall, Outgoing, CanSend, N+1).
 
 %% Message encoding:
 %%
-%%	<<MsgSz:32,PadSz:16,Padding:PadSz,Payload>>
-%%
-%% MsgSz 	- the size of the message without the MsgSz field
-%% PadSz	- the size of the Padding field
-%% Payload	- an Erlang term encoded using term_to_binary()
-%%
-%% The purpose of the padding is to align the message to CHUNK_SIZE
+%% <<0,Chunk1/binary>>
+%% <<0,Chunk2/binary>>
+%% ...
+%% <<255,ChunkN/binary>>	last chunk
 %%
 
-send_message(Sock, Term) ->
-	%%io:format("navel: send ~P\n", [Term,12]),
-	Payload = term_to_binary(Term),
-	NumChunks = (4 + 2 + byte_size(Payload) + ?CHUNK_SIZE-1) div ?CHUNK_SIZE,
-	MsgSz = NumChunks * ?CHUNK_SIZE - 4,
-	PadSz = MsgSz - 2 - byte_size(Payload),
-	Pkt = <<MsgSz:32,PadSz:16,0:PadSz/unit:8,Payload/binary>>,
-	ok = gen_tcp:send(Sock, Pkt).
+message_chunks(Term) -> message_chunks(term_to_binary(Term), []).
+message_chunks(Bin, Acc) when byte_size(Bin) =< ?CHUNK_SIZE ->
+	lists:reverse([<<255,Bin/binary>>|Acc]);
+message_chunks(<<Chunk:?CHUNK_SIZE/binary,Bin/binary>>, Acc) ->
+	message_chunks(Bin, [<<0,Chunk/binary>>|Acc]).
 
