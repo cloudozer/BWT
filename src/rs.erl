@@ -34,7 +34,7 @@ start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
       Self = {navel:get_node(),self()},
 
       %% Start sink app
-      {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory,1024}]),
+      {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory,2024}]),
       {_Box,Sink,Schedule2} = navel:call(sink, sk, start_sink, [Schedule1,Self]),
       io:format("Sink started. Sink pid: ~p~nSchedule:~p~n",[Sink,Schedule2]),
 
