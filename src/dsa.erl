@@ -12,6 +12,7 @@
 -include("bwt.hrl").
 
 
+
 dsa(Str) ->
 	Alphabet = "TGCA", % sorted in descenting order
 	[$$,L|_] = lists:reverse(Str),

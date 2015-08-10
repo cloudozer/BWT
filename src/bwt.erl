@@ -116,8 +116,9 @@ get_all_permutations(Acc,T,K,N) ->
 fm(X) ->
 	_ = statistics(runtime),
 	%SA = st:sa_seq(X),
-	SA = dsa:dsa(X),
-	%io:format("~p~n",[SA]),
+	%SA = dsa:dsa(X),
+	SA = suff_arr_master:main(X,3),
+	%io:format("~p~n~p~n",[SA,length(SA)]),
 	
 	{_,T2} = statistics(runtime),
 	io:format("Suffix array generation took: ~psec~n",[T2/1000]),
