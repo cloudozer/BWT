@@ -52,7 +52,7 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source,HttpStorage) ->
 seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	receive
-		quit -> ok;
+		quit -> print_stat(SavedSeqs);
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 %% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
@@ -77,4 +77,14 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt
 	end.
 
 
-	
+
+print_stat(SavedSeqs) ->
+	N = dict:size(SavedSeqs),
+	Entries = dict:fetch_keys(SavedSeqs),
+	io:format("There are ~w entries in saved sequences dict~n",[N]),
+	io:format("~p% are 'no_seeds'~n",[length(lists:filters(fun(K) -> dict:fetch(K,SavedSeqs)=:=no_found end,Entries))/N*100]),
+	io:format("~p% are 'too_many_seeds'~n",[length(lists:filters(fun(K) -> dict:fetch(K,SavedSeqs)=:=too_many_seeds end,Entries))/N*100]).
+
+
+
+
