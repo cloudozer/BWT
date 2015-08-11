@@ -82,7 +82,7 @@ print_stat(SavedSeqs) ->
 	N = dict:size(SavedSeqs),
 	Entries = dict:fetch_keys(SavedSeqs),
 	io:format("There are ~w entries in saved sequences dict~n",[N]),
-	io:format("~p% are 'no_seeds'~n",[length(lists:filters(fun(K) -> dict:fetch(K,SavedSeqs)=:=no_found end,Entries))/N*100]),
+	io:format("~p% are 'no_seeds'~n",[length(lists:filters(fun(K) -> dict:fetch(K,SavedSeqs)=:=no_seeds end,Entries))/N*100]),
 	io:format("~p% are 'too_many_seeds'~n",[length(lists:filters(fun(K) -> dict:fetch(K,SavedSeqs)=:=too_many_seeds end,Entries))/N*100]).
 
 
