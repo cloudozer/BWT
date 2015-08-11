@@ -5,7 +5,7 @@
 
 -module(sga).
 -export([
-		sga/6,
+		sga/7,
 		skip_Ns/1
 		]).
 
@@ -14,22 +14,22 @@
 
 
 % finds seeds for a sequence Qseq against reference sequence represented by FM-index
-sga(FM,Pc,Pg,Pt,Last,Qseq) -> sga(FM,Pc,Pg,Pt,Last,Qseq,[],0,0).
-sga(FM,Pc,Pg,Pt,Last,Qseq,Acc,Qty,Shift) -> 
+sga(FM,SavedSeqs,Pc,Pg,Pt,Last,Qseq) -> sga(FM,SavedSeqs,Pc,Pg,Pt,Last,Qseq,[],0,0).
+sga(FM,SavedSeqs,Pc,Pg,Pt,Last,Qseq,Acc,Qty,Shift) -> 
 	case skip_Ns(Qseq) of
 		no_more_subseqs -> get_similar(Qty,Acc);
 		{Skip,Qseq1} ->
 			Qlen = length(Qseq1),
-			case bwa:find_seeds(FM,Pc,Pg,Pt,Last,Qseq1) of
+			case bwa:find_seeds(FM,SavedSeqs,Pc,Pg,Pt,Last,Qseq1) of
 				no_seeds ->
 					%io:format("Seeds not found~n"),
-					sga(FM,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN), Acc, Qty,Shift+?MIN_LEN+Skip);
+					sga(FM,SavedSeqs,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN), Acc, Qty,Shift+?MIN_LEN+Skip);
 				too_many_seeds ->
 					%io:format("Got too many seeds for a subseq: ~p~n",[Qseq]),
-					sga(FM,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN),Acc,Qty,Shift+?MIN_LEN+Skip);
+					sga(FM,SavedSeqs,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN),Acc,Qty,Shift+?MIN_LEN+Skip);
 				Seed_ends ->
 					%io:format("~p seeds found: ~p~n",[length(Seed_ends),[S+Shift||S<-Seed_ends]]),
-					sga(FM,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN),add_seeds(Seed_ends,Acc,Shift+Skip),Qty+1,Shift+?MIN_LEN+Skip)					
+					sga(FM,SavedSeqs,Pc,Pg,Pt,Last,lists:sublist(Qseq1,Qlen-?MIN_LEN),add_seeds(Seed_ends,Acc,Shift+Skip),Qty+1,Shift+?MIN_LEN+Skip)					
 			end
 	end.
 

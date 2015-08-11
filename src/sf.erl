@@ -46,9 +46,10 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source,HttpStorage) ->
 
 	{Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 	Shift = proplists:get_value(shift, Meta),
-	seed_finder(Chunk,Alq,R_source,FM,Ref1,Pc,Pg,Pt,Last,Shift).
+	SavedSeqs = dict:new(),
+	seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
-seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shift) ->
+seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	receive
 		quit -> ok;
@@ -58,7 +59,7 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shif
 
 			lists:foreach(
 				fun({Qname,Qseq}) ->
-					Seeds = sga:sga(FM,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
+					Seeds = sga:sga(FM,SavedSeqs,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
 					Seeds1 = lists:map(fun({SeedEnd,D}) ->
 						Ref_len = size(Qseq) + D,
 						GlobalPos = SeedEnd - Ref_len + Shift,
@@ -72,7 +73,7 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shif
 					navel:call_no_return(AlqN, erlang, send, [AlqP, {Qname,Chunk,Qseq,Seeds1}])
 				end, Batch),
 
-			seed_finder(Chunk,Alq,R_source,FM,Ref,Pc,Pg,Pt,Last,Shift)
+			seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift)
 	end.
 
 
