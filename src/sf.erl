@@ -46,19 +46,20 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source,HttpStorage) ->
 
 	{Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 	Shift = proplists:get_value(shift, Meta),
-	seed_finder(Chunk,Alq,R_source,FM,Ref1,Pc,Pg,Pt,Last,Shift).
+	SavedSeqs = dict:new(),
+	seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
-seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shift) ->
+seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	receive
-		quit -> ok;
+		quit -> print_stat(SavedSeqs);
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 %% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
 
-			lists:foreach(
-				fun({Qname,Qseq}) ->
-					Seeds = sga:sga(FM,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
+			SavedSeqs1 = lists:foldl(
+				fun({Qname,Qseq},SavedSeqsAcc) ->
+					{Seeds, SavedSeqsAcc1} = sga:sga(FM,SavedSeqsAcc,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
 					Seeds1 = lists:map(fun({SeedEnd,D}) ->
 						Ref_len = size(Qseq) + D,
 						GlobalPos = SeedEnd - Ref_len + Shift,
@@ -69,11 +70,22 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shif
 
 						{GlobalPos,Ref_seq1}
 					end, Seeds),
-					navel:call_no_return(AlqN, erlang, send, [AlqP, {Qname,Chunk,Qseq,Seeds1}])
-				end, Batch),
+					navel:call_no_return(AlqN, erlang, send, [AlqP, {Qname,Chunk,Qseq,Seeds1}]),
+					SavedSeqsAcc1
+				end, SavedSeqs, Batch),
 
-			seed_finder(Chunk,Alq,R_source,FM,Ref,Pc,Pg,Pt,Last,Shift)
+			seed_finder(Chunk,Alq,R_source,FM,SavedSeqs1,Ref,Pc,Pg,Pt,Last,Shift)
 	end.
 
 
-	
+
+print_stat(SavedSeqs) ->
+	N = dict:size(SavedSeqs),
+	Entries = dict:fetch_keys(SavedSeqs),
+	io:format("There are ~w entries in saved sequences dict~n",[N]),
+	io:format("~p% are 'no_seeds'~n",[length(lists:filter(fun(K) -> dict:fetch(K,SavedSeqs)=:=no_seeds end,Entries))/N*100]),
+	io:format("~p% are 'too_many_seeds'~n",[length(lists:filter(fun(K) -> dict:fetch(K,SavedSeqs)=:=too_many_seeds end,Entries))/N*100]).
+
+
+
+
