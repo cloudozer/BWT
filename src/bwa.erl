@@ -11,14 +11,8 @@
 
 
 find_seeds(FM,SavedSeqs,Pc,Pg,Pt,Last, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
-	{Key,Tail} = lists:split(?SAVED_SEQ_LEN,lists:reverse(Subseq)), 
-	case dict:is_key(Key,SavedSeqs) of
-		true -> 
-			case dict:fetch(Key,SavedSeqs) of
-				{Sp,Ep} -> {find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN),SavedSeqs};
-				no_seeds -> {no_seeds,SavedSeqs};
-				too_many_seeds ->{ too_many_seeds,SavedSeqs}
-			end;
+	case bad_seq(Subseq) of
+		true -> too_many_seeds;
 		false->
 			{Key,Tail} = lists:split(?SAVED_SEQ_LEN,lists:reverse(Subseq)), 
 			case dict:is_key(Key,SavedSeqs) of
