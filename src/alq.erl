@@ -18,9 +18,9 @@
 % starts Alq in each box if there is one or more seed_finder
 start_alq(Schedule,SinkHost,Sink,Lingd) -> start_alq(Schedule,SinkHost,Sink,Lingd,[]).
 
-start_alq([{Box_id,Chunks}|Schedule],SinkHost,Sink,Lingd,Acc) ->
-	NodeName = list_to_atom("alq_" ++ Box_id),
-	{ok,AlqHost} = lingd:create(Lingd, NodeName, [{memory, 3548}]),
+start_alq([{{Box_id,BoxHost},Chunks}|Schedule],SinkHost,Sink,Lingd,Acc) ->
+	NodeName = list_to_atom("alq_" ++ atom_to_list(Box_id)),
+	{ok,AlqHost} = lingd:create(Lingd, BoxHost, NodeName, [{memory, 3548}]),
 	ok = navel:call(NodeName,navel,connect,[SinkHost]),
 	ok = navel:call(NodeName,lingd,connect,[]),
 	A = navel:call(NodeName,erlang,spawn,[?MODULE,alq,[Sink,SinkHost,Lingd]]),

@@ -2,12 +2,12 @@
 -behaviour(gen_fsm).
 
 
--export([start_link/1, create/2, create/3, ling_up/2, destroy/1]).
+-export([start_link/1, create/2, create/3, create/4, ling_up/2, destroy/1]).
 -export([connect/0]).
 -export([init/1, beam/3, ling/3]).
 -export([ip/0]).
 
--record(state, {host = '127.0.0.1', port, port_increment = 10, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin", instances = [], ip_inc = 2}).
+-record(state, {host = 'erlangonxen.org', port, port_increment = 10, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin -setcookie secret", instances = [], ip_inc = 2}).
 
 
 %% lingd API
@@ -46,6 +46,14 @@ log:info("Instance ~p created (~p).", [Name,Host]),
 log:info("Connected to instance~n"),
   {ok, Host}.
 
+create({LNode,LPid},Host,Name,Opts) ->
+  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name, Opts}]),
+log:info("Remote instance ~p created.", [Name]),
+timer:sleep(2000),
+log:info("navel:connect ~p~n", [Host]),
+  ok = navel:connect(Host),
+  {ok, Host}.
+
 ling_up(CallerBin, Host) ->
   gen_fsm:sync_send_event(?MODULE, {ling_up, CallerBin, Host}).
 
@@ -76,6 +84,13 @@ beam({create, Name, _Opts}, _From, S=#state{host = Host, port_increment = PortIn
   {ok, Node} = slave:start_link(Host, Name, [S#state.slave_opts]),
   {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
   {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
+
+beam({create, Host, Name, Opts}, _From, S) ->
+io:format("beam ~p~n", [{create, Host, Name, Opts}]),
+  {ok, Node} = slave:start_link(Host, Name, ["-pa /home/yatagan/BWT/ebin /home/yatagan/BWT/deps/*/ebin /home/yatagan/BWT/apps/*/ebin -setcookie secret"]),
+io:format("running navel... ~p~n", [{Node,Name}]),
+  {ok,_} = rpc:call(Node, navel, start, [Name]),
+  {reply, {ok, Host}, beam, S};
 
 beam(destroy, _From, S) ->
   %% TODO implement me

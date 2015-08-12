@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -name client@127.0.0.1 -attached
+%%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -attached -name launcher@erlangonxen.org -setcookie secret
 
 main([]) ->
   io:format("Usage: start_local.sh SeqFileName Chromosome HttpStorage Boxes~n");
@@ -10,7 +10,7 @@ main([SeqFileName, ChromosomeList, HttpStorage, Boxes]) ->
 
 main([SeqFileName, ChromosomeListRaw, HttpStorage, BoxesRaw, OptsStr]) ->
   ChromosomeList = string_to_term(ChromosomeListRaw),
-  Boxes = string_to_term(BoxesRaw),
+  Boxes = list_to_term(BoxesRaw),
   Opts = list_to_term(OptsStr),
   VM = proplists:get_value(vm, Opts, beam),
   start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes),
