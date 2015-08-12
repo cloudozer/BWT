@@ -11,17 +11,21 @@
 
 
 find_seeds(FM,SavedSeqs,Pc,Pg,Pt,Last, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
-	{Key,Tail} = lists:split(?SAVED_SEQ_LEN,lists:reverse(Subseq)), 
-	case dict:is_key(Key,SavedSeqs) of
-		true -> 
-			case dict:fetch(Key,SavedSeqs) of
-				{Sp,Ep} -> find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN);
-				no_seeds -> no_seeds;
-				too_many_seeds -> too_many_seeds
-			end;
+	case bad_seq(Subseq) of
+		true -> too_many_seeds;
 		false->
-			SavedSeqs1 = add_new_key(FM,SavedSeqs,Pc,Pg,Pt,Last,Key),
-			find_seeds(FM,SavedSeqs1,Pc,Pg,Pt,Last, Subseq)
+			{Key,Tail} = lists:split(?SAVED_SEQ_LEN,lists:reverse(Subseq)), 
+			case dict:is_key(Key,SavedSeqs) of
+				true -> 
+					case dict:fetch(Key,SavedSeqs) of
+						{Sp,Ep} -> find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN);
+						no_seeds -> no_seeds;
+						too_many_seeds -> too_many_seeds
+					end;
+				false->
+					SavedSeqs1 = add_new_key(FM,SavedSeqs,Pc,Pg,Pt,Last,Key),
+					find_seeds(FM,SavedSeqs1,Pc,Pg,Pt,Last, Subseq)
+			end
 	end.
 
 
@@ -84,4 +88,9 @@ find_interval(_,_Sp,_Ep,[],_) -> not_found.
 
 
 
+bad_seq(Subseq) -> 
+	N = length(Subseq),
+	length(lists:filter(fun($C)->true;($G)->true;(_)->false 
+						end, lists:sublist(Subseq,N-?MIN_LEN+1,?MIN_LEN))) < ?MIN_LEN/3.
+	
 
