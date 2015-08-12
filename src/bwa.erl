@@ -15,9 +15,9 @@ find_seeds(FM,SavedSeqs,Pc,Pg,Pt,Last, Subseq) -> %%%%%%%%  starting point  %%%%
 	case dict:is_key(Key,SavedSeqs) of
 		true -> 
 			case dict:fetch(Key,SavedSeqs) of
-				{Sp,Ep} -> find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN);
-				no_seeds -> no_seeds;
-				too_many_seeds -> too_many_seeds
+				{Sp,Ep} -> {find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN),SavedSeqs};
+				no_seeds -> {no_seeds,SavedSeqs};
+				too_many_seeds ->{ too_many_seeds,SavedSeqs}
 			end;
 		false->
 			SavedSeqs1 = add_new_key(FM,SavedSeqs,Pc,Pg,Pt,Last,Key),
@@ -39,7 +39,7 @@ add_new_key(FM,SavedSeqs,Pc,Pg,Pt,Last,Key) ->
 			Sp = 1, Ep = Pc-1
 	end,
 	Interval = find_interval(FM, Sp,Ep, Tail, 1),
-	Max_range = length(FM)/math:pow(4,?SAVED_SEQ_LEN-1),
+	Max_range = size(FM)/math:pow(4,?SAVED_SEQ_LEN),
 	case Interval of
 		{Sp,Ep} when Ep-Sp > Max_range -> 
 			dict:store(Key,too_many_seeds,SavedSeqs);
@@ -80,7 +80,7 @@ find_interval(FM,Sp,Ep,[C2|Qseq],N) ->
 			%io:format("New range: (~p, ~p)~n",[Sp1,Ep1]),
 			find_interval(FM, Sp1, Ep1, Qseq, N+1)
 	end;
-find_interval(_,_Sp,_Ep,[],_) -> not_found.
+find_interval(_,Sp,Ep,[],_) -> {Sp,Ep}.
 
 
 
