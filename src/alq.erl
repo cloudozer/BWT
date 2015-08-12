@@ -22,7 +22,7 @@ start_alq([{{Box_id,BoxHost},Chunks}|Schedule],SinkHost,Sink,Lingd,Acc) ->
 	NodeName = list_to_atom("alq_" ++ atom_to_list(Box_id)),
 	{ok,AlqHost} = lingd:create(Lingd, BoxHost, NodeName, [{memory, 3548}]),
 	ok = navel:call(NodeName,navel,connect,[SinkHost]),
-	ok = navel:call(NodeName,lingd,connect,[]),
+	ok = navel:call(NodeName,navel,connect,[{'erlangonxen.org',10}]),
 	A = navel:call(NodeName,erlang,spawn,[?MODULE,alq,[Sink,SinkHost,Lingd]]),
 	start_alq(Schedule,SinkHost,Sink,Lingd,[{Box_id,{AlqHost,{NodeName,A}},[ C ||{C,_} <- Chunks]}|Acc]);
 

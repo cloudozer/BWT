@@ -48,8 +48,6 @@ log:info("Instance ~p created.", [Name]),
 create({LNode,LPid},Host,Name,Opts) ->
   {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name, Opts}]),
 log:info("Remote instance ~p created.", [Name]),
-timer:sleep(2000),
-log:info("navel:connect ~p~n", [Host]),
   ok = navel:connect(Host),
   {ok, Host}.
 
@@ -85,9 +83,7 @@ beam({create, Name, _Opts}, _From, S=#state{host = Host, port_increment = PortIn
   {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
 
 beam({create, Host, Name, Opts}, _From, S) ->
-io:format("beam ~p~n", [{create, Host, Name, Opts}]),
   {ok, Node} = slave:start_link(Host, Name, ["-pa /home/yatagan/BWT/ebin /home/yatagan/BWT/deps/*/ebin /home/yatagan/BWT/apps/*/ebin -setcookie secret"]),
-io:format("running navel... ~p~n", [{Node,Name}]),
   {ok,_} = rpc:call(Node, navel, start, [Name]),
   {reply, {ok, Host}, beam, S};
 
