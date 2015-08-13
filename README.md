@@ -7,7 +7,7 @@ make && ./scripts/start_local.es bwt_files/SRR770176_1.fastq_tiny GL000193.1 htt
 
 # BEAM
 
-./rebar co && ./scripts/start_local.es bwt_files/SRR770176_1.fastq_tiny GL000193.1 http://127.0.0.1:8888 [box1] "[{vm,beam}]"
+./rebar co && ./scripts/start_local.es bwt_files/SRR770176_1.fastq 22 http://127.0.0.1:8888 "[{box1,'46.4.100.178'}]" "[{vm,beam}]"
 
 # Checkout and build
 	$ git clone https://github.com/cloudozer/BWT.git
