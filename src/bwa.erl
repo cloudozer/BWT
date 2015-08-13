@@ -92,5 +92,4 @@ bad_seq(Subseq) ->
 	N = length(Subseq),
 	length(lists:filter(fun($C)->true;($G)->true;(_)->false 
 						end, lists:sublist(Subseq,N-?MIN_LEN+1,?MIN_LEN))) < ?MIN_LEN/3.
-	
 
