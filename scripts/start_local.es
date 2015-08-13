@@ -34,20 +34,16 @@ list_to_term(String) ->
 
 start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes) ->
 
-  ImageFile = <<"/home/yatagan/BWT/BWT.img">>,
-  GatorOts = [{host, "10.0.0.1"},{port, 4387}],
-
   %% Start local navel
   navel:start(launcher),
   true = register(launcher, self()),
 
-  SourceExtra = <<"-ipaddr 10.0.0.10 -netmask 255.255.255.0 -gateway 10.0.0.1 -eval ''">>,
-  ok = egator:create(<<"test">>, ImageFile, [{memory, 1024},{extra, SourceExtra}], GatorOpts),
+  %% Start lingd daemon
+  {ok, {LingdNode, LingdPid}} = lingd:start_link(VM),
+  LingdRef = {LingdNode, LingdPid},
 
-  {ok,_SourceHost} = lingd:create(LingdRef, source, [{memory, 2548}]),
-log:info("connencting to souce"),
-  ok = navel:call(source,navel,connect,['10.0.0.1']),
-log:info("spawning..."),
+  {ok,_SourceHost} = lingd:create(LingdRef, source, [{memory, 128}]),
+  ok = navel:call(source,lingd,connect,[]),
   navel:call_no_return(source, erlang, spawn, [rs,start_cluster,[Boxes,ChromosomeList,SeqFileName,HttpStorage,LingdRef]]),
 
   Wait = fun Wait() ->

@@ -41,9 +41,8 @@ create({LNode,LPid},Name) ->
 
 create({LNode,LPid},Name,Opts) ->
   {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name, Opts}, 30000]),
-log:info("Instance ~p created (~p).", [Name,Host]),
+log:info("Instance ~p created.", [Name]),
   ok = navel:connect(Host),
-log:info("Connected to instance~n"),
   {ok, Host}.
 
 create({LNode,LPid},Host,Name,Opts) ->
@@ -59,7 +58,7 @@ destroy({LNode,LPid}) ->
   navel:call(LNode, gen_fsm, sync_send_event, [LPid, destroy, 30000]).
 
 connect() ->
-  navel:connect('10.0.0.1').
+  navel:connect({'127.0.0.1', 10}).
 
 %% Delete me
 ip() ->
@@ -94,10 +93,9 @@ beam(destroy, _From, S) ->
 
 ling({create, Name, Opts}, From, S = #state{instances = Instances, ip_inc = IpInc}) ->
   Host = {10,0,0,1},
-io:format("ling creating ~p~n", [Name]),
   NameBin = list_to_binary(atom_to_list(Name)),
   Extra = list_to_binary(io_lib:format("-ipaddr 10.0.0.~b -netmask 255.255.255.0 -gateway 10.0.0.1 -home /BWT -pz /BWT/ebin -eval 'ok = application:start(sasl), navel:start(~w), ok = navel:connect({~w,~w}), timer:sleep(2000), ok = navel:call(~w, lingd, ling_up, [~w,lingd:ip()]).'", [IpInc, Name, Host, S#state.port, ?MODULE, term_to_binary(From)])),
-log:info("ling create ~p", [Extra]),
+%log:info("ling create ~p", [Extra]),
   egator:create(NameBin, <<"/home/yatagan/BWT/BWT.img">>, [{memory, proplists:get_value(memory, Opts, 512)},{extra, Extra}], []),
   {next_state, ling, S#state{instances = [NameBin | Instances], ip_inc = IpInc + 1}};
 
