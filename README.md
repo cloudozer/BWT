@@ -1,5 +1,5 @@
-
-python3 -m http.server 8888
+# Run http-server (with ranges support)
+$ python2 RangeHTTPServer.py 8888
 
 # LING
 sudo ../gator/gator --listen --bind-to 127.0.0.1 --port 4387
@@ -7,7 +7,7 @@ make && ./scripts/start_local.es bwt_files/SRR770176_1.fastq_tiny GL000193.1 htt
 
 # BEAM
 
-./rebar co && ./scripts/start_local.es bwt_files/SRR770176_1.fastq_tiny GL000193.1 http://127.0.0.1:8888 [box1] "[{vm,beam}]"
+./rebar co && ./scripts/start_local.es bwt_files/SRR770176_1.fastq?r=0-80538540 GL000193.1 http://127.0.0.1:8888 [box1] "[{vm,beam}]"
 
 # Checkout and build
 	$ git clone https://github.com/cloudozer/BWT.git
