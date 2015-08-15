@@ -60,13 +60,21 @@ produce_workload(0, Fastq, Acc) ->
 produce_workload(_Size, <<>>, Acc) ->
   {<<>>, Acc};
 produce_workload(Size, Bin, Acc) ->
-  [<<$@, SName/binary>>, Bin1] = binary:split(Bin, <<$\n>>),
-  [SData, Bin2] = binary:split(Bin1, <<$\n>>),
-  [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
-  [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
-  Seq = {SName, SData},
-  produce_workload(Size - 1, Bin4, [Seq | Acc]).
-
+  try 
+  case binary:split(Bin, <<$\n>>) of
+  [<<$@, SName/binary>>, Bin1] ->
+	  [SData, Bin2] = binary:split(Bin1, <<$\n>>),
+	  [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
+	  [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
+	  Seq = {SName, SData},
+	  produce_workload(Size - 1, Bin4, [Seq | Acc]);
+  [Fb, Bin1] ->
+io:format("Bin1 ~p~n", [Fb]),
+	  produce_workload(Size, Bin1, Acc)
+  end
+  catch _:_ ->
+    {<<>>, Acc}
+  end.
 
 r_source(<<>>,Alqs,SFs,0,Sink) ->
 	% multicast it
@@ -84,7 +92,7 @@ r_source(<<>>,Alqs,SFs,0,Sink) ->
 	end;
 
 r_source(Reads,Alqs,SFs,0,Sink) ->
-  case produce_workload(3, Reads) of
+  case produce_workload(300, Reads) of
     {Reads1, []} ->
       r_source(Reads1,Alqs,SFs,0,Sink);
     {Reads1, Batch} ->
