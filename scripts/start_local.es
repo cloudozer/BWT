@@ -10,7 +10,7 @@ main([Host, SeqFileName, ChromosomeList, HttpStorage, Boxes]) ->
 
 main([Host, SeqFileName, ChromosomeListRaw, HttpStorage, BoxesRaw, OptsStr]) ->
   Name = list_to_atom("launcher@" ++ Host),
-  {ok,_} = net_kernel:start(Name, longnames),
+  {ok,_} = net_kernel:start([Name, longnames]),
   ChromosomeList = string_to_term(ChromosomeListRaw),
   Boxes = list_to_term(BoxesRaw),
   Opts = list_to_term(OptsStr),
@@ -45,7 +45,7 @@ start_subcluster(Host, SeqFileName, ChromosomeList, HttpStorage, VM, Boxes) ->
   LingdRef = {LingdNode, LingdPid},
 
   {ok,_SourceHost} = lingd:create(LingdRef, source, [{memory, 128}]),
-  ok = navel:call(source,lingd,connect,[]),
+  ok = navel:call(source,navel,connect,[{'127.0.0.1', 10}]),
   navel:call_no_return(source, erlang, spawn, [rs,start_cluster,[Boxes,ChromosomeList,SeqFileName,HttpStorage,LingdRef]]),
 
   Wait = fun Wait() ->
@@ -57,7 +57,7 @@ start_subcluster(Host, SeqFileName, ChromosomeList, HttpStorage, VM, Boxes) ->
         {{Year, Month, Day}, {Hour, Min, Sec1}} = erlang:localtime(),
         StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
         io:format(StatTemplate, [SeqFileName, "human_g1k_v37_decoy.fasta", ChromosomeList, ReadsNum, Sec, WorkersNum, Year, Month, Day, Hour, Min, Sec1]),
-        ok = lingd:destroy(LingdRef),
+        ok = lingn:destroy(LingdRef),
         halt(0)
     end
   end,

@@ -32,7 +32,7 @@ start_link(beam, Host) ->
   {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
   ok = navel:connect({State#state.host, PortInc}),
 timer:sleep(1000),
-  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {beam,#state{port_increment = PortInc + 1}}, []]),
+  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {beam,State#state{port_increment = PortInc + 1}}, []]),
   NNode = navel:call(?MODULE, navel, get_node, []),
   {ok, {NNode, Pid}}.
 
