@@ -3,19 +3,17 @@
 %%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -attached -setcookie secret
 
 main([]) ->
-  io:format("Usage: start_local.sh Host, SeqFileName Chromosome HttpStorage Boxes~n");
+  io:format("Usage: start_local.sh SeqFileName Chromosome HttpStorage Boxes~n");
 
-main([Host, SeqFileName, ChromosomeList, HttpStorage, Boxes]) ->
-  main([Host, SeqFileName, ChromosomeList, HttpStorage, Boxes, "[]"]);
+main([SeqFileName, ChromosomeList, HttpStorage, Boxes]) ->
+  main([SeqFileName, ChromosomeList, HttpStorage, Boxes, "[]"]);
 
-main([Host, SeqFileName, ChromosomeListRaw, HttpStorage, BoxesRaw, OptsStr]) ->
-  Name = list_to_atom("launcher@" ++ Host),
-  {ok,_} = net_kernel:start([Name, longnames]),
+main([SeqFileName, ChromosomeListRaw, HttpStorage, BoxesRaw, OptsStr]) ->
   ChromosomeList = string_to_term(ChromosomeListRaw),
   Boxes = list_to_term(BoxesRaw),
   Opts = list_to_term(OptsStr),
   VM = proplists:get_value(vm, Opts, beam),
-  start_subcluster(list_to_atom(Host), SeqFileName, ChromosomeList, HttpStorage, VM, Boxes),
+  start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes),
   receive
     {stop, Secs} ->
       io:format("It's all over. ~.1f sec.~n", [Secs])
@@ -34,7 +32,10 @@ list_to_term(String) ->
       Error
   end.
 
-start_subcluster(Host, SeqFileName, ChromosomeList, HttpStorage, VM, Boxes) ->
+start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes = [{_, Host}|_]) ->
+
+  Name = list_to_atom("launcher@" ++ atom_to_list(Host)),
+  {ok,_} = net_kernel:start([Name, longnames]),
 
   %% Start local navel
   navel:start(launcher),
