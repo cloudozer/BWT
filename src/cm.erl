@@ -5,16 +5,18 @@
 %
 
 -module(cm).
--export([start_cigar_makers/4,
+-export([start_cigar_makers/5,
 		cigar_maker/2
 		]).
 
 -include("bwt.hrl").
 
 
-start_cigar_makers(N,Sink,SinkHost={SinkHost1,_},LingdRef) ->
+start_cigar_makers(N,Sink,SinkHost={SinkHost1,_}, BoxName, LingdRef) ->
+log:info("!!!start_cigar_makers ~p", [{N,Sink,SinkHost}]),
 	lists:foreach(  fun(I) ->
-		NodeName = list_to_atom("cm_" ++ integer_to_list(I)),
+		NodeName = list_to_atom("cm_" ++ integer_to_list(I) ++ "_" ++ atom_to_list(BoxName)),
+log:info("!!!blad ~p", [{NodeName,I}]),
 		{ok,_} = lingd:create(LingdRef, SinkHost1, NodeName, []),
     ok = navel:call(NodeName,navel,connect,[SinkHost]),
 		navel:call_no_return(NodeName, erlang, spawn, [?MODULE, cigar_maker,[{navel:get_node(),self()},Sink]])

@@ -48,6 +48,7 @@ log:info("Instance ~p created.", [Name1]),
 
 create({LNode,LPid},Host,Name,Opts) ->
   Name1 = clean_slave_name(Name),
+log:info("2beam({create ~p", [{self(),Host, Name}]),
   {ok, Host1} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name1, Opts}, 30000]),
 log:info("Remote instance ~p created.", [Name1]),
   ok = navel:connect(Host1),
@@ -88,7 +89,6 @@ beam({create, Host, Name, _Opts}, _From, S=#state{port_increment = PortInc}) ->
   %% TODO: move it somewhere
   SlaveOpts = ["-pa /home/yatagan/BWT/ebin /home/yatagan/BWT/deps/*/ebin /home/yatagan/BWT/apps/*/ebin -setcookie secret"],
   {ok, Node} = slave:start_link(Host, Name, SlaveOpts),
-log:info("beam({create ~p", [{Host, Name, PortInc}]),
   {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
   {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
 
