@@ -108,7 +108,7 @@ r_source(<<>>,Alqs,SFs,0,Sink) ->
 	end;
 
 r_source(Reads,Alqs,SFs,0,Sink) ->
-  case produce_workload(10, Reads) of
+  case produce_workload(2000, Reads) of
     {Reads1, []} ->
       r_source(Reads1,Alqs,SFs,0,Sink);
     {Reads1, Batch} ->

@@ -48,7 +48,6 @@ log:info("Instance ~p created.", [Name1]),
 
 create({LNode,LPid},Host,Name,Opts) ->
   Name1 = clean_slave_name(Name),
-log:info("2beam({create ~p", [{self(),Host, Name}]),
   {ok, Host1} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name1, Opts}, 30000]),
 log:info("Remote instance ~p created.", [Name1]),
   ok = navel:connect(Host1),

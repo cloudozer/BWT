@@ -13,10 +13,8 @@
 
 
 start_cigar_makers(N,Sink,SinkHost={SinkHost1,_}, BoxName, LingdRef) ->
-log:info("!!!start_cigar_makers ~p", [{N,Sink,SinkHost}]),
 	lists:foreach(  fun(I) ->
 		NodeName = list_to_atom("cm_" ++ integer_to_list(I) ++ "_" ++ atom_to_list(BoxName)),
-log:info("!!!blad ~p", [{NodeName,I}]),
 		{ok,_} = lingd:create(LingdRef, SinkHost1, NodeName, []),
     ok = navel:call(NodeName,navel,connect,[SinkHost]),
 		navel:call_no_return(NodeName, erlang, spawn, [?MODULE, cigar_maker,[{navel:get_node(),self()},Sink]])
@@ -34,7 +32,7 @@ cigar_maker({AlqN,AlqP}=Alq, Sink={SinkN,SinkP}) ->
       case sw:sw(Qsec,Ref) of
         no_match -> ok;%io:format("no_match~n");
         {Score,CIGAR} ->
-          io:format("CM cigar: ~p, ~p~n",[Score,CIGAR]),
+          %% io:format("CM cigar: ~p, ~p~n",[Score,CIGAR]),
           navel:call_no_return(SinkN, erlang, send, [SinkP, {SeqName,Chunk,Pos,Score,CIGAR,Ref}])
       end,
 
