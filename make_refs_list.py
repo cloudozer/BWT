@@ -3,7 +3,8 @@
 import os
 import json
 
-
-l = os.listdir('fm_indices')
-j = json.dumps(l)
+PATH = 'fm_indices'
+files = os.listdir(PATH)
+data = [[f, os.stat(os.path.join(PATH, f)).st_size] for f in files]
+j = json.dumps(data)
 print(j)

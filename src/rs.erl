@@ -6,12 +6,26 @@
 
 
 -module(rs).
--export([start_cluster/5,
+-export([
+  start/2,
+	start_cluster/5,
   r_source/5
-		]).
+]).
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
 
+
+start(SeqFileName, HttpStorage) ->
+	Pid = spawn(fun() ->
+		SeqFileNameUrl = HttpStorage ++ "/" ++ SeqFileName,
+		{ok,Reads} = http:get(SeqFileNameUrl),
+		receive
+			{run, Alqs,SFs, SinkRef} ->
+				r_source(Reads,Alqs,SFs,length(SFs),SinkRef)
+		end
+	end),
+	Ref = {navel:get_node(), Pid},
+	{ok, Ref}.
 
 start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
   % TODO: refactor it

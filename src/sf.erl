@@ -6,13 +6,19 @@
 
 
 -module(sf).
--export([start_SF/4,
-		seed_finder/4
-		]).
+-export([
+	start/4,
+	start_SF/4,
+	seed_finder/4
+]).
 
 
 -define(REF_EXTENSION_LEN, 200).
 
+start(Chunk,AlqRef,SourceRef,HttpStorage) ->
+	Pid = spawn(?MODULE,seed_finder,[Chunk,AlqRef,SourceRef,HttpStorage]),
+	Ref = {navel:get_node(), Pid},
+	{ok, Ref}.
 
 % returns {Alqs, SFs} - list of Alq processes and list of SF processes
 start_SF(Schedule,Lingd,HttpStorage,Source) -> start_SF(Schedule,Lingd,HttpStorage,Source,[],[]).

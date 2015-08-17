@@ -37,29 +37,30 @@ start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes = [{_, Host
   Name = list_to_atom("launcher@" ++ atom_to_list(Host)),
   {ok,_} = net_kernel:start([Name, longnames]),
 
-  %% Start local navel
-  navel:start(launcher),
-  true = register(launcher, self()),
+  % TODO: refactor it
+  IndexUrl = HttpStorage ++ "/fm_indices/index.json",
+  {ok, FilesInfoJson} = http:get(IndexUrl),
+  FilesInfo = jsx:decode(FilesInfoJson),
 
-  %% Start lingd daemon
-  {ok, {LingdNode, LingdPid}} = lingd:start_link(VM, Host),
-  LingdRef = {LingdNode, LingdPid},
+  case schedule:chunks_to_box(ChromosomeList,FilesInfo,Boxes) of
+    not_enough_memory ->
+      io:format("Not enough memory~n"),
+      throw(not_enough_memory);
 
-  {ok,_SourceHost} = lingd:create(LingdRef, source, [{memory, 128}]),
-  ok = navel:call(source,navel,connect,[{'127.0.0.1', 10}]),
-  navel:call_no_return(source, erlang, spawn, [rs,start_cluster,[Boxes,ChromosomeList,SeqFileName,HttpStorage,LingdRef]]),
+    Schedule ->
+      ok = subcluster:start(Boxes, Schedule, SeqFileName, HttpStorage, VM, Host),
 
-  Wait = fun Wait() ->
-    receive
-      {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq} ->
-        io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
-        Wait();
-      {source_sink_done, Sec, WorkersNum, ReadsNum} ->
-        {{Year, Month, Day}, {Hour, Min, Sec1}} = erlang:localtime(),
-        StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
-        io:format(StatTemplate, [SeqFileName, "human_g1k_v37_decoy.fasta", ChromosomeList, ReadsNum, Sec, WorkersNum, Year, Month, Day, Hour, Min, Sec1]),
-        ok = lingn:destroy(LingdRef),
-        halt(0)
-    end
-  end,
-  Wait().
+      receive_cigars(SeqFileName,ChromosomeList)
+  end.
+
+receive_cigars(SeqFileName,ChromosomeList) ->
+  receive
+    {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq} ->
+      io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
+      receive_cigars(SeqFileName,ChromosomeList);
+    {source_sink_done, Sec, WorkersNum, ReadsNum} ->
+      {{Year, Month, Day}, {Hour, Min, Sec1}} = erlang:localtime(),
+      StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
+      io:format(StatTemplate, [SeqFileName, "human_g1k_v37_decoy.fasta", ChromosomeList, ReadsNum, Sec, WorkersNum, Year, Month, Day, Hour, Min, Sec1]),
+      halt(0)
+  end.

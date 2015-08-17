@@ -5,15 +5,21 @@
 %
 
 -module(alq).
--export([start_alq/4,
-		alq/3
-		]).
+-export([
+	start/3,
+	start_alq/4,
+	alq/3
+]).
 
 -define(CIGAR_MAKER_NBR,6).
 
 -include("bwt.hrl").
 
 
+start(SinkRef,SinkHost,LingdRef) ->
+	Pid = spawn(?MODULE,alq,[SinkRef,SinkHost,LingdRef]),
+	Ref = {navel:get_node(), Pid},
+	{ok, Ref}.
 
 % starts Alq in each box if there is one or more seed_finder
 start_alq(Schedule,SinkHost,Sink,Lingd) -> start_alq(Schedule,SinkHost,Sink,Lingd,[]).

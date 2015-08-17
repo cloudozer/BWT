@@ -6,10 +6,16 @@
 
 
 -module(sk).
--export([start_sink/2,
-		sink/2
-		]).
+-export([
+  start/2,
+	start_sink/2,
+	sink/2
+]).
 
+start(SourceRef, AlqsNum) ->
+	Pid = spawn(?MODULE,sink,[SourceRef,AlqsNum]),
+	Ref = {navel:get_node(), Pid},
+	{ok, Ref}.
 
 start_sink(Schedule, Source) ->
 	New_schedule = remove_source_sink(Schedule),
