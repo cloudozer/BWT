@@ -14,7 +14,7 @@ start(Boxes, Schedule, SeqFileName, HttpStorage, VM, Host) ->
   %% Start lingd daemon
   {ok, {LingdNode, LingdPid}} = lingd:start_link(VM, Host),
   LingdRef = {LingdNode, LingdPid},
-  LingdHost = {Host, 10},
+  LingdHost = {Host, 100},
 
   %% Reads source
   {source, SourceMem, {_, SourceHost, _}, Schedule1} = schedule:pop_subcluster_element(source, Schedule),

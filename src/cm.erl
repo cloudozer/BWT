@@ -12,10 +12,10 @@
 -include("bwt.hrl").
 
 
-start_cigar_makers(N,Sink,SinkHost,LingdRef) ->
+start_cigar_makers(N,Sink,SinkHost={SinkHost1,_},LingdRef) ->
 	lists:foreach(  fun(I) ->
 		NodeName = list_to_atom("cm_" ++ integer_to_list(I)),
-		{ok,_} = lingd:create(LingdRef, NodeName, []),
+		{ok,_} = lingd:create(LingdRef, SinkHost1, NodeName, []),
     ok = navel:call(NodeName,navel,connect,[SinkHost]),
 		navel:call_no_return(NodeName, erlang, spawn, [?MODULE, cigar_maker,[{navel:get_node(),self()},Sink]])
 	end,lists:seq(1,N)).

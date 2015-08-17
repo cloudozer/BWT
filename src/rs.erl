@@ -21,7 +21,9 @@ start(SeqFileName, HttpStorage) ->
 		{ok,Reads} = http:get(SeqFileNameUrl),
 		receive
 			{run, Alqs,SFs, SinkRef} ->
-				r_source(Reads,Alqs,SFs,length(SFs),SinkRef)
+StartTime = now(),
+				r_source(Reads,Alqs,SFs,length(SFs),SinkRef),
+io:format("Fastq complited within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
 		end
 	end),
 	Ref = {navel:get_node(), Pid},

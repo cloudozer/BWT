@@ -6,7 +6,7 @@
 -export([init/1, beam/3, ling/3]).
 -export([ip/0, clean_slave_name/1]).
 
--record(state, {host = 'localhost', port, port_increment = 10, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin -setcookie secret", instances = [], ip_inc = 2}).
+-record(state, {host = 'localhost', port, port_increment = 100, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin -setcookie secret", instances = [], ip_inc = 2}).
 
 
 %% lingd API
@@ -48,7 +48,7 @@ log:info("Instance ~p created.", [Name1]),
 
 create({LNode,LPid},Host,Name,Opts) ->
   Name1 = clean_slave_name(Name),
-  {ok, Host1} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name1, Opts}]),
+  {ok, Host1} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name1, Opts}, 30000]),
 log:info("Remote instance ~p created.", [Name1]),
   ok = navel:connect(Host1),
   {ok, Host1}.
@@ -88,6 +88,7 @@ beam({create, Host, Name, _Opts}, _From, S=#state{port_increment = PortInc}) ->
   %% TODO: move it somewhere
   SlaveOpts = ["-pa /home/yatagan/BWT/ebin /home/yatagan/BWT/deps/*/ebin /home/yatagan/BWT/apps/*/ebin -setcookie secret"],
   {ok, Node} = slave:start_link(Host, Name, SlaveOpts),
+log:info("beam({create ~p", [{Host, Name, PortInc}]),
   {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
   {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
 

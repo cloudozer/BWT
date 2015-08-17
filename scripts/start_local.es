@@ -48,6 +48,7 @@ start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes = [{_, Host
       throw(not_enough_memory);
 
     Schedule ->
+      io:format("Schedule: ~p~n", [Schedule]),
       ok = subcluster:start(Boxes, Schedule, SeqFileName, HttpStorage, VM, Host),
 
       receive_cigars(SeqFileName,ChromosomeList)
