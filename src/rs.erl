@@ -92,7 +92,7 @@ io:format("Bin1 ~p~n", [Fb]),
 
 r_source(<<>>,Alqs,SFs,0,Sink) ->
 	% multicast it
-	lists:foreach(  fun({_,{_,{_,A}}})-> A ! fastq_done
+	lists:foreach(  fun({ANode,APid})-> navel:call_no_return(ANode, erlang, send, [APid, fastq_done])
 					end,Alqs),
 	io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
 	case get_sink_confirmation(Sink) of
@@ -142,7 +142,7 @@ get_sink_confirmation(Sink) ->
 
 shutdown_cluster(Alqs,SFs,{SinkN,SinkP}) ->
   navel:call_no_return(SinkN,erlang,send,[SinkP,quit]),
-	lists:foreach(fun({_,{_,{N,P}}})-> navel:call_no_return(N,erlang,send,[P,quit]) end, Alqs),
+	lists:foreach(fun({N,P})-> navel:call_no_return(N,erlang,send,[P,quit]) end, Alqs),
 	lists:foreach(fun({N,P})-> navel:call_no_return(N,erlang,send,[P,quit]) end, SFs).
 
 

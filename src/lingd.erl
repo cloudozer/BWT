@@ -4,7 +4,7 @@
 
 -export([start_link/1, start_link/2, create/2, create/3, create/4, ling_up/2, destroy/1]).
 -export([init/1, beam/3, ling/3]).
--export([ip/0]).
+-export([ip/0, clean_slave_name/1]).
 
 -record(state, {host = 'localhost', port, port_increment = 10, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin -setcookie secret", instances = [], ip_inc = 2}).
 
@@ -40,16 +40,18 @@ create({LNode,LPid},Name) ->
   create({LNode,LPid},Name,[]).
 
 create({LNode,LPid},Name,Opts) ->
-  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name, Opts}, 30000]),
-log:info("Instance ~p created.", [Name]),
+  Name1 = clean_slave_name(Name),
+  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name1, Opts}, 30000]),
+log:info("Instance ~p created.", [Name1]),
   ok = navel:connect(Host),
   {ok, Host}.
 
 create({LNode,LPid},Host,Name,Opts) ->
-  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name, Opts}]),
-log:info("Remote instance ~p created.", [Name]),
-  ok = navel:connect(Host),
-  {ok, Host}.
+  Name1 = clean_slave_name(Name),
+  {ok, Host1} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name1, Opts}]),
+log:info("Remote instance ~p created.", [Name1]),
+  ok = navel:connect(Host1),
+  {ok, Host1}.
 
 ling_up(CallerBin, Host) ->
   gen_fsm:sync_send_event(?MODULE, {ling_up, CallerBin, Host}).
@@ -63,6 +65,9 @@ ip() ->
     case [ X || {If,Props} =X <- Ifaddrs, If =/= "lo", lists:keymember(addr, 1, Props) ] of
 	[] -> unassigned;
 	[{_,Props}|_] -> proplists:get_value(addr, Props) end.
+
+clean_slave_name(Name) ->
+  list_to_atom(lists:filter(fun($.) -> false;(_) -> true end, atom_to_list(Name))).
 
 %% broadcast(NodePids, Msg) ->
 %%   lists:foreach(fun({Node,Pid}) ->
@@ -79,12 +84,12 @@ beam({create, Name, _Opts}, _From, S=#state{host = Host, port_increment = PortIn
   {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
   {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
 
-beam({create, Host, Name, _Opts}, _From, S) ->
+beam({create, Host, Name, _Opts}, _From, S=#state{port_increment = PortInc}) ->
   %% TODO: move it somewhere
   SlaveOpts = ["-pa /home/yatagan/BWT/ebin /home/yatagan/BWT/deps/*/ebin /home/yatagan/BWT/apps/*/ebin -setcookie secret"],
   {ok, Node} = slave:start_link(Host, Name, SlaveOpts),
-  {ok,_} = rpc:call(Node, navel, start, [Name]),
-  {reply, {ok, Host}, beam, S};
+  {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
+  {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
 
 beam(destroy, _From, S) ->
   %% TODO implement me

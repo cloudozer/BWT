@@ -41,11 +41,12 @@ start_SF([],_,_,_,Alqs,SFs) ->
 
 
 
-seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source,HttpStorage) ->
-	{ok, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ binary_to_list(Chunk)),
+seed_finder(Chunk,Alq={AlqN,AlqP},R_source,HttpStorage) ->
+	ChunkList = atom_to_list(Chunk),
+	{ok, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ ChunkList),
 	{Meta,FM} = binary_to_term(FmIndexBin),
 
-	RefFileName = re:replace(Chunk, ".fm", ".ref", [{return, list}]),
+	RefFileName = re:replace(ChunkList, ".fm", ".ref", [{return, list}]),
 	{ok, Ref} = http:get(HttpStorage ++ "/fm_indices/" ++ RefFileName),
 	Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
 	Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
@@ -55,7 +56,7 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source,HttpStorage) ->
 	SavedSeqs = dict:new(),
 	seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
-seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
+seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	receive
 		quit -> print_stat(SavedSeqs);
