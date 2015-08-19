@@ -31,11 +31,19 @@
 
 # Setup and run HTTP storage
 
+    wget http://nginx.org/download/nginx-1.9.4.tar.gz
+    tar xvf nginx-1.9.4.tar.gz
+    cd nginx-1.9.4
+    ./configure
+    make
+    sudo make install
+
     $ ./scripts/make_refs_list.py > fm_indices/index.json
     $ python scripts/http/nginx-server.py . 8888
     
 # Setup cluster
 Make sure your user on one of the servers ('main' box) is allowed to rsh to all rest servers without being prompted for a password.
+Each server must have the same compiled BWT source code in the same path.
 
 # Start
 From 'main' box:
