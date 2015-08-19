@@ -86,7 +86,9 @@ beam({create, Name, _Opts}, _From, S=#state{host = Host, port_increment = PortIn
 
 beam({create, Host, Name, _Opts}, _From, S=#state{port_increment = PortInc}) ->
   %% TODO: move it somewhere
-  SlaveOpts = ["-pa /home/yatagan/BWT/ebin /home/yatagan/BWT/deps/*/ebin /home/yatagan/BWT/apps/*/ebin -setcookie secret"],
+  {ok,Cwd} = file:get_cwd(),
+  PA = lists:foldl(fun(Path,Acc) -> filename:join(Cwd,Path) ++ " " ++ Acc end, "", ["ebin", "deps/*/ebin", "apps/*/ebin"]),
+  SlaveOpts = ["-pa " ++ PA ++ " -setcookie secret"],
   {ok, Node} = slave:start_link(Host, Name, SlaveOpts),
   {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
   {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
