@@ -34,6 +34,7 @@ __all__ = ["RangeHTTPRequestHandler"]
 import os
 import posixpath
 import BaseHTTPServer
+import SocketServer
 import urllib
 import cgi
 import shutil
@@ -273,8 +274,12 @@ class RangeHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         })
 
 
+class ThreadingSimpleServer(SocketServer.ThreadingMixIn,
+                   BaseHTTPServer.HTTPServer):
+    pass
+
 def test(HandlerClass = RangeHTTPRequestHandler,
-         ServerClass = BaseHTTPServer.HTTPServer):
+         ServerClass = ThreadingSimpleServer):
     BaseHTTPServer.test(HandlerClass, ServerClass)
 
 
