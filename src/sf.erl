@@ -59,7 +59,7 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source,HttpStorage) ->
 seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	receive
-		quit -> print_stat(SavedSeqs);
+		quit -> quit; %% print_stat(SavedSeqs);
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 %% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
