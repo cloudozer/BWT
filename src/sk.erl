@@ -6,10 +6,16 @@
 
 
 -module(sk).
--export([start_sink/2,
-		sink/2
-		]).
+-export([
+  start/2,
+	start_sink/2,
+	sink/2
+]).
 
+start(SourceRef, AlqsNum) ->
+	Pid = spawn(?MODULE,sink,[SourceRef,AlqsNum]),
+	Ref = {navel:get_node(), Pid},
+	{ok, Ref}.
 
 start_sink(Schedule, Source) ->
 	New_schedule = remove_source_sink(Schedule),
@@ -38,7 +44,7 @@ sink(R_source,J,Alq_nbr,Acc) ->
 
 		{SeqName,Chunk,Pos,Score,CIGAR,RefSeq}=Rec ->
 			% output
-			io:format("Sink: got SAM line~n"),
+			%% io:format("Sink: got SAM line~n"),
 			io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chunk, Pos, CIGAR, Score, RefSeq]),
 			sink(R_source,J,Alq_nbr,[Rec|Acc]);
 			

@@ -6,13 +6,19 @@
 
 
 -module(sf).
--export([start_SF/4,
-		seed_finder/4
-		]).
+-export([
+	start/4,
+	start_SF/4,
+	seed_finder/4
+]).
 
 
 -define(REF_EXTENSION_LEN, 200).
 
+start(Chunk,AlqRef,SourceRef,HttpStorage) ->
+	Pid = spawn(?MODULE,seed_finder,[Chunk,AlqRef,SourceRef,HttpStorage]),
+	Ref = {navel:get_node(), Pid},
+	{ok, Ref}.
 
 % returns {Alqs, SFs} - list of Alq processes and list of SF processes
 start_SF(Schedule,Lingd,HttpStorage,Source) -> start_SF(Schedule,Lingd,HttpStorage,Source,[],[]).
@@ -35,30 +41,32 @@ start_SF([],_,_,_,Alqs,SFs) ->
 
 
 
-seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source,HttpStorage) ->
-	{ok, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ binary_to_list(Chunk)),
+seed_finder(Chunk,Alq={AlqN,AlqP},R_source,HttpStorage) ->
+	ChunkList = atom_to_list(Chunk),
+	{ok, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ ChunkList),
 	{Meta,FM} = binary_to_term(FmIndexBin),
 
-	RefFileName = re:replace(Chunk, ".fm", ".ref", [{return, list}]),
+	RefFileName = re:replace(ChunkList, ".fm", ".ref", [{return, list}]),
 	{ok, Ref} = http:get(HttpStorage ++ "/fm_indices/" ++ RefFileName),
 	Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
 	Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 
 	{Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 	Shift = proplists:get_value(shift, Meta),
-	seed_finder(Chunk,Alq,R_source,FM,Ref1,Pc,Pg,Pt,Last,Shift).
+	SavedSeqs = dict:new(),
+	seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
-seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shift) ->
+seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	receive
-		quit -> ok;
+		quit -> print_stat(SavedSeqs);
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 %% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
 
-			lists:foreach(
-				fun({Qname,Qseq}) ->
-					Seeds = sga:sga(FM,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
+			SavedSeqs1 = lists:foldl(
+				fun({Qname,Qseq},SavedSeqsAcc) ->
+					{Seeds, SavedSeqsAcc1} = sga:sga(FM,SavedSeqsAcc,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
 					Seeds1 = lists:map(fun({SeedEnd,D}) ->
 						Ref_len = size(Qseq) + D,
 						GlobalPos = SeedEnd - Ref_len + Shift,
@@ -69,11 +77,22 @@ seed_finder(Chunk,Alq={_,{AlqN,AlqP}},R_source={SN,SP},FM,Ref,Pc,Pg,Pt,Last,Shif
 
 						{GlobalPos,Ref_seq1}
 					end, Seeds),
-					navel:call_no_return(AlqN, erlang, send, [AlqP, {Qname,Chunk,Qseq,Seeds1}])
-				end, Batch),
+					navel:call_no_return(AlqN, erlang, send, [AlqP, {Qname,Chunk,Qseq,Seeds1}]),
+					SavedSeqsAcc1
+				end, SavedSeqs, Batch),
 
-			seed_finder(Chunk,Alq,R_source,FM,Ref,Pc,Pg,Pt,Last,Shift)
+			seed_finder(Chunk,Alq,R_source,FM,SavedSeqs1,Ref,Pc,Pg,Pt,Last,Shift)
 	end.
 
 
-	
+
+print_stat(SavedSeqs) ->
+	N = dict:size(SavedSeqs),
+	Entries = dict:fetch_keys(SavedSeqs),
+	io:format("There are ~w entries in saved sequences dict~n",[N]),
+	io:format("~p% are 'no_seeds'~n",[length(lists:filter(fun(K) -> dict:fetch(K,SavedSeqs)=:=no_seeds end,Entries))/N*100]),
+	io:format("~p% are 'too_many_seeds'~n",[length(lists:filter(fun(K) -> dict:fetch(K,SavedSeqs)=:=too_many_seeds end,Entries))/N*100]).
+
+
+
+

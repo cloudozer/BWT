@@ -2,12 +2,11 @@
 -behaviour(gen_fsm).
 
 
--export([start_link/1, create/2, create/3, ling_up/2, destroy/1]).
--export([connect/0]).
+-export([start_link/1, start_link/2, create/2, create/3, create/4, ling_up/2, destroy/1]).
 -export([init/1, beam/3, ling/3]).
--export([ip/0]).
+-export([ip/0, clean_slave_name/1]).
 
--record(state, {host = '127.0.0.1', port, port_increment = 10, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin", instances = [], ip_inc = 2}).
+-record(state, {host = 'localhost', port, port_increment = 100, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin -setcookie secret", instances = [], ip_inc = 2}).
 
 
 %% lingd API
@@ -24,15 +23,16 @@ timer:sleep(1000),
 timer:sleep(2000),
   {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [{local, ?MODULE}, ?MODULE, {ling,#state{port_increment = PortInc + 1, port = PortInc}}, []]),
   Node1 = navel:call(?MODULE, navel, get_node, []),
-  {ok, {Node1,Pid}};
-start_link(beam) ->
-  State = #state{},
-  {ok, Node} = slave:start_link(State#state.host, ?MODULE, [State#state.slave_opts]),
+  {ok, {Node1,Pid}}.
+
+start_link(beam, Host) ->
+  State = #state{host = Host},
+  {ok, Node} = slave:start_link(Host, ?MODULE, [State#state.slave_opts]),
   PortInc = State#state.port_increment,
   {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
   ok = navel:connect({State#state.host, PortInc}),
 timer:sleep(1000),
-  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {beam,#state{port_increment = PortInc + 1}}, []]),
+  {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [?MODULE,  {beam,State#state{port_increment = PortInc + 1}}, []]),
   NNode = navel:call(?MODULE, navel, get_node, []),
   {ok, {NNode, Pid}}.
 
@@ -40,10 +40,18 @@ create({LNode,LPid},Name) ->
   create({LNode,LPid},Name,[]).
 
 create({LNode,LPid},Name,Opts) ->
-  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name, Opts}, 30000]),
-log:info("Instance ~p created.", [Name]),
+  Name1 = clean_slave_name(Name),
+  {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name1, Opts}, 30000]),
+log:info("Instance ~p created.", [Name1]),
   ok = navel:connect(Host),
   {ok, Host}.
+
+create({LNode,LPid},Host,Name,Opts) ->
+  Name1 = clean_slave_name(Name),
+  {ok, Host1} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Host, Name1, Opts}, 30000]),
+log:info("Remote instance ~p created.", [Name1]),
+  ok = navel:connect(Host1),
+  {ok, Host1}.
 
 ling_up(CallerBin, Host) ->
   gen_fsm:sync_send_event(?MODULE, {ling_up, CallerBin, Host}).
@@ -51,15 +59,15 @@ ling_up(CallerBin, Host) ->
 destroy({LNode,LPid}) ->
   navel:call(LNode, gen_fsm, sync_send_event, [LPid, destroy, 30000]).
 
-connect() ->
-  navel:connect({'127.0.0.1', 10}).
-
-%% Delete me
+%% TODO: Delete me
 ip() ->
     {ok,Ifaddrs} = inet:getifaddrs(),
     case [ X || {If,Props} =X <- Ifaddrs, If =/= "lo", lists:keymember(addr, 1, Props) ] of
 	[] -> unassigned;
 	[{_,Props}|_] -> proplists:get_value(addr, Props) end.
+
+clean_slave_name(Name) ->
+  list_to_atom(lists:filter(fun($.) -> false;(_) -> true end, atom_to_list(Name))).
 
 %% broadcast(NodePids, Msg) ->
 %%   lists:foreach(fun({Node,Pid}) ->
@@ -73,6 +81,15 @@ init({VM, State}) when ling == VM; beam == VM ->
 
 beam({create, Name, _Opts}, _From, S=#state{host = Host, port_increment = PortInc}) ->
   {ok, Node} = slave:start_link(Host, Name, [S#state.slave_opts]),
+  {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
+  {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
+
+beam({create, Host, Name, _Opts}, _From, S=#state{port_increment = PortInc}) ->
+  %% TODO: move it somewhere
+  {ok,Cwd} = file:get_cwd(),
+  PA = lists:foldl(fun(Path,Acc) -> filename:join(Cwd,Path) ++ " " ++ Acc end, "", ["ebin", "deps/*/ebin", "apps/*/ebin"]),
+  SlaveOpts = ["-pa " ++ PA ++ " -setcookie secret"],
+  {ok, Node} = slave:start_link(Host, Name, SlaveOpts),
   {ok,_} = rpc:call(Node, navel, start, [Name, PortInc]),
   {reply, {ok, {Host,PortInc}}, beam, S#state{port_increment = PortInc + 1}};
 

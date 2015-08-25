@@ -9,6 +9,7 @@
 		t/0,
 		sw/2,
 		sw/3,
+		simple_match/2,
 		sigma/2,
 		rand_seq/1,
 		get_starting_point/2]).
@@ -25,7 +26,8 @@ t(T1, 0, J) ->
 	T2 = os:timestamp(),
 	io:format("SW took ~ps; found ~p matches~n",[timer:now_diff(T2,T1) / 1000000, J ]);
 t(T1, N, J) ->
-	CIGAR = sw(150,170),
+	CIGAR = simple_match("ACGTTGCAGTGCATGACAGTAGACATGACAGTACAGTAGCACCCCCATTAATTGGGGGGGATTAGATAGATTGGGAACTAGTGACATAGACAGATACCGG",
+		"ACGTTGCAGTGCATGACAGTAGACATGACAGTACAGTAGCACCCCCATTAATTGGAAGGGATTAGATAGATTGGGAACTAGTGACATAGACAGATACCGG"),
 	case CIGAR of
 		no_match -> t(T1,N-1,J);
 		_ -> t(T1,N-1,J+1)
@@ -161,6 +163,17 @@ get_str(N,Dir) ->
 							up  -> "I"
 						end.
  
+
+
+simple_match(Ls1,Ls2) when length(Ls1) =:= length(Ls2) -> 
+	simple_match(Ls1,Ls2,?MATCH*length(Ls1),?MATCH*length(Ls1)*0.9).
+
+simple_match(_,_,Val,Thr) when Val < Thr -> no_match;
+simple_match([$N|Ls1],[_|Ls2],Val,Thr) -> simple_match(Ls1,Ls2,Val-?MATCH+?UNKNOWN,Thr);
+simple_match([S|Ls1],[S|Ls2],Val,Thr) -> simple_match(Ls1,Ls2,Val,Thr);
+simple_match([_|Ls1],[_|Ls2],Val,Thr) -> simple_match(Ls1,Ls2,Val-?MATCH+?MISMATCH,Thr);
+simple_match([],[],Val,_) -> Val.
+
 
 
 sigma($N,$N)-> ?UNKNOWN;

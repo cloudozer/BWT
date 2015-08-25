@@ -1,5 +1,5 @@
 name = "BWT"
 kernel = "BWT.img"
-extra = "-ipaddr 192.168.56.201 -netmask 255.255.255.0 -gateway 192.168.56.200 -home /BWT -pz /BWT/apps/master/ebin /BWT/apps/worker_bwt_app/ebin /BWT/deps/goldrush/ebin /BWT/deps/lager/ebin /BWT/ebin -eval 'application:start(sasl), application:start(worker_bwt_app)'"
-memory = 1500
+extra = "-ipaddr 10.0.0.10 -netmask 255.255.255.0 -gateway 10.0.0.1 -home /BWT `"
+memory = 150
 vif = ['bridge=xenbr0']

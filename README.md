@@ -1,89 +1,60 @@
+# Clone BWT, switch to branch 'source_sink_multibox':
 
-python3 -m http.server 8888
+    $ git clone https://github.com/cloudozer/BWT.git
+    $ git checkout source_sink_multibox
+    
+# Build
 
-# LING
-sudo ../gator/gator --listen --bind-to 127.0.0.1 --port 4387
-make && ./scripts/start_local.es bwt_files/SRR770176_1.fastq_tiny GL000193.1 http://127.0.0.1:8888 [box1] "[{vm,ling}]"
+    $ cd BWT
+    $ ./rebar get-deps co
+    
+# Get mouse genome
+    $ wget ftp://hgdownload.cse.ucsc.edu/goldenPath/mm9/chromosomes/chr17.fa.gz
+    $ gunzip -c chr17.fa.gz > bwt_files/chr17.fa
+    
+    $ wget http://ftp.era.ebi.ac.uk/vol1/fastq/ERR002/ERR002814/ERR002814_1.fastq.gz
+    $ gunzip -c ERR002814_1.fastq.gz > bwt_files/ERR002814_1.fastq
+    
+# Make fm index:
+    
+    $ erl -pa ebin
+    1> fm_index:make_indices("bwt_files/chr17.fa", ["chr17"]).
+    Making fm-index for chromosome chr17 ...
+    ...
+    <it works something like 10 minutes>
+    ...
+    All fm-indices for chromosome chr17 are built
+    No more chromosomes found
+    
+    quit erlang shell
+    2> q().
 
-# BEAM
+# Setup and run HTTP storage
 
-./rebar co && ./scripts/start_local.es bwt_files/SRR770176_1.fastq_tiny GL000193.1 http://127.0.0.1:8888 [box1] "[{vm,beam}]"
+    wget http://nginx.org/download/nginx-1.9.4.tar.gz
+    tar xvf nginx-1.9.4.tar.gz
+    cd nginx-1.9.4
+    ./configure
+    make
+    sudo make install
 
-# Checkout and build
-	$ git clone https://github.com/cloudozer/BWT.git
-	$ cd BWT
-	$ git checkout master
-	$ ./rebar get-deps
-	# Setup domain config files (bwtm.dom and bwtw.dom)
-	$ make
-	
-## Getting DNA files
-1. Download an archive: https://docs.google.com/uc?id=0B2DPaltm6IwpYVFHOEZYSGpldHc&export=download
-2. Extract it to the BWT folder
-	
-## Run test on local machine using 2 workers
-	$ ./scripts/start_local.sh SRR770176_1.fastq GL000193.1 2
+    $ ./scripts/make_refs_list.py > fm_indices/index.json
+    $ python scripts/http/nginx-server.py . 8888
+    
+# Setup cluster
+Make sure your user on one of the servers ('main' box) is allowed to rsh to all rest servers without being prompted for a password.
+Each server must have the same compiled BWT source code in the same path.
 
-### Cluster's nodes requirements
-* Friendly Linux
-* Xen
-* Erlang OTP 17
-* Git
-* Internet access
+# Start
+From 'main' box:
 
-### Master node Setup
-
-Edit domain config file 'bwtm.dom', setup expected number of workers, ssh port, etc.
-
-	$ make
-	$ sudo xl create -c bwtm.dom
-
-### Worker node Setup
-
-Edit domain config file 'bwtm.dom', setup master ip address, etc.
-
-	$ make
-	$ sudo xl create -c bwtw.dom
-
-# Secure Shell connection to a Ling node
-
-	$ ssh %NODE_HOST% -p %PORT%   # (password: 1)
-
-
-[Disregards Info below this line]
-
-# Big file processing 
-
-These are small tools to help process large files in Erlang.  In general, the strategy is to read in the file as an array of possibly overlapping Erlang binary "chunks".  These can then be processed in parallel/concurrently.
-
-## How to run
-1. download bio_pfile.erl
-2. launch Erlang shell
-3. compile: c(bio_pfil)
-4. run: bio_pfile:read(Filename,NumerOfChunks) or bio_pfile:read(FileName,NumberOfChunks,SizeOfOverlap)
-        both of which return an array of chunk elements: {{StartPos,Length},BinaryData}
-
-## Example
-
-    1> Data = bio_pfile:read("../data/GCA_000001405.15_GRCh38_full_analysis_set.fna",10000).
-    [{{0,32553715},<<">chr1  AC:CM000663.2  gi:568336023  LN:248956422  rl:Chromosome  M5:6aef897c3d6ff0c78aff06ac189178dd     AS"...>>},
-    {{32543715,32563715},<<"ACCTCATAGATTGGTCATCTTTTTCTC\nCTATATTTCTCTAATATTTAATCTCTCTCTCTCTCTCTCTTTGTATGTGCATTGCCTTTGGAGAGATTTC\nC"...>>},
-    {{65097430,32563715},<<"AATCAAGAAAATATGTTTACCAAAA\nTGCATTGCAATTTTCCCAAACCTGAGTCTTCAAATAACAAACATGAACTTATAGGTACTGTGAACTAGAA"...>>},
-    {{97651145,32563715},<<"CAAGAATTGAGGTTTGGGAAACT\nCCATCTAGATTTCAGAGGATGTATGGAAATACCTGGATGTCCAGGCAGTAGTTTGCTGCAAGGGTGTG"...>>},
-    {{813832875,32563715},<<"TT\nT"...>>},
-    {{846386590,...},<<...>>},
-    {{...},...},
-    {...}|...]
-    2> length(Data).                                                                        
-    10001
-    3> lists:nth(1,Data).                                                                   
-    {{0,32553715},<<">chr1  AC:CM000663.2  gi:568336023  LN:248956422  rl:Chromosome  M5:6aef897c3d6ff0c78aff06ac189178dd  AS:GRC"...>>}
-    4>  
-
-
-5. run: bio_pfile:spawn_find_pattern(ChunkArray,BinaryPattern) which returns an array of all the stat positions where the pattern was found as {StartPosition,LengthOfPattern}.
-
-## Example
-
-    4>  bio_pfile:spawn_find_pattern(Data,<<"TATATTCAGTCTTTCTAACACCATTTATTGAAGAGACTGTAG">>).
-    [{162758595,42}]
+    $ ./scripts/start_local.es bwt_files/ERR002814_1.fastq chr17 http://erlangonxen.org:8888 "[{box1,'erlangonxen.org',24},{box2,'46.4.100.178',24},{box4,'46.4.85.166',24}]" "[{vm,beam}]"
+     you will see
+    
+    ERR002814.6748574 IL11_585:8:330:753:844/1      chr17_p3.fm      36352383      36M      72      TCCAGCTTGGGGGAGGGGTAGCTGCAGTAGTTTCCT
+    ERR002814.6748588 IL11_585:8:330:797:680/1      chr17_p6.fm      90461772      36M      72      CTCTAACTACATTTAAACACTCACAAATCAAAGGAC
+    ...
+    <a lot of CIGARs>
+    Fastq complited within 69.966899 secs.
+    
+    <manually terminate the process>
