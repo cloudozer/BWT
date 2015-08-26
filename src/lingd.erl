@@ -2,19 +2,19 @@
 -behaviour(gen_fsm).
 
 
--export([start_link/1, start_link/2, create/2, create/3, create/4, ling_up/2, destroy/1]).
+-export([start_link/2, create/2, create/3, create/4, ling_up/2, destroy/1]).
 -export([init/1, beam/3, ling/3]).
 -export([ip/0, clean_slave_name/1]).
 
--record(state, {host = 'localhost', port, port_increment = 100, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin -setcookie secret", instances = [], ip_inc = 2}).
+-record(state, {host = 'localhost', port, port_increment = 100, slave_opts = "-pa ebin deps/*/ebin apps/*/ebin -setcookie secret -rsh ssh", instances = [], ip_inc = 2}).
 
 
 %% lingd API
 
-start_link(ling) ->
+start_link(ling, Host) ->
   %{ok, Pid} = gen_fsm:start_link(?MODULE, {{xen,ling},#state{}}, []),
-  State = #state{},
-  {ok, Node} = slave:start_link(State#state.host, ?MODULE, [State#state.slave_opts]),
+  State = #state{host = Host},
+  {ok, Node} = slave:start_link(Host, ?MODULE, [State#state.slave_opts]),
   % ok = rpc:call(Node, application, start, [sasl]),
   PortInc = State#state.port_increment,
   {ok,_} = rpc:call(Node, navel, start, [?MODULE, PortInc]),
@@ -23,7 +23,7 @@ timer:sleep(1000),
 timer:sleep(2000),
   {ok, Pid} = navel:call(?MODULE, gen_fsm, start_link, [{local, ?MODULE}, ?MODULE, {ling,#state{port_increment = PortInc + 1, port = PortInc}}, []]),
   Node1 = navel:call(?MODULE, navel, get_node, []),
-  {ok, {Node1,Pid}}.
+  {ok, {Node1,Pid}};
 
 start_link(beam, Host) ->
   State = #state{host = Host},
@@ -99,6 +99,13 @@ beam(destroy, _From, S) ->
 
 ling({create, Name, Opts}, From, S = #state{instances = Instances, ip_inc = IpInc}) ->
   Host = {10,0,0,1},
+  NameBin = list_to_binary(atom_to_list(Name)),
+  Extra = list_to_binary(io_lib:format("-ipaddr 10.0.0.~b -netmask 255.255.255.0 -gateway 10.0.0.1 -home /BWT -pz /BWT/ebin -eval 'ok = application:start(sasl), navel:start(~w), ok = navel:connect({~w,~w}), timer:sleep(2000), ok = navel:call(~w, lingd, ling_up, [~w,lingd:ip()]).'", [IpInc, Name, Host, S#state.port, ?MODULE, term_to_binary(From)])),
+%log:info("ling create ~p", [Extra]),
+  egator:create(NameBin, <<"/home/yatagan/BWT/BWT.img">>, [{memory, proplists:get_value(memory, Opts, 512)},{extra, Extra}], []),
+  {next_state, ling, S#state{instances = [NameBin | Instances], ip_inc = IpInc + 1}};
+
+ling({create, Host, Name, Opts}, From, S = #state{instances = Instances, ip_inc = IpInc}) ->
   NameBin = list_to_binary(atom_to_list(Name)),
   Extra = list_to_binary(io_lib:format("-ipaddr 10.0.0.~b -netmask 255.255.255.0 -gateway 10.0.0.1 -home /BWT -pz /BWT/ebin -eval 'ok = application:start(sasl), navel:start(~w), ok = navel:connect({~w,~w}), timer:sleep(2000), ok = navel:call(~w, lingd, ling_up, [~w,lingd:ip()]).'", [IpInc, Name, Host, S#state.port, ?MODULE, term_to_binary(From)])),
 %log:info("ling create ~p", [Extra]),
