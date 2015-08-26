@@ -8,7 +8,6 @@
 -module(rs).
 -export([
   start/2,
-	start_cluster/5,
   r_source/5
 ]).
 
