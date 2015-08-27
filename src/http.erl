@@ -54,7 +54,8 @@ do_recv(Sock) ->
 recv_headers(Sock, Headers) ->
   case binary:split(Headers, <<"\r\n\r\n">>) of
     [Headers1, Body] ->
-      [_Status | Headers2] = binary:split(Headers1, <<"\r\n">>, [global]),
+      OK = <<"200 OK">>,
+      [<<_HttpVer:9/binary, OK/binary >> | Headers2] = binary:split(Headers1, <<"\r\n">>, [global]),
       Headers3 = lists:map(fun(B)->[K,V]=binary:split(B, <<": ">>), {K,V} end, Headers2),
       ContentLength = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers3)),
       {ok, Body1} = recv_body(Sock, [Body], ContentLength-size(Body)),
