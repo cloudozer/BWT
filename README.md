@@ -48,7 +48,7 @@ Each server must have the same compiled BWT source code in the same path.
 # Start
 From 'main' box:
 
-    $ ./scripts/start_local.es bwt_files/ERR002814_1.fastq chr17 http://erlangonxen.org:8888 "[{box1,'erlangonxen.org',24},{box2,'46.4.100.178',24},{box4,'46.4.85.166',24}]" "[{vm,beam}]"
+    $ ./scripts/start_sub_cluster.es bwt_files/ERR002814_1.fastq chr17 http://erlangonxen.org:8888 "[{box1,'erlangonxen.org',24},{box2,'46.4.100.178',24},{box4,'46.4.85.166',24}]" "[{vm,beam}]"
      you will see
     
     ERR002814.6748574 IL11_585:8:330:753:844/1      chr17_p3.fm      36352383      36M      72      TCCAGCTTGGGGGAGGGGTAGCTGCAGTAGTTTCCT
