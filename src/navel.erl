@@ -204,7 +204,7 @@ merge(Chip, Chips) -> list_to_binary(lists:reverse([Chip|Chips])).
 
 action(S, {'$iam',RemoteName}, Call) ->
 	{ok,{{A,B,C,D},P}} = inet:peername(S),
-	io:format("navel: connected to ~s at ~w.~w.~w.~w:~w \n", [RemoteName,A,B,C,D,P]),
+	%io:format("navel: connected to ~s at ~w.~w.~w.~w:~w \n", [RemoteName,A,B,C,D,P]),
 	introduce(self(), RemoteName),
 	Call;
 

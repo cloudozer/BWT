@@ -48,7 +48,6 @@ handle_info({done,Pid}, S=#state{workers = [Pid], source = {SNode,SPid}, start_t
   navel:call_no_return(SNode, erlang, send, [SPid, {sink_done, Sec}]),
   {stop, normal, S};
 handle_info({done,Pid}, S) ->
-log:info("sink handle_info({done ~p", [{Pid, S#state.workers}]),
   {noreply, S#state{workers = lists:delete(Pid, S#state.workers)}}.
 
 handle_call({run, SourcePid={SNode,SPid}, Workers, Client}, _From, State) ->

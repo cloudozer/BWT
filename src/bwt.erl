@@ -5,6 +5,7 @@
 
 -module(bwt).
 -export([t/0,
+		t_ref/0, t_ref/3,
 		bwt/1,
 		get_suffs/1,
 		fm/1,
@@ -31,6 +32,25 @@ t(T1,N,FM,Pc,Pg,Pt,Last,Acc) ->
 	Qseq = sw:rand_seq(150),
 	Seeds = sga:sga(FM,Pc,Pg,Pt,Last,Qseq),
 	t(T1,N-1,FM,Pc,Pg,Pt,Last,Acc+length(Seeds)).
+
+
+t_ref() ->
+	random:seed(),
+	{ok,Ref} = file:read_file("fm_indices/21_p1.ref"),
+	io:format("Length of Ref: ~p~n",[size(Ref)]),
+	{T,V} = timer:tc(?MODULE,t_ref,[Ref,100000,undef]),
+	io:format("Random reference reading took ~p us,~p~n",[T,V]).
+t_ref(_Ref,0,Ref_seq) -> Ref_seq;
+t_ref(Ref,J,R) ->
+	Len = 100,
+	case R =:= <<"ATATATATATATATATATATATATATATATATATAT">> of
+		true -> error(seldom);
+		false->
+			Pos = random:uniform(size(Ref)-Len),
+			<<_:Pos/bytes,Ref_seq:Len/bytes,_/binary>> = Ref,
+			t_ref(Ref,J-1,binary_to_list(Ref_seq))
+	end.
+
 
 
 test() ->
