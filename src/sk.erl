@@ -29,7 +29,7 @@ start_sink([{Box,Ls}|Schedule],New_schedule,Source) ->
 sink(R_source,Alq_nbr) -> sink(R_source,Alq_nbr,Alq_nbr,[]).
 
 sink(R_source={SourceN,SourceP},0,Alq_nbr,_Acc) ->
-	io:format("All aligning queues confirmed that they have no more tasks for cigar_makers~n"),
+%	io:format("All aligning queues confirmed that they have no more tasks for cigar_makers~n"),
 	navel:call(SourceN, erlang, send, [SourceP, {{navel:get_node(),self()},fastq_done}]),
 	sink(R_source,Alq_nbr);
 sink(R_source,J,Alq_nbr,Acc) ->
@@ -38,13 +38,14 @@ sink(R_source,J,Alq_nbr,Acc) ->
 
 		{SeqName,Chunk,Pos,Score,CIGAR,RefSeq}=Rec ->
 			% output
-			io:format("Sink: got SAM line~n"),
-			io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chunk, Pos, CIGAR, Score, RefSeq]),
+			%io:format("."),
+			%io:format("Sink: got SAM line~n"),
+			%io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chunk, Pos, CIGAR, Score, RefSeq]),
 			sink(R_source,J,Alq_nbr,[Rec|Acc]);
 			
 		fastq_done -> 
 			% store data obtained or send it farther
-			io:format("\tSink: alq has no more tasks for cigar makers~n"),
+			%io:format("\tSink: alq has no more tasks for cigar makers~n"),
 			sink(R_source,J-1,Alq_nbr,Acc)
 		
 	end.

@@ -44,7 +44,7 @@ start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes) ->
 
   {ok,_SourceHost} = lingd:create(LingdRef, source, [{memory, 128}]),
   ok = navel:call(source,lingd,connect,[]),
-  navel:call_no_return(source, erlang, spawn, [rs,start_cluster,[Boxes,ChromosomeList,SeqFileName,HttpStorage,LingdRef]]),
+  navel:call_no_return(source, erlang, spawn, [rs,start_cluster,[Boxes,ChromosomeList,SeqFileName,HttpStorage,LingdRef,{navel:get_node(),self()}]]),
 
   Wait = fun Wait() ->
     receive

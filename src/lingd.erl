@@ -41,7 +41,7 @@ create({LNode,LPid},Name) ->
 
 create({LNode,LPid},Name,Opts) ->
   {ok, Host} = navel:call(LNode, gen_fsm, sync_send_event, [LPid, {create, Name, Opts}, 30000]),
-log:info("Instance ~p created.", [Name]),
+%log:info("Instance ~p created.", [Name]),
   ok = navel:connect(Host),
   {ok, Host}.
 

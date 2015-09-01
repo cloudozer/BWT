@@ -32,7 +32,7 @@ cigar_maker({AlqN,AlqP}=Alq, Sink={SinkN,SinkP}) ->
       case sw:sw(Qsec,Ref) of
         no_match -> ok;%io:format("no_match~n");
         {Score,CIGAR} ->
-          io:format("CM cigar: ~p, ~p~n",[Score,CIGAR]),
+          %io:format("CM cigar: ~p, ~p~n",[Score,CIGAR]),
           navel:call_no_return(SinkN, erlang, send, [SinkP, {SeqName,Chunk,Pos,Score,CIGAR,Ref}])
       end,
 

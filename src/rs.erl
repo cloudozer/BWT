@@ -6,14 +6,14 @@
 
 
 -module(rs).
--export([start_cluster/5,
-  r_source/5
+-export([start_cluster/6,
+  r_source/6
 		]).
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
 
 
-start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
+start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef,ClientRef) ->
   % TODO: refactor it
   % box RAM in Gb
   Box_mem = 24,
@@ -30,28 +30,31 @@ start_cluster(Boxes,ChromoLs,SeqFileName,HttpStorage,LingdRef) ->
 
 		Schedule ->
 			Schedule1 = lists:zip(Boxes,Schedule),
-			io:format("Schedule: ~p~n",[Schedule1]),
+			%io:format("Schedule: ~p~n",[Schedule1]),
 
       Self = {navel:get_node(),self()},
 
       %% Start sink app
       {ok,SinkHost} = lingd:create(LingdRef, sink, [{memory,1024}]),
       {_Box,Sink,Schedule2} = navel:call(sink, sk, start_sink, [Schedule1,Self]),
-      io:format("Sink started. Sink pid: ~p~nSchedule:~p~n",[Sink,Schedule2]),
+      %io:format("Sink started. Sink pid: ~p~nSchedule:~p~n",[Sink,Schedule2]),
 
       %% Create just one alq
       Schedule3 = alq:start_alq(Schedule2,SinkHost,Sink,LingdRef), % {Box_id,Alq,Chunk_files}
-      io:format("Alq started. New Schedule: ~p~n",[Schedule3]),
+      %io:format("Alq started. New Schedule: ~p~n",[Schedule3]),
 
       {Alqs, SFs} = sf:start_SF(Schedule3,LingdRef,HttpStorage,Self),
-      io:format("SFs started. Alqs & SFs: ~p~n~p~n",[Alqs,SFs]),
+      %io:format("SFs started. Alqs & SFs: ~p~n~p~n",[Alqs,SFs]),
 
       SeqFileNameUrl = HttpStorage ++ "/" ++ SeqFileName,
 
       {ok,Reads} = http:get(SeqFileNameUrl),
 StartTime = now(),
-			r_source(Reads,Alqs,SFs,length(SFs),Sink),
-io:format("Fastq complited within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
+      ReadsAligned = r_source(Reads,Alqs,SFs,length(SFs),Sink,0),
+{ClNode,ClPid} = ClientRef,
+Secs = timer:now_diff(now(), StartTime) / 1000000,
+navel:call_no_return(ClNode, erlang, send, [ClPid, {source_sink_done, Secs, 1, ReadsAligned}])
+%io:format("Fastq complited within ~p secs.", [Secs])
 	end.
 
 produce_workload(N, Fastq) ->
@@ -71,7 +74,8 @@ produce_workload(Size, Bin, Acc) ->
 	  Seq = {SName, SData},
 	  produce_workload(Size - 1, Bin4, [Seq | Acc]);
   [Fb, Bin1] ->
-io:format("Bin1 ~p~n", [Fb]),
+%% TODO fix ignoring some reads
+%io:format("Bin1 ~p~n", [Fb]),
 	  produce_workload(Size, Bin1, Acc)
   end
   catch _:_ ->
@@ -79,33 +83,34 @@ io:format("Bin1 ~p~n", [Fb]),
   end.
 
 
-r_source(<<>>,Alqs,SFs,0,Sink) ->
+r_source(<<>>,Alqs,SFs,0,Sink,ReadsAligned) ->
 	% multicast it
 	lists:foreach(  fun({_,{_,{_,A}}})-> A ! fastq_done
 					end,Alqs),
-	io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
+	%io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
 	case get_sink_confirmation(Sink) of
 		{timeout,Time} -> 
-			io:format("No confirmation got from sink during ~psec~n",[Time]),
+			%io:format("No confirmation got from sink during ~psec~n",[Time]),
 			shutdown_cluster(Alqs,SFs,Sink);
 		Time -> 
-			io:format("Source waited for confirmation ~p msec~n",[Time]),
+			%io:format("Source waited for confirmation ~p msec~n",[Time]),
 			% request next fastq file
 			shutdown_cluster(Alqs,SFs,Sink)
-	end;
+	end,
+  ReadsAligned;
 
-r_source(Reads,Alqs,SFs,0,Sink) ->
+r_source(Reads,Alqs,SFs,0,Sink,ReadsAligned) ->
   case produce_workload(300, Reads) of
     {Reads1, []} ->
-      r_source(Reads1,Alqs,SFs,0,Sink);
+      r_source(Reads1,Alqs,SFs,0,Sink,ReadsAligned);
     {Reads1, Batch} ->
       multicast(Batch,SFs),
-      r_source(Reads1,Alqs,SFs,length(SFs),Sink)
+      r_source(Reads1,Alqs,SFs,length(SFs),Sink,ReadsAligned+length(Batch))
   end;
 
-r_source(Reads,Alqs,SFs,N,Sink) ->
+r_source(Reads,Alqs,SFs,N,Sink,ReadsAligned) ->
 	receive
-		{_,ready} -> r_source(Reads,Alqs,SFs,N-1,Sink)
+		{_,ready} -> r_source(Reads,Alqs,SFs,N-1,Sink,ReadsAligned)
 	end.
 
 

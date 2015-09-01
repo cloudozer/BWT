@@ -60,8 +60,8 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid={CmN,CmP}|CMs]) ->
 
 		fastq_done when length([Pid|CMs]) =:= ?CIGAR_MAKER_NBR ->
 			{SN,SP} = Sink,
-			navel:call_no_return(SN,erlang,send,[SP,fastq_done]),
-			io:format("Alq confirmed that fastq_done~n")
+			navel:call_no_return(SN,erlang,send,[SP,fastq_done])
+			%io:format("Alq confirmed that fastq_done~n")
 	end;
 
 cm_balancer(?CIGAR_MAKER_NBR,Sink,[{_Read_name,_Chromo,_Read,[]}|Tasks],CMs) ->
