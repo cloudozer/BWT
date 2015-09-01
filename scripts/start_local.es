@@ -46,17 +46,18 @@ start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes) ->
   ok = navel:call(source,lingd,connect,[]),
   navel:call_no_return(source, erlang, spawn, [rs,start_cluster,[Boxes,ChromosomeList,SeqFileName,HttpStorage,LingdRef,{navel:get_node(),self()}]]),
 
-  Wait = fun Wait() ->
+  wait(SeqFileName, ChromosomeList, LingdRef).
+
+wait(SeqFileName, ChromosomeList, LingdRef) ->
     receive
       {cigar, SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq} ->
         io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chromosome, Pos, CigarValue, CigarRate, RefSeq]),
-        Wait();
+        wait(SeqFileName, ChromosomeList, LingdRef);
       {source_sink_done, Sec, WorkersNum, ReadsNum} ->
         {{Year, Month, Day}, {Hour, Min, Sec1}} = erlang:localtime(),
         StatTemplate = "~nReads: ~p~nReference seq: ~p~nChromosomes: ~p~nReads aligned: ~p~nAlignment completion time: ~.1f sec~nWorkers: ~p~nDate/time: ~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B~n~n",
         io:format(StatTemplate, [SeqFileName, "human_g1k_v37_decoy.fasta", ChromosomeList, ReadsNum, Sec, WorkersNum, Year, Month, Day, Hour, Min, Sec1]),
         ok = lingd:destroy(LingdRef),
         halt(0)
-    end
-  end,
-  Wait().
+    end,
+  wait(SeqFileName, ChromosomeList, LingdRef).
