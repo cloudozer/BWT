@@ -17,7 +17,6 @@ start_cigar_makers(N,Sink,SinkHost,AlqHost,BoxName,LingdRef) ->
 		NodeName = list_to_atom("cm_" ++ integer_to_list(I) ++ "_" ++ atom_to_list(BoxName)),
 		{ok,_} = lingd:create(LingdRef, AlqHost, NodeName, []),
                 ok = navel:call(NodeName,navel,connect,[SinkHost]),
-                ok = navel:call(NodeName,navel,connect,[AlqHost]),
 		navel:call_no_return(NodeName, erlang, spawn, [?MODULE, cigar_maker,[{navel:get_node(),self()},Sink]])
 	end,lists:seq(1,N)).
 
