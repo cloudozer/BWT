@@ -37,7 +37,7 @@ start(Boxes, Schedule, SeqFileName, HttpStorage, VM, Host) ->
     ok = navel:call(AlqName, navel, connect, [LingdHost]),
     ok = navel:call(AlqName, navel, connect, [SourceHost1]),
     ok = navel:call(AlqName, navel, connect, [SinkHost1]),
-    {ok,AlqRef} = navel:call(AlqName, alq, start, [SinkRef,SinkHost1,BoxName,LingdRef]),
+    {ok,AlqRef} = navel:call(AlqName, alq, start, [SinkRef,BoxHost,BoxName,LingdRef]),
     {BoxName, AlqRef}
   end, Schedule2),
   Alqs = lists:map(fun({_Box,Alq}) -> Alq end, AlqsBoxes),

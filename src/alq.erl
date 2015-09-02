@@ -35,9 +35,9 @@ start_alq([{{Box_id,BoxHost},Chunks}|Schedule],SinkHost,Sink,Lingd,Acc) ->
 start_alq([],_,_,_,Acc) -> Acc.
 
 
-alq(Sink,SinkHost,BoxName,Lingd) ->
+alq(Sink,Host,BoxName,Lingd) ->
   	%% spawn N cigar_makers
-	cm:start_cigar_makers(?CIGAR_MAKER_NBR,Sink,SinkHost,BoxName,Lingd),
+	cm:start_cigar_makers(?CIGAR_MAKER_NBR,Sink,Host,BoxName,Lingd),
 	cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[]).
 
 

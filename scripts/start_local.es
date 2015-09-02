@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -attached -setcookie secret
+%%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -attached -setcookie secret -rsh ssh
 
 main([]) ->
   io:format("Usage: start_local.sh SeqFileName Chromosome HttpStorage Boxes~n");
