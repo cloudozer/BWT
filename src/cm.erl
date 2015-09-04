@@ -29,7 +29,23 @@ cigar_maker({AlqN,AlqP}=Alq, Sink={SinkN,SinkP}) ->
 %% 			io:format("CM: got read. Aligned: ", []),
 			% run SW and send results to Sink
       Qsec = binary_to_list(QsecBin),
-      case sw:sw(Qsec,Ref) of
+
+			CM = self(),
+			Fun =
+				case length(Qsec) == length(Ref) of
+					true ->
+						fun sw:simple_match/2;
+					false ->
+						fun(Qsec,Ref) ->
+							spawn_link(fun() ->
+								Res = sw:sw(Qsec,Ref),
+								CM ! {result, Res}
+							end),
+							receive {result, Result} -> Result end
+						end
+				end,
+
+      case Fun(Qsec,Ref) of
         no_match -> ok;%io:format("no_match~n");
         {Score,CIGAR} ->
           %% io:format("CM cigar: ~p, ~p~n",[Score,CIGAR]),
