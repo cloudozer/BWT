@@ -52,7 +52,7 @@ cigar_maker({AlqN,AlqP}=Alq, Sink={SinkN,SinkP}) ->
           navel:call_no_return(SinkN, erlang, send, [SinkP, {SeqName,Chunk,Pos,Score,CIGAR,Ref}])
       end,
 
-			spawn(?MODULE,cigar_maker,[Alq,Sink]);
+			cigar_maker(Alq,Sink);
 
 		quit -> ok	
 	end.
