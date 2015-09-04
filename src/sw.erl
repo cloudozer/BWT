@@ -171,7 +171,7 @@ simple_match(Ls1,Ls2) when length(Ls1) =:= length(Ls2) ->
 		no_match ->
 			no_match;
 		_ ->
-			{Val, integer_to_list(length(Ls1)) ++ "M"}
+			{round(Val), integer_to_list(length(Ls1)) ++ "M"}
 	end.
 
 

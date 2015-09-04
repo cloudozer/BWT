@@ -78,7 +78,7 @@ r_source(Reads,Alqs,SFs,0,Sink) ->
       r_source(Reads1,Alqs,SFs,length(SFs),Sink)
   end;
 
-r_source(Reads,Alqs,SFs,N,Sink) when N == 1; N == 2 ->
+r_source(Reads,Alqs,SFs,N,Sink) when N == 1 ->
 	receive
 		{Pid,ready} -> 
 			io:format("ready ~p: ~p~n", [os:timestamp(), Pid]),
