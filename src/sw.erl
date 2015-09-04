@@ -167,7 +167,13 @@ get_str(N,Dir) ->
 
 simple_match(Ls1,Ls2) when length(Ls1) =:= length(Ls2) -> 
 	Val = simple_match(Ls1,Ls2,?MATCH*length(Ls1),?MATCH*length(Ls1)*0.9),
-	{Val, integer_to_list(Ls1) ++ "M"}.
+	case Val of
+		no_match ->
+			no_match;
+		_ ->
+			{Val, integer_to_list(length(Ls1)) ++ "M"}
+	end.
+
 
 simple_match(_,_,Val,Thr) when Val < Thr -> no_match;
 simple_match([$N|Ls1],[_|Ls2],Val,Thr) -> simple_match(Ls1,Ls2,Val-?MATCH+?UNKNOWN,Thr);
