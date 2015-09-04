@@ -41,7 +41,7 @@ start_SF([],_,_,_,Alqs,SFs) ->
 
 
 
-seed_finder(Chunk,Alq={AlqN,AlqP},R_source,HttpStorage) ->
+seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 	ChunkList = atom_to_list(Chunk),
 	{ok, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ ChunkList),
 	{Meta,FM} = binary_to_term(FmIndexBin),
@@ -54,14 +54,15 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source,HttpStorage) ->
 	{Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 	Shift = proplists:get_value(shift, Meta),
 	SavedSeqs = dict:new(),
+	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
 seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
-	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	receive
 		quit -> quit; %% print_stat(SavedSeqs);
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
+			navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 %% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
 
 			SavedSeqs1 = lists:foldl(
