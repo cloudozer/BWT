@@ -33,7 +33,7 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 
 	{Pc,Pg,Pt,Last} = proplists:get_value(pointers, Meta),
 	Shift = proplists:get_value(shift, Meta),
-	SavedSeqs = dict:new(),
+	SavedSeqs = ets:new(saved_seqs,[]),
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 	seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
@@ -45,10 +45,10 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Las
 			navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
 %% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
 
-			SavedSeqs1 = lists:foldl(
-				fun({Qname,Qseq},SavedSeqsAcc) ->
-					{Seeds, SavedSeqsAcc1} = sga:sga(FM,SavedSeqsAcc,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
-					Seeds1 = lists:map(fun({SeedEnd,D}) ->
+			SeedBatch = lists:foldl(
+				fun({Qname,Qseq},SeedsAcc) ->
+					Seeds = sga:sga(FM,SavedSeqs,Pc,Pg,Pt,Last,binary_to_list(Qseq)),
+					SeedSeqs = lists:map(fun({SeedEnd,D}) ->
 						Ref_len = size(Qseq) + D,
 						GlobalPos = SeedEnd - Ref_len + Shift,
 						Start_pos = SeedEnd - Ref_len + ?REF_EXTENSION_LEN,
@@ -58,11 +58,15 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Las
 
 						{GlobalPos,Ref_seq1}
 					end, Seeds),
-					navel:call_no_return(AlqN, erlang, send, [AlqP, {Qname,Chunk,Qseq,Seeds1}]),
-					SavedSeqsAcc1
-				end, SavedSeqs, Batch),
+					[ {Qname,Chunk,Qseq,SeedSeqs} | SeedsAcc ]
+				end, [], Batch),
 
-			seed_finder(Chunk,Alq,R_source,FM,SavedSeqs1,Ref,Pc,Pg,Pt,Last,Shift)
+			case length(SeedBatch) =:= 0 of
+				true -> ok;
+				_ -> 
+					navel:call_no_return(AlqN, erlang, send, [AlqP, SeedBatch])
+			end,		
+			seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift)
 	end.
 
 

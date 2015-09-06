@@ -12,16 +12,20 @@
 
 find_seeds(FM,SavedSeqs,Pc,Pg,Pt,Last, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%
 	{Key,Tail} = lists:split(?SAVED_SEQ_LEN,lists:reverse(Subseq)), 
-	case dict:is_key(Key,SavedSeqs) of
-		true -> 
-			case dict:fetch(Key,SavedSeqs) of
-				{Sp,Ep} -> {find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN),SavedSeqs};
-				no_seeds -> {no_seeds,SavedSeqs};
-				too_many_seeds ->{ too_many_seeds,SavedSeqs}
+	case ets:lookup(SavedSeqs,Key) of
+		[] -> 
+			case add_new_key(FM,SavedSeqs,Pc,Pg,Pt,Last,Key) of
+				{Sp,Ep} -> find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN);
+				no_seeds -> no_seeds;
+				too_many_seeds -> too_many_seeds
 			end;
-		false->
-			SavedSeqs1 = add_new_key(FM,SavedSeqs,Pc,Pg,Pt,Last,Key),
-			find_seeds(FM,SavedSeqs1,Pc,Pg,Pt,Last, Subseq)
+			
+		[{Key,Val}] ->
+			case Val of
+				{Sp,Ep} -> find_seeds(FM, Sp,Ep, Tail, ?SAVED_SEQ_LEN);
+				no_seeds -> no_seeds;
+				too_many_seeds -> too_many_seeds
+			end
 	end.
 
 
@@ -39,15 +43,9 @@ add_new_key(FM,SavedSeqs,Pc,Pg,Pt,Last,Key) ->
 			Sp = 1, Ep = Pc-1
 	end,
 	Interval = find_interval(FM, Sp,Ep, Tail, 1),
-	Max_range = size(FM)/math:pow(4,?SAVED_SEQ_LEN),
-	case Interval of
-		{Sp,Ep} when Ep-Sp > Max_range -> 
-			dict:store(Key,too_many_seeds,SavedSeqs);
-		not_found ->
-			dict:store(Key,no_seeds,SavedSeqs);
-		_ ->
-			dict:store(Key,Interval,SavedSeqs)
-	end.
+	ets:insert(SavedSeqs,{Key,Interval}),
+	Interval.
+
 
 
 %% returns the list of matches of the given Subsequence against 
@@ -74,13 +72,18 @@ find_seeds(FM,Sp,Ep,[],N) -> fmi:get_seed_ends(FM,Sp,Ep,N).
 find_interval(_,_Sp,_Ep,[$N|_],_) -> too_many_seeds; 
 find_interval(FM,Sp,Ep,[C2|Qseq],N) ->
 	case fmi:se_down(Sp,Ep,C2,FM) of
-		not_found -> not_found;
+		not_found -> no_seeds;
 		Sp1 ->
 			Ep1 = fmi:se_up(Ep,C2,FM),
 			%io:format("New range: (~p, ~p)~n",[Sp1,Ep1]),
 			find_interval(FM, Sp1, Ep1, Qseq, N+1)
 	end;
-find_interval(_,Sp,Ep,[],_) -> {Sp,Ep}.
+find_interval(FM,Sp,Ep,[],_) -> 
+	Max_range = size(FM)/math:pow(4,?SAVED_SEQ_LEN),
+	case Ep-Sp > Max_range of
+		true -> too_many_seeds;
+		_ -> {Sp,Ep}
+	end.
 
 
 
