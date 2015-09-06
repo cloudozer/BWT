@@ -31,8 +31,11 @@ alq(Sink,SinkHost,Host,BoxName,Lingd) ->
 cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[]) ->
 	receive
 		quit -> terminate_cm(?CIGAR_MAKER_NBR);
-		{_Read_name,_Chromo,_Read,_Ref_seeds}=Task -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task],[]);
-		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid])
+
+		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid]);
+
+		NewTasks -> cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,[])
+		
 	after 10000 ->
 		throw({timeout, cm_balancer, empty_stacks})
 	end;
