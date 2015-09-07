@@ -13,7 +13,6 @@
 
 -include("bwt.hrl").
 
--define(REF_EXTENSION_LEN, 200).
 
 %% api
 

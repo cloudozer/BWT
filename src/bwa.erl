@@ -7,7 +7,6 @@
 -export([find_seeds/7]).
 
 -include("bwt.hrl").
--define(SAVED_SEQ_LEN,6).
 
 
 find_seeds(FM,SavedSeqs,Pc,Pg,Pt,Last, Subseq) -> %%%%%%%%  starting point  %%%%%%%%%%

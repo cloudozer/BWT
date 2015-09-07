@@ -11,8 +11,8 @@
 	seed_finder/4
 ]).
 
+-include("bwt.hrl").
 
--define(REF_EXTENSION_LEN, 200).
 
 start(Chunk,AlqRef,SourceRef,HttpStorage) ->
 	Pid = spawn_link(?MODULE,seed_finder,[Chunk,AlqRef,SourceRef,HttpStorage]),
@@ -39,7 +39,11 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 
 seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	receive
-		quit -> quit; 
+		quit -> 
+			io:format("Max range: ~p~n",[size(FM)/math:pow(4,?SAVED_SEQ_LEN)]),
+			lists:foreach(  fun(Key) -> io:format("~p~n",[ ets:lookup(SavedSeqs,Key) ])
+							end,[ [L1,L2] || L1<-[$A,$T],L2<-[$A,$T] ]),
+			quit; 
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 			navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
