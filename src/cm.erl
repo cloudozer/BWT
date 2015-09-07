@@ -34,26 +34,33 @@ align(Qsec,Ref) ->
 	end.
 
 
-cigar_maker({AlqN,AlqP}=Alq, Sink={SinkN,SinkP}) ->
+cigar_maker({AlqN,AlqP}=Alq, Sink) ->
 	navel:call_no_return(AlqN,erlang,send,[AlqP,{{navel:get_node(),self()},ready}]),
 	receive
-		{SeqName,Chunk,QsecBin,Ref_seeds} ->
-			Qsec = binary_to_list(QsecBin),
-
-			SAM_lines = lists:foldl(
-				fun({Pos,Ref},Acc)->
-					case align(Qsec,Ref) of
-						no_match -> Acc;
-						{Score,CIGAR} -> [{SeqName,Chunk,Pos,Score,CIGAR,Ref}|Acc]
-					end
-				end,[],Ref_seeds),
-
-			case length(SAM_lines) =:= 0 of
-				true -> ok;
-				_ -> navel:call_no_return(SinkN,erlang,send,[SinkP,SAM_lines])
-			end;
+		Tasks = [_|_] -> align_tasks(Tasks,Sink);
 			
 		quit -> ok	
 	end,
 	cigar_maker(Alq,Sink).
+
+
+
+align_tasks([{SeqName,Chunk,QsecBin,Ref_seeds}|Tasks],Sink={SinkN,SinkP}) ->
+	Qsec = binary_to_list(QsecBin),
+
+	SAM_lines = lists:foldl(
+		fun({Pos,Ref},Acc)->
+			case align(Qsec,Ref) of
+				no_match -> Acc;
+				{Score,CIGAR} -> [{SeqName,Chunk,Pos,Score,CIGAR,Ref}|Acc]
+			end
+		end,[],Ref_seeds),
+
+	case length(SAM_lines) =:= 0 of
+		true -> ok;
+		_ -> navel:call_no_return(SinkN,erlang,send,[SinkP,SAM_lines])
+	end,
+	align_tasks(Tasks,Sink);
+align_tasks([],_Sink) -> ok.
+
 

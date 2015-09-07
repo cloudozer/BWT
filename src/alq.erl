@@ -11,6 +11,7 @@
 ]).
 
 -define(CIGAR_MAKER_NBR,6).
+-define(TASK_BATCH_SIZE,100).
 
 -include("bwt.hrl").
 
@@ -55,11 +56,10 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 		quit -> terminate_cm(?CIGAR_MAKER_NBR)
 	end;
 
-cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks]=OldTasks,[]) ->
+cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[]) ->
 	receive
-		{{CmN,CmP},ready} ->
-			navel:call_no_return(CmN,erlang,send,[CmP,Task]),
-			cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,[]);
+		{Pid,ready} ->
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[Pid]);
 			
 		NewTasks=[_|_] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[]);
 
@@ -69,10 +69,14 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks]=OldTasks,[]) ->
 		throw({timeout, cm_balancer, tasks_orevflow})
 	end;
 
-cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks],[{CmN,CmP}|CMs]) ->
-	navel:call_no_return(CmN,erlang,send,[CmP,Task]),
-	cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs).
+cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,[{CmN,CmP}|CMs]) when length(Tasks) < ?TASK_BATCH_SIZE ->
+	navel:call_no_return(CmN,erlang,send,[CmP,Tasks]),
+	cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs);
 
+cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,[{CmN,CmP}|CMs]) ->
+	{TaskBatch,RestTasks} = lists:split(?TASK_BATCH_SIZE, Tasks),
+	navel:call_no_return(CmN,erlang,send,[CmP,TaskBatch]),
+	cm_balancer(?CIGAR_MAKER_NBR,Sink,RestTasks,CMs).
 
 
 terminate_cm(0) -> ok;

@@ -39,12 +39,7 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 
 seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	receive
-		quit -> 
-			io:format("Max range: ~p~n",[size(FM)/math:pow(4,?SAVED_SEQ_LEN)]),
-			lists:foreach(  fun(Key) -> io:format("~p~n",[ ets:lookup(SavedSeqs,Key) ])
-							end,[ [L1,L2,L3,L4,L5,L6] || L1<-[$A,$T],L2<-[$A,$T],L3<-[$A,$T],
-														L4<-[$A,$T],L5<-[$A,$T],L6<-[$A,$T] ]),
-			quit; 
+		quit -> quit; 
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 			navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
