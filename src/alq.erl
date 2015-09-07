@@ -55,9 +55,6 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 		quit -> terminate_cm(?CIGAR_MAKER_NBR)
 	end;
 
-%cm_balancer(?CIGAR_MAKER_NBR,Sink,[{_Read_name,_Chromo,_Read,[]}|Tasks],CMs) ->
-%	cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs);
-
 cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks]=OldTasks,[]) ->
 	receive
 		{{CmN,CmP},ready} ->
@@ -75,15 +72,6 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks]=OldTasks,[]) ->
 cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks],[{CmN,CmP}|CMs]) ->
 	navel:call_no_return(CmN,erlang,send,[CmP,Task]),
 	cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs).
-
-
-%cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,[{Pos,Ref}|Ref_seeds]}|Tasks],[{CmN,CmP}|CMs]) ->
-%	navel:call_no_return(CmN,erlang,send,[CmP,{Ref,Read,Read_name,Chromo,Pos}]),
-%	case Ref_seeds of
-%		[] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs);
-%		_ -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,Ref_seeds}|Tasks],CMs)
-%	end.
-
 
 
 
