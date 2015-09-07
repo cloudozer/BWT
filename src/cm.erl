@@ -25,9 +25,10 @@ align(Qsec,Ref) ->
 	case length(Qsec)=:=length(Ref) of
 		true -> sw:simple_match(Qsec,Ref);
 		false-> 
+			Self = self(),
 			spawn_link( fun() ->
 							Res = sw:sw(Qsec,Ref),
-							self() ! {result, Res}
+							Self ! {result, Res}
 						end),
 			receive {result, Result} -> Result end
 	end.
