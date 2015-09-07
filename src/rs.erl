@@ -55,9 +55,8 @@ io:format("Bin1 ~p~n", [Fb]),
   end.
 
 r_source(<<>>,Alqs,SFs,0,Sink) ->
-	% multicast it
-	lists:foreach(  fun({ANode,APid})-> navel:call_no_return(ANode, erlang, send, [APid, fastq_done])
-					end,Alqs),
+	terminate(Alqs,length(SFs)),
+	
 	io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
 	case get_sink_confirmation(Sink) of
 		{timeout,Time} -> 
@@ -91,7 +90,13 @@ r_source(Reads,Alqs,SFs,N,Sink) ->
 	end.
 
 
-
+terminate(Alqs,0) ->
+	% multicast it
+	lists:foreach(  fun({ANode,APid})-> navel:call_no_return(ANode, erlang, send, [APid, fastq_done])
+					end,Alqs);
+terminate(Alqs,J) ->
+	terminate(Alqs,J-1).
+	
 
 multicast(Batch,SFs) ->
 %% 	lists:foreach(fun({_,SF})-> SF ! {data,Batch} end, SFs).  % {_,SF} = {box,pid}
