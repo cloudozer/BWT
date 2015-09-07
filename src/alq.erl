@@ -10,7 +10,7 @@
 	alq/5
 ]).
 
--define(CIGAR_MAKER_NBR,6).
+-define(CIGAR_MAKER_NBR,8).
 
 -include("bwt.hrl").
 
@@ -44,7 +44,7 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 	receive
 		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid|CMs]);
 		
-		NewTasks=[_|_] ->
+		NewTasks=[_|_] ->io:format("Empty Queue: ~n"),
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,CMs);
 
 		fastq_done when length(CMs) =:= ?CIGAR_MAKER_NBR ->
@@ -61,7 +61,7 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks]=OldTasks,[]) ->
 			navel:call_no_return(CmN,erlang,send,[CmP,Task]),
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,[]);
 			
-		NewTasks=[_|_] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[]);
+		NewTasks=[_|_] -> io:format("Queue: ~p~n", [length(OldTasks)]), cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[]);
 
 		quit -> terminate_cm(?CIGAR_MAKER_NBR)
 
@@ -78,7 +78,7 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks],[{CmN,CmP}|CMs]) ->
 terminate_cm(0) -> ok;
 terminate_cm(N) ->
 	receive
-		{Pid,ready} -> Pid ! quit, terminate_cm(N-1)
+		{{CmN,CmP},ready} -> navel:call_no_return(CmN,erlang,send,[CmP,quit]) , terminate_cm(N-1)
 	end.
 
 
