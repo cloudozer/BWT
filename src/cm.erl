@@ -21,38 +21,38 @@ start_cigar_makers(N,Sink,SinkHost,AlqHost,BoxName,LingdRef) ->
 	end,lists:seq(1,N)).
 
 
+align(Qsec,Ref) ->
+	case length(Qsec)=:=length(Ref) of
+		true -> sw:simple_match(Qsec,Ref);
+		false-> 
+			spawn_link( fun() ->
+							Res = sw:sw(Qsec,Ref),
+							self() ! {result, Res}
+						end),
+			receive {result, Result} -> Result end
+	end.
+
 
 cigar_maker({AlqN,AlqP}=Alq, Sink={SinkN,SinkP}) ->
 	navel:call_no_return(AlqN,erlang,send,[AlqP,{{navel:get_node(),self()},ready}]),
 	receive
-		{Ref,QsecBin,SeqName,Chunk,Pos} = M ->
-%% 			io:format("CM: got read. Aligned: ", []),
-			% run SW and send results to Sink
-      Qsec = binary_to_list(QsecBin),
+		{SeqName,Chunk,QsecBin,Ref_seeds} ->
+			Qsec = binary_to_list(QsecBin),
 
-			CM = self(),
-			Fun =
-				case length(Qsec) == length(Ref) of
-					true ->
-						fun sw:simple_match/2;
-					false ->
-						fun(Qsec,Ref) ->
-							spawn_link(fun() ->
-								Res = sw:sw(Qsec,Ref),
-								CM ! {result, Res}
-							end),
-							receive {result, Result} -> Result end
-						end
-				end,
+			SAM_lines = lists:foldl(
+				fun({Pos,Ref},Acc)->
+					case align(Qsec,Ref) of
+						no_match -> Acc;
+						{Score,CIGAR} -> [{SeqName,Chunk,Pos,Score,CIGAR,Ref}|Acc]
+					end
+				end,[],Ref_seeds),
 
-      case Fun(Qsec,Ref) of
-        no_match -> ok;%io:format("no_match~n");
-        {Score,CIGAR} ->
-          %% io:format("CM cigar: ~p, ~p~n",[Score,CIGAR]),
-          navel:call_no_return(SinkN, erlang, send, [SinkP, {SeqName,Chunk,Pos,Score,CIGAR,Ref}])
-      end,
-
-			cigar_maker(Alq,Sink);
-
+			case length(SAM_lines) =:= 0 of
+				true -> ok;
+				_ -> navel:call_no_return(SinkN,erlang,send,[SinkP,SAM_lines])
+			end;
+			
 		quit -> ok	
-	end.
+	end,
+	cigar_maker(Alq,Sink).
+

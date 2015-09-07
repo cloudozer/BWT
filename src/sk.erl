@@ -40,19 +40,14 @@ sink(R_source={SourceN,SourceP},0,Alq_nbr,_Acc) ->
 	sink(R_source,Alq_nbr);
 sink(R_source,J,Alq_nbr,Acc) ->
 	receive
-		quit -> ok;
-
-		{SeqName,Chunk,Pos,Score,CIGAR,RefSeq}=Rec ->
-			% output
-			%% io:format("Sink: got SAM line~n"),
-%			io:format("~s      ~s      ~b      ~s      ~b      ~s~n", [SeqName, Chunk, Pos, CIGAR, Score, RefSeq]),
-			sink(R_source,J,Alq_nbr,[Rec|Acc]);
+		SAM_lines=[_|_] -> sink(R_source,J,Alq_nbr,SAM_lines++Acc);
 			
 		fastq_done -> 
 			% store data obtained or send it farther
 			io:format("\tSink: alq has no more tasks for cigar makers~n"),
-			sink(R_source,J-1,Alq_nbr,Acc)
-		
+			sink(R_source,J-1,Alq_nbr,Acc);
+
+		quit -> ok
 	end.
 
 

@@ -29,59 +29,60 @@ alq(Sink,SinkHost,Host,BoxName,Lingd) ->
 
 
 cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[]) ->
-	receive
-		quit -> terminate_cm(?CIGAR_MAKER_NBR);
-
+	receive	
 		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid]);
 
-		NewTasks -> cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,[])
+		NewTasks=[_|_] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,[]);
+
+		quit -> terminate_cm(?CIGAR_MAKER_NBR)
 		
 	after 10000 ->
 		throw({timeout, cm_balancer, empty_stacks})
 	end;
 
-cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid={CmN,CmP}|CMs]) ->
+cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 	receive
-		quit -> terminate_cm(?CIGAR_MAKER_NBR);
+		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid|CMs]);
+		
+		NewTasks=[_|_] ->
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,CMs);
 
-		{Pid1,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid1,Pid|CMs]);
-
-		fastq_done when length([Pid|CMs]) =:= ?CIGAR_MAKER_NBR ->
+		fastq_done when length(CMs) =:= ?CIGAR_MAKER_NBR ->
 			{SN,SP} = Sink,
 			navel:call_no_return(SN,erlang,send,[SP,fastq_done]),
 			io:format("Alq confirmed that fastq_done~n");
 
-		NewTasks ->
-			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,[{CmN,CmP}|CMs])
-
+		quit -> terminate_cm(?CIGAR_MAKER_NBR)
 	end;
 
-cm_balancer(?CIGAR_MAKER_NBR,Sink,[{_Read_name,_Chromo,_Read,[]}|Tasks],CMs) ->
-	cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs);
+%cm_balancer(?CIGAR_MAKER_NBR,Sink,[{_Read_name,_Chromo,_Read,[]}|Tasks],CMs) ->
+%	cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs);
 
-cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,[{Pos,Ref}|Ref_seeds]}|Tasks]=OldTasks,[]) ->
+cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks]=OldTasks,[]) ->
 	receive
-		quit -> terminate_cm(?CIGAR_MAKER_NBR);
-
 		{{CmN,CmP},ready} ->
-			navel:call_no_return(CmN,erlang,send,[CmP,{Ref,Read,Read_name,Chromo,Pos}]),
-			case Ref_seeds of
-				[] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,[]);
-				_ -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,Ref_seeds}|Tasks],[])
-			end;
+			navel:call_no_return(CmN,erlang,send,[CmP,Task]),
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,[]);
+			
+		NewTasks=[_|_] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[]);
 
-		NewTasks -> cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[])
+		quit -> terminate_cm(?CIGAR_MAKER_NBR)
 
 	after 10000 ->
 		throw({timeout, cm_balancer, tasks_orevflow})
 	end;
 
-cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,[{Pos,Ref}|Ref_seeds]}|Tasks],[{CmN,CmP}|CMs]) ->
-	navel:call_no_return(CmN,erlang,send,[CmP,{Ref,Read,Read_name,Chromo,Pos}]),
-	case Ref_seeds of
-		[] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs);
-		_ -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,Ref_seeds}|Tasks],CMs)
-	end.
+cm_balancer(?CIGAR_MAKER_NBR,Sink,[Task|Tasks],[{CmN,CmP}|CMs]) ->
+	navel:call_no_return(CmN,erlang,send,[CmP,Task]),
+	cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs).
+
+
+%cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,[{Pos,Ref}|Ref_seeds]}|Tasks],[{CmN,CmP}|CMs]) ->
+%	navel:call_no_return(CmN,erlang,send,[CmP,{Ref,Read,Read_name,Chromo,Pos}]),
+%	case Ref_seeds of
+%		[] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,Tasks,CMs);
+%		_ -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[{Read_name,Chromo,Read,Ref_seeds}|Tasks],CMs)
+%	end.
 
 
 
