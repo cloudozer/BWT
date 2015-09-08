@@ -8,20 +8,27 @@
 -module(rs).
 -export([
   start/2,
-  r_source/5
+  r_source/8
 ]).
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
+-define(SEQ_FILE_CHUNK_SIZE,200000000).
 
 
 start(SeqFileName, HttpStorage) ->
 	Pid = spawn(fun() ->
 		SeqFileNameUrl = HttpStorage ++ "/" ++ SeqFileName,
-		{ok,Reads} = http:get(SeqFileNameUrl),
+
+		{ok,Headers} = http:get_headers(SeqFileNameUrl),
+		ContentLength = proplists:get_value(<<"Content-Length">>, Headers),
+		{ok,Headers1,Reads} = http:get(SeqFileNameUrl, [{"Range", http:range(0, ?SEQ_FILE_CHUNK_SIZE-1)}]),
+		SeqFileChunkSize = proplists:get_value(<<"Content-Length">>, Headers1),
+		http:get_async(self(), SeqFileNameUrl, [{"Range", http:range(SeqFileChunkSize, 2*?SEQ_FILE_CHUNK_SIZE-1)}]),
+
 		receive
 			{run, Alqs,SFs, SinkRef} ->
 StartTime = now(),
-				r_source(Reads,Alqs,SFs,length(SFs),SinkRef),
+				r_source(Reads, <<>>, ContentLength, SeqFileChunkSize, Alqs,SFs,length(SFs),SinkRef),
 io:format("Fastq completed within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
 		end
 	end),
@@ -54,7 +61,7 @@ io:format("Bin1 ~p~n", [Fb]),
     {<<>>, Acc}
   end.
 
-r_source(<<>>,Alqs,SFs,0,Sink) ->
+r_source(<<>>,<<>>,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
 	% multicast it
 	lists:foreach(  fun({ANode,APid})-> navel:call_no_return(ANode, erlang, send, [APid, fastq_done])
 					end,Alqs),
@@ -69,25 +76,29 @@ r_source(<<>>,Alqs,SFs,0,Sink) ->
 			shutdown_cluster(Alqs,SFs,Sink)
 	end;
 
-r_source(Reads,Alqs,SFs,0,Sink) ->
+r_source(<<>>,Reads,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
+
+	r_source(Reads,<<>>,ContentLength,DownloadedSize,Alqs,SFs,N,Sink);
+
+r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
   case produce_workload(10000, Reads) of
     {Reads1, []} ->
-      r_source(Reads1,Alqs,SFs,0,Sink);
+      r_source(Reads1,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,0,Sink);
     {Reads1, Batch} ->
       multicast(Batch,SFs),
-      r_source(Reads1,Alqs,SFs,length(SFs),Sink)
+      r_source(Reads1,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink)
   end;
 
-r_source(Reads,Alqs,SFs,N,Sink) when N == 1 ->
+r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) when N == 1 ->
 	receive
 		{Pid,ready} -> 
 			io:format("ready ~p: ~p~n", [os:timestamp(), Pid]),
-			r_source(Reads,Alqs,SFs,N-1,Sink)
+			r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
 	end;
-r_source(Reads,Alqs,SFs,N,Sink) ->
+r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
 	receive
 		{Pid,ready} -> 
-			r_source(Reads,Alqs,SFs,N-1,Sink)
+			r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
 	end.
 
 
