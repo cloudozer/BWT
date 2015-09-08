@@ -20,7 +20,7 @@ start(SeqFileName, HttpStorage) ->
 		SeqFileNameUrl = HttpStorage ++ "/" ++ SeqFileName,
 
 		{ok,Headers} = http:get_headers(SeqFileNameUrl),
-		ContentLength = proplists:get_value(<<"Content-Length">>, Headers),
+		ContentLength = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
 		{ok,Headers1,Reads} = http:get(SeqFileNameUrl, [{"Range", http:range(0, ?SEQ_FILE_CHUNK_SIZE-1)}]),
 		?SEQ_FILE_CHUNK_SIZE = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers1)),
 		http:get_async(SeqFileNameUrl, [{"Range", http:range(?SEQ_FILE_CHUNK_SIZE, 2*?SEQ_FILE_CHUNK_SIZE-1)}]),
@@ -45,23 +45,20 @@ produce_workload(0, Fastq, Acc) ->
 produce_workload(_Size, <<>>, Acc) ->
   {<<>>, Acc};
 produce_workload(Size, Bin, Acc) ->
-  try 
   case binary:split(Bin, <<$\n>>) of
-  [<<$@, SName/binary>>, Bin1] ->
-	  [SData, Bin2] = binary:split(Bin1, <<$\n>>),
-	  [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
-	  [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
-	  Seq = {SName, SData},
-	  produce_workload(Size - 1, Bin4, [Seq | Acc]);
-  [Fb, Bin1] ->
-    %% Ignore
-    produce_workload(Size, Bin1, Acc)
-  end
-  catch _:_ ->
-    {<<>>, Acc}
+    [<<$@, SName/binary>>, Bin1] ->
+            [SData, Bin2] = binary:split(Bin1, <<$\n>>),
+            [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
+            [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
+            Seq = {SName, SData},
+            produce_workload(Size - 1, Bin4, [Seq | Acc]);
+    [Fb, Bin1] ->
+      %% Ignore
+      produce_workload(Size, Bin1, Acc)
   end.
 
 r_source(<<>>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
+io:format("RS 0~n"),
 	terminate(Alqs,length(SFs)),
 
 	io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
@@ -76,43 +73,58 @@ r_source(<<>>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentL
 	end;
 
 r_source(<<>>,SeqFileNameUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
-io:format("r_source(<<>>~n"),
+io:format("RS 1 ~p~n", [{ContentLength,DownloadedSize,N}]),
         receive
-          {got_async, _, Reads} ->
-            http:get_async(SeqFileNameUrl, [{"Range", http:range(DownloadedSize, DownloadedSize+?SEQ_FILE_CHUNK_SIZE-1)}]),
-
-            r_source(Reads,SeqFileNameUrl,ContentLength,DownloadedSize+?SEQ_FILE_CHUNK_SIZE,Alqs,SFs,N,Sink)
+          {got_async, Headers, Reads} ->
+            ContentLength1 = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
+            ContentLength1 = size(Reads),
+            if DownloadedSize+ContentLength1 < ContentLength ->
+              DownloadedSize1 = DownloadedSize + ContentLength1,
+              http:get_async(SeqFileNameUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]);
+            true ->
+              ok
+            end,
+io:format("000 ~p~n", [{DownloadedSize,ContentLength1,ContentLength,DownloadedSize+ContentLength1}]),
+            r_source(Reads,SeqFileNameUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,N,Sink)
         end;
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
-  case produce_workload(10000, Reads) of
-    {Reads1, []} ->
-      r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink);
-    {Reads1, Batch} ->
-      multicast(Batch,SFs),
-      r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink);
-    {fastq_parse_err, Bin, Batch} ->
-io:format("fastq_parse_err~n"),
-      receive
-        {got_async, _, ReadsNext} ->
-io:format("ReadsNext ~b~n", [size(ReadsNext)]),
-          http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize, DownloadedSize+?SEQ_FILE_CHUNK_SIZE-1)}]),
-          if Batch =/= [] ->
-            multicast(Batch,SFs),
-            r_source(<< Bin/binary, ReadsNext/binary >>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink);
-          true ->
-            r_source(<< Bin/binary, ReadsNext/binary >>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink)
-          end
-      end
-  end;
+io:format("# ~p~n", [size(Reads)]),
+  try
+    case produce_workload(10000, Reads) of
+      %{Reads1, []} ->
+      %  r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink);
+      {Reads1, Batch} ->
+        multicast(Batch,SFs),
+        r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink)
+    end
+  catch _:_ ->
+            receive
+          {got_async, Headers, ReadsNext} ->
+            ContentLength1 = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
+            ContentLength1 = size(ReadsNext),
+            if DownloadedSize+ContentLength1 < ContentLength ->
+              DownloadedSize1 = DownloadedSize + ContentLength1,
+              http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]);
+            true ->
+              ok
+            end,
+
+io:format("111 ~p~n", [{DownloadedSize,ContentLength1,ContentLength,DownloadedSize+ContentLength1}]),
+r_source(<< Reads/binary, ReadsNext/binary >> ,SeqUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
+end
+end;
+
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) when N == 1 ->
+io:format("RS 3~n"),
 	receive
 		{Pid,ready} -> 
 			io:format("ready ~p: ~p~n", [os:timestamp(), Pid]),
 			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
 	end;
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
+io:format("RS 4~n"),
 	receive
 		{Pid,ready} -> 
 			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
