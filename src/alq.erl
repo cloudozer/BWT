@@ -11,7 +11,7 @@
 ]).
 
 -define(CIGAR_MAKER_NBR,6).
--define(TASK_BATCH_SIZE,100).
+-define(TASK_BATCH_SIZE,500).
 
 -include("bwt.hrl").
 
