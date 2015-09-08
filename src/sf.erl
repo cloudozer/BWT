@@ -23,11 +23,11 @@ start(Chunk,AlqRef,SourceRef,HttpStorage) ->
 
 seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 	ChunkList = atom_to_list(Chunk),
-	{ok, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ ChunkList),
+	{ok, _, FmIndexBin} = http:get(HttpStorage ++ "/fm_indices/" ++ ChunkList),
 	{Meta,FM} = binary_to_term(FmIndexBin),
 
 	RefFileName = re:replace(ChunkList, ".fm", ".ref", [{return, list}]),
-	{ok, Ref} = http:get(HttpStorage ++ "/fm_indices/" ++ RefFileName),
+	{ok, _, Ref} = http:get(HttpStorage ++ "/fm_indices/" ++ RefFileName),
 	Extension = list_to_binary(lists:duplicate(?REF_EXTENSION_LEN, $N)),
 	Ref1 = <<Extension/binary, Ref/binary, Extension/binary>>,
 

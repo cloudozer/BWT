@@ -12,7 +12,7 @@
 ]).
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
--define(SEQ_FILE_CHUNK_SIZE,200000000).
+-define(SEQ_FILE_CHUNK_SIZE,20000000).
 
 
 start(SeqFileName, HttpStorage) ->
@@ -22,13 +22,13 @@ start(SeqFileName, HttpStorage) ->
 		{ok,Headers} = http:get_headers(SeqFileNameUrl),
 		ContentLength = proplists:get_value(<<"Content-Length">>, Headers),
 		{ok,Headers1,Reads} = http:get(SeqFileNameUrl, [{"Range", http:range(0, ?SEQ_FILE_CHUNK_SIZE-1)}]),
-		SeqFileChunkSize = proplists:get_value(<<"Content-Length">>, Headers1),
-		http:get_async(self(), SeqFileNameUrl, [{"Range", http:range(SeqFileChunkSize, 2*?SEQ_FILE_CHUNK_SIZE-1)}]),
+		?SEQ_FILE_CHUNK_SIZE = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers1)),
+		http:get_async(SeqFileNameUrl, [{"Range", http:range(?SEQ_FILE_CHUNK_SIZE, 2*?SEQ_FILE_CHUNK_SIZE-1)}]),
 
 		receive
 			{run, Alqs,SFs, SinkRef} ->
 StartTime = now(),
-				r_source(Reads, <<>>, ContentLength, SeqFileChunkSize, Alqs,SFs,length(SFs),SinkRef),
+				r_source(Reads, SeqFileNameUrl, ContentLength, ?SEQ_FILE_CHUNK_SIZE, Alqs,SFs,length(SFs),SinkRef),
 io:format("Fastq completed within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
 		end
 	end),
@@ -54,14 +54,14 @@ produce_workload(Size, Bin, Acc) ->
 	  Seq = {SName, SData},
 	  produce_workload(Size - 1, Bin4, [Seq | Acc]);
   [Fb, Bin1] ->
-io:format("Bin1 ~p~n", [Fb]),
-	  produce_workload(Size, Bin1, Acc)
+    %% Ignore
+    produce_workload(Size, Bin1, Acc)
   end
   catch _:_ ->
     {<<>>, Acc}
   end.
 
-r_source(<<>>,<<>>,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
+r_source(<<>>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
 	terminate(Alqs,length(SFs)),
 
 	io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
@@ -75,29 +75,47 @@ r_source(<<>>,<<>>,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLen
 			shutdown_cluster(Alqs,SFs,Sink)
 	end;
 
-r_source(<<>>,Reads,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
+r_source(<<>>,SeqFileNameUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
+io:format("r_source(<<>>~n"),
+        receive
+          {got_async, _, Reads} ->
+            http:get_async(SeqFileNameUrl, [{"Range", http:range(DownloadedSize, DownloadedSize+?SEQ_FILE_CHUNK_SIZE-1)}]),
 
-	r_source(Reads,<<>>,ContentLength,DownloadedSize,Alqs,SFs,N,Sink);
+            r_source(Reads,SeqFileNameUrl,ContentLength,DownloadedSize+?SEQ_FILE_CHUNK_SIZE,Alqs,SFs,N,Sink)
+        end;
 
-r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
+r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
   case produce_workload(10000, Reads) of
     {Reads1, []} ->
-      r_source(Reads1,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,0,Sink);
+      r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink);
     {Reads1, Batch} ->
       multicast(Batch,SFs),
-      r_source(Reads1,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink)
+      r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink);
+    {fastq_parse_err, Bin, Batch} ->
+io:format("fastq_parse_err~n"),
+      receive
+        {got_async, _, ReadsNext} ->
+io:format("ReadsNext ~b~n", [size(ReadsNext)]),
+          http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize, DownloadedSize+?SEQ_FILE_CHUNK_SIZE-1)}]),
+          if Batch =/= [] ->
+            multicast(Batch,SFs),
+            r_source(<< Bin/binary, ReadsNext/binary >>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink);
+          true ->
+            r_source(<< Bin/binary, ReadsNext/binary >>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink)
+          end
+      end
   end;
 
-r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) when N == 1 ->
+r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) when N == 1 ->
 	receive
 		{Pid,ready} -> 
 			io:format("ready ~p: ~p~n", [os:timestamp(), Pid]),
-			r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
+			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
 	end;
-r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
+r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
 	receive
 		{Pid,ready} -> 
-			r_source(Reads,ReadsNext,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
+			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
 	end.
 
 

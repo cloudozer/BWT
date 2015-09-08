@@ -39,7 +39,7 @@ start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes = [{_, Host
 
   % TODO: refactor it
   IndexUrl = HttpStorage ++ "/fm_indices/index.json",
-  {ok, FilesInfoJson} = http:get(IndexUrl),
+  {ok, _, FilesInfoJson} = http:get(IndexUrl),
   FilesInfo = jsx:decode(FilesInfoJson),
 
   case schedule:chunks_to_box(ChromosomeList,FilesInfo,Boxes) of

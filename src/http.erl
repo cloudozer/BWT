@@ -18,8 +18,10 @@ get(Url) ->
   get(Url, []).
 
 get(Url, Headers) ->
-  {Headers, Body} = do_get(Url, Headers),
-  {ok, Headers, Body}.
+  {ok, Sock} = do_request(Url, Headers),
+  {ok, Headers1, Body} = do_recv(Sock),
+  ok = gen_tcp:close(Sock),
+  {ok, Headers1, Body}.
 
 get_headers(Url) ->
   {ok, Sock} = do_request(Url, []),
@@ -28,12 +30,6 @@ get_headers(Url) ->
   {ok, Headers}.
 
 %% Private
-
-do_get(Url, Headers) ->
-  {ok, Sock} = do_request(Url, Headers),
-  {ok, Headers, Body} = do_recv(Sock),
-  ok = gen_tcp:close(Sock),
-  {Headers, Body}.
 
 do_request(Url, Headers) ->
   {ok, {_Scheme, _UserInfo, Host, Port, Path, Query}} = http_uri:parse(Url),
@@ -62,7 +58,8 @@ recv_headers(Sock, Headers) ->
 
       [<<_HttpVer:9/binary, StatusCodeBin:3/binary, _StatusMsg/binary >> | Headers2] = binary:split(Headers1, <<"\r\n">>, [global]),
       StatusCode = binary_to_integer(StatusCodeBin),
-      if 200 =/= StatusCode ->
+      %% if not 2**
+      if ( StatusCode div 100 ) =/= 2 ->
         throw({http_get, StatusCode});
         true -> ok
       end,
@@ -95,5 +92,5 @@ get_refseq(Chunks) -> Chunks.
 
 
 range(Start, End) ->
-  io_lib:format("~b-~b/*", [Start, End]).
+  io_lib:format("bytes=~b-~b", [Start, End]).
 
