@@ -40,21 +40,17 @@ io:format("Fastq completed within ~p secs.", [timer:now_diff(now(), StartTime) /
 produce_workload(N, Fastq) ->
   produce_workload(N, Fastq, []).
 
-produce_workload(0, Fastq, Acc) ->
-  {Fastq, Acc};
-produce_workload(_Size, <<>>, Acc) ->
-  {<<>>, Acc};
+produce_workload(0, Bin, Acc) ->
+  {Bin, Acc};
 produce_workload(Size, Bin, Acc) ->
   case binary:split(Bin, <<$\n>>) of
     [<<$@, SName/binary>>, Bin1] ->
-            [SData, Bin2] = binary:split(Bin1, <<$\n>>),
-            [<<$+>>, Bin3] = binary:split(Bin2, <<$\n>>),
-            [_Quality, Bin4] = binary:split(Bin3, <<$\n>>),
-            Seq = {SName, SData},
-            produce_workload(Size - 1, Bin4, [Seq | Acc]);
-    [Fb, Bin1] ->
-      %% Ignore
-      produce_workload(Size, Bin1, Acc)
+      case binary:split(Bin1, <<$\n>>) of
+        [SData, Bin2] -> produce_workload(Size-1,Bin2,[{SName, SData}|Acc]);
+        [Bin1] -> {Bin1,Acc}
+      end;
+    [_, Bin1] -> produce_workload(Size, Bin1, Acc);
+    [Bin] -> {Bin,Acc}
   end.
 
 r_source(<<>>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
@@ -89,31 +85,43 @@ io:format("000 ~p~n", [{DownloadedSize,ContentLength1,ContentLength,DownloadedSi
         end;
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
-io:format("# ~p~n", [size(Reads)]),
-  try
-    case produce_workload(10000, Reads) of
-      %{Reads1, []} ->
-      %  r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink);
-      {Reads1, Batch} ->
-        multicast(Batch,SFs),
-        r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink)
-    end
-  catch _:_ ->
-            receive
-          {got_async, Headers, ReadsNext} ->
-            ContentLength1 = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
-            ContentLength1 = size(ReadsNext),
-            if DownloadedSize+ContentLength1 < ContentLength ->
-              DownloadedSize1 = DownloadedSize + ContentLength1,
-              http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]);
-            true ->
-              ok
-            end,
+  io:format("# ~p~n", [size(Reads)]),
+  case produce_workload(10000, Reads) of
+    {Reads1, []} -> 
+      case ContentLength =:= DownloadedSize of
+        true ->
+          io:format("Tail of fastq: ~p~n",[Reads1]),
+          terminate(Alqs,length(SFs)),
 
-io:format("111 ~p~n", [{DownloadedSize,ContentLength1,ContentLength,DownloadedSize+ContentLength1}]),
-r_source(<< Reads/binary, ReadsNext/binary >> ,SeqUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
-end
-end;
+          io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
+          case get_sink_confirmation(Sink) of
+            {timeout,Time} -> 
+              io:format("No confirmation got from sink during ~psec~n",[Time]),
+              shutdown_cluster(Alqs,SFs,Sink);
+            Time -> 
+              io:format("Source waited for confirmation ~p msec~n",[Time]),
+              % request next fastq file
+              shutdown_cluster(Alqs,SFs,Sink)
+          end;
+
+        false ->
+          receive
+            {got_async, Headers, ReadsNext} ->
+              ContentLength1 = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
+              ContentLength1 = size(ReadsNext),
+              if DownloadedSize+ContentLength1 < ContentLength ->
+                DownloadedSize1 = DownloadedSize + ContentLength1,
+                http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]);
+              true ->
+                ok
+              end
+          end,
+          r_source(<< Reads/binary, ReadsNext/binary >> ,SeqUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
+      end;
+    {Reads1, Batch} -> 
+      multicast(Batch,SFs),
+      r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink)
+  end;
 
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) when N == 1 ->
@@ -123,6 +131,7 @@ io:format("RS 3~n"),
 			io:format("ready ~p: ~p~n", [os:timestamp(), Pid]),
 			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
 	end;
+
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
 io:format("RS 4~n"),
 	receive
