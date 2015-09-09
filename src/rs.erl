@@ -43,14 +43,24 @@ produce_workload(N, Fastq) ->
 produce_workload(0, Bin, Acc) ->
   {Bin, Acc};
 produce_workload(Size, Bin, Acc) ->
+  case get_next_read(Bin) of
+    {false,Bin1} -> {Bin1,Acc};
+    {SName,SData,Bin1} -> produce_workload(Size-1,Bin1,[{SName, SData}|Acc])
+  end.
+
+get_next_read(Bin) ->
   case binary:split(Bin, <<$\n>>) of
     [<<$@, SName/binary>>, Bin1] ->
       case binary:split(Bin1, <<$\n>>) of
-        [SData, Bin2] -> produce_workload(Size-1,Bin2,[{SName, SData}|Acc]);
-        [Bin1] -> {Bin1,Acc}
+        [SData, Bin2] -> 
+          case binary:split(Bin2, <<$\n>>) of
+            [<<"+">>,Bin3] -> {SName,SData,Bin3};
+            [_] -> {false,Bin}
+          end;
+        [_] -> {false,Bin}
       end;
-    [_, Bin1] -> produce_workload(Size, Bin1, Acc);
-    [Bin] -> {Bin,Acc}
+    [_, Bin1] -> get_next_read(Bin1);
+    [Bin] -> {false,Bin}
   end.
 
 r_source(<<>>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
@@ -116,7 +126,7 @@ r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
                 ok
               end
           end,
-          r_source(<< Reads/binary, ReadsNext/binary >> ,SeqUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
+          r_source(<< Reads1/binary, ReadsNext/binary >> ,SeqUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
       end;
     {Reads1, Batch} -> 
       multicast(Batch,SFs),
