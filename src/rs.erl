@@ -54,7 +54,14 @@ get_next_read(Bin) ->
       case binary:split(Bin1, <<$\n>>) of
         [SData, Bin2] -> 
           case binary:split(Bin2, <<$\n>>) of
-            [<<"+">>,Bin3] -> {SName,SData,Bin3};
+            [<<"+">>,Bin3] -> 
+              case binary:split(Bin3, <<$\n>>) of
+                [_,Bin4] ->
+                  {SName,SData,Bin4};
+                [_] ->
+                  {false,Bin}
+              end;
+            [_,_] -> {false,Bin};
             [_] -> {false,Bin}
           end;
         [_] -> {false,Bin}
@@ -63,36 +70,36 @@ get_next_read(Bin) ->
     [Bin] -> {false,Bin}
   end.
 
-r_source(<<>>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
-io:format("RS 0~n"),
-	terminate(Alqs,length(SFs)),
-
-	io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
-	case get_sink_confirmation(Sink) of
-		{timeout,Time} -> 
-			io:format("No confirmation got from sink during ~psec~n",[Time]),
-			shutdown_cluster(Alqs,SFs,Sink);
-		Time -> 
-			io:format("Source waited for confirmation ~p msec~n",[Time]),
-			% request next fastq file
-			shutdown_cluster(Alqs,SFs,Sink)
-	end;
-
-r_source(<<>>,SeqFileNameUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
-io:format("RS 1 ~p~n", [{ContentLength,DownloadedSize,0}]),
-        receive
-          {got_async, Headers, Reads} ->
-            ContentLength1 = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
-            ContentLength1 = size(Reads),
-            if DownloadedSize+ContentLength1 < ContentLength ->
-              DownloadedSize1 = DownloadedSize + ContentLength1,
-              http:get_async(SeqFileNameUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]);
-            true ->
-              ok
-            end,
-io:format("000 ~p~n", [{DownloadedSize,ContentLength1,ContentLength,DownloadedSize+ContentLength1}]),
-            r_source(Reads,SeqFileNameUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
-        end;
+%r_source(<<>>,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) when ContentLength == DownloadedSize ->
+%io:format("RS 0~n"),
+%	terminate(Alqs,length(SFs)),
+%
+%	io:format("~n\trs finished fastq distribution and is waiting for confirmation from sink~n"),
+%	case get_sink_confirmation(Sink) of
+%		{timeout,Time} -> 
+%			io:format("No confirmation got from sink during ~psec~n",[Time]),
+%			shutdown_cluster(Alqs,SFs,Sink);
+%		Time -> 
+%			io:format("Source waited for confirmation ~p msec~n",[Time]),
+%			% request next fastq file
+%			shutdown_cluster(Alqs,SFs,Sink)
+%	end;
+%
+%r_source(<<>>,SeqFileNameUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
+%io:format("RS 1 ~p~n", [{ContentLength,DownloadedSize,0}]),
+%        receive
+%          {got_async, Headers, Reads} ->
+%            ContentLength1 = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
+%            ContentLength1 = size(Reads),
+%            if DownloadedSize+ContentLength1 < ContentLength ->
+%              DownloadedSize1 = DownloadedSize + ContentLength1,
+%              http:get_async(SeqFileNameUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]);
+%            true ->
+%              ok
+%            end,
+%io:format("000 ~p~n", [{DownloadedSize,ContentLength1,ContentLength,DownloadedSize+ContentLength1}]),
+%            r_source(Reads,SeqFileNameUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
+%        end;
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
   io:format("# ~p~n", [size(Reads)]),
@@ -135,7 +142,6 @@ r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
 
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) when N == 1 ->
-io:format("RS 3~n"),
 	receive
 		{Pid,ready} -> 
 			io:format("ready ~p: ~p~n", [os:timestamp(), Pid]),
@@ -143,7 +149,6 @@ io:format("RS 3~n"),
 	end;
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
-io:format("RS 4~n"),
 	receive
 		{Pid,ready} -> 
 			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
