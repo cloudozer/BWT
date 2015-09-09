@@ -12,7 +12,7 @@
 ]).
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
--define(SEQ_FILE_CHUNK_SIZE,20000000).
+-define(SEQ_FILE_CHUNK_SIZE,200000000).
 
 
 start(SeqFileName, HttpStorage) ->
@@ -68,8 +68,8 @@ io:format("RS 0~n"),
 			shutdown_cluster(Alqs,SFs,Sink)
 	end;
 
-r_source(<<>>,SeqFileNameUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
-io:format("RS 1 ~p~n", [{ContentLength,DownloadedSize,N}]),
+r_source(<<>>,SeqFileNameUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
+io:format("RS 1 ~p~n", [{ContentLength,DownloadedSize,0}]),
         receive
           {got_async, Headers, Reads} ->
             ContentLength1 = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
@@ -81,7 +81,7 @@ io:format("RS 1 ~p~n", [{ContentLength,DownloadedSize,N}]),
               ok
             end,
 io:format("000 ~p~n", [{DownloadedSize,ContentLength1,ContentLength,DownloadedSize+ContentLength1}]),
-            r_source(Reads,SeqFileNameUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,N,Sink)
+            r_source(Reads,SeqFileNameUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
         end;
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
