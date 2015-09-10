@@ -12,7 +12,7 @@
 ]).
 
 -define(SINK_CONFIRM_TIMEOUT,10000).
--define(SEQ_FILE_CHUNK_SIZE,200000000).
+-define(SEQ_FILE_CHUNK_SIZE,100000000).
 
 
 start(SeqFileName, HttpStorage) ->
@@ -21,14 +21,20 @@ start(SeqFileName, HttpStorage) ->
 
 		{ok,Headers} = http:get_headers(SeqFileNameUrl),
 		ContentLength = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers)),
-		{ok,Headers1,Reads} = http:get(SeqFileNameUrl, [{"Range", http:range(0, ?SEQ_FILE_CHUNK_SIZE-1)}]),
-		?SEQ_FILE_CHUNK_SIZE = binary_to_integer(proplists:get_value(<<"Content-Length">>, Headers1)),
-		http:get_async(SeqFileNameUrl, [{"Range", http:range(?SEQ_FILE_CHUNK_SIZE, 2*?SEQ_FILE_CHUNK_SIZE-1)}]),
+		DownloadedSize = case ContentLength > ?SEQ_FILE_CHUNK_SIZE of
+			true ->
+				{ok,Headers1,Reads} = http:get(SeqFileNameUrl, [{"Range", http:range(0, ?SEQ_FILE_CHUNK_SIZE-1)}]),
+				http:get_async(SeqFileNameUrl, [{"Range", http:range(?SEQ_FILE_CHUNK_SIZE, 2*?SEQ_FILE_CHUNK_SIZE-1)}]),
+				?SEQ_FILE_CHUNK_SIZE;
+			false ->
+				{ok,Headers1,Reads} = http:get(SeqFileNameUrl),
+				ContentLength
+		end,
 
 		receive
 			{run, Alqs,SFs, SinkRef} ->
 StartTime = now(),
-				r_source(Reads, SeqFileNameUrl, ContentLength, ?SEQ_FILE_CHUNK_SIZE, Alqs,SFs,length(SFs),SinkRef),
+				r_source(Reads, SeqFileNameUrl, ContentLength, DownloadedSize, Alqs,SFs,length(SFs),SinkRef),
 io:format("Fastq completed within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
 		end
 	end),
@@ -102,7 +108,6 @@ get_next_read(Bin) ->
 %        end;
 
 r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
-  io:format("# ~p~n", [size(Reads)]),
   case produce_workload(10000, Reads) of
     {Reads1, []} -> 
       case ContentLength =:= DownloadedSize of
@@ -128,7 +133,8 @@ r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
               ContentLength1 = size(ReadsNext),
               if DownloadedSize+ContentLength1 < ContentLength ->
                 DownloadedSize1 = DownloadedSize + ContentLength1,
-                http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]);
+                http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]),
+  io:format("Fastq downloaded ~p%~n", [100*(DownloadedSize+ContentLength1)/ContentLength]);
               true ->
                 ok
               end

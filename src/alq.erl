@@ -10,8 +10,8 @@
 	alq/5
 ]).
 
--define(CIGAR_MAKER_NBR,6).
--define(TASK_BATCH_SIZE,500).
+-define(CIGAR_MAKER_NBR,10).
+-define(TASK_BATCH_SIZE,2000).
 
 -include("bwt.hrl").
 
@@ -45,7 +45,7 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 	receive
 		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid|CMs]);
 		
-		NewTasks=[_|_] ->io:format("Empty Queue: ~n"),
+		NewTasks=[_|_] ->
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,CMs);
 
 		fastq_done when length(CMs) =:= ?CIGAR_MAKER_NBR ->
