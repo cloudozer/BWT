@@ -33,13 +33,14 @@ start_sink([{Box,Ls}|Schedule],New_schedule,Source) ->
 
 
 sink(R_source,Alq_nbr) -> 
-	{ok,Dev} = file:open("BWT_OUT.sam",write),
+	{ok,Dev} = file:open("OUT.sam",write),
 	sink(R_source,Alq_nbr,Alq_nbr,Dev,0).
 
 sink(R_source={SourceN,SourceP},0,Alq_nbr,Dev,SAM_lines_qty) ->
 	io:format("All aligning queues confirmed that they have no more tasks for cigar_makers~n"),
 	io:format("~p matches found~n",[SAM_lines_qty]),
 	file:close(Dev),
+	file:rename("OUT.sam","fastq_OUT.sam"),
 	navel:call(SourceN, erlang, send, [SourceP, {{navel:get_node(),self()},fastq_done}]),
 	sink(R_source,Alq_nbr);
 sink(R_source,J,Alq_nbr,Dev,Acc) ->
