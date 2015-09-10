@@ -50,14 +50,14 @@ cigar_maker({AlqN,AlqP}=Alq, Sink) ->
 
 
 
-align_tasks([{SeqName,Chunk,QsecBin,Ref_seeds}|Tasks],Sink={SinkN,SinkP}) ->
+align_tasks([{SeqName,Chromo,QsecBin,Ref_seeds}|Tasks],Sink={SinkN,SinkP}) ->
 	Qsec = binary_to_list(QsecBin),
 
 	SAM_lines = lists:foldl(
 		fun({Pos,Ref},Acc)->
 			case align(Qsec,Ref) of
 				no_match -> Acc;
-				{Score,CIGAR} -> [{SeqName,Chunk,Pos,Score,CIGAR,Ref}|Acc]
+				{Score,CIGAR} -> [{SeqName,Chromo,Pos,Score,CIGAR,Ref}|Acc]
 			end
 		end,[],Ref_seeds),
 

@@ -29,20 +29,10 @@ alq(Sink,SinkHost,Host,BoxName,Lingd) ->
 	cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[]).
 
 
-cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[]) ->
-	receive	
-		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid]);
-
-		NewTasks=[_|_] -> cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,[]);
-
-		quit -> terminate_cm(?CIGAR_MAKER_NBR)
-		
-	after 10000 ->
-		throw({timeout, cm_balancer, empty_stacks})
-	end;
-
 cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 	receive
+		quit -> terminate_cm(?CIGAR_MAKER_NBR);
+
 		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid|CMs]);
 		
 		NewTasks=[_|_] ->
@@ -51,19 +41,17 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 		fastq_done when length(CMs) =:= ?CIGAR_MAKER_NBR ->
 			{SN,SP} = Sink,
 			navel:call_no_return(SN,erlang,send,[SP,fastq_done]),
-			io:format("Alq confirmed that fastq_done~n");
-
-		quit -> terminate_cm(?CIGAR_MAKER_NBR)
+			io:format("Alq confirmed that fastq_done~n")
 	end;
 
 cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[]) ->
 	receive
+		quit -> terminate_cm(?CIGAR_MAKER_NBR);
+		
 		{Pid,ready} ->
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[Pid]);
 			
-		NewTasks=[_|_] -> io:format("Queue: ~p~n", [length(OldTasks)]), cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[]);
-
-		quit -> terminate_cm(?CIGAR_MAKER_NBR)
+		NewTasks=[_|_] -> io:format("Queue: ~p~n", [length(OldTasks)]), cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[])
 
 	after 10000 ->
 		throw({timeout, cm_balancer, tasks_orevflow})
