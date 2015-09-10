@@ -104,7 +104,7 @@ r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
               if DownloadedSize+ContentLength1 < ContentLength ->
                 DownloadedSize1 = DownloadedSize + ContentLength1,
                 http:get_async(SeqUrl, [{"Range", http:range(DownloadedSize1, DownloadedSize1+?SEQ_FILE_CHUNK_SIZE-1)}]),
-  io:format("Fastq downloaded ~p%~n", [100*(DownloadedSize+ContentLength1)/ContentLength]);
+  io:format("Fastq downloaded ~b%~n", [round(100*(DownloadedSize+ContentLength1)/ContentLength)]);
               true ->
                 ok
               end
