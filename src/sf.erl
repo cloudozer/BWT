@@ -35,7 +35,7 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 	Shift = proplists:get_value(shift, Meta),
 	SavedSeqs = ets:new(saved_seqs,[]),
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
-	[Chromo|_] = strings:tokens(Chunk,"_p"),
+	[Chromo|_] = string:tokens(ChunkList,"_p"),
 	seed_finder(Chromo,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
 seed_finder(Chromo,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
