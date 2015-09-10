@@ -6,11 +6,16 @@
 
 -module(cm).
 -export([start_cigar_makers/6,
-		cigar_maker/2
+		cigar_maker/2, t/0
 		]).
 
 -include("bwt.hrl").
 
+
+t() -> 
+	Ref = sw:rand_seq(101),
+	lists:foreach(  fun(_)-> Qsec = sw:rand_seq(100), align(Qsec,Ref) 
+					end,lists:seq(1,1000)).
 
 start_cigar_makers(N,Sink,SinkHost,AlqHost,BoxName,LingdRef) ->
 	lists:foreach(  fun(I) ->

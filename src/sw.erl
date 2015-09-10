@@ -38,7 +38,7 @@ rand_seq(N)->
 	rand_seq([],N).
 rand_seq(Acc,0) -> Acc;
 rand_seq(Acc,N) -> 
-	case random:uniform() < 0.0 of
+	case random:uniform() < 0.1 of
 		true ->
 			rand_seq([lists:nth(random:uniform(10),[$Y,$R,$B,$D,$K,$M,$N,$S,$V,$W])|Acc], N-1);
 		_ ->
