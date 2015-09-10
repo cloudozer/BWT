@@ -35,15 +35,15 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 	Shift = proplists:get_value(shift, Meta),
 	SavedSeqs = ets:new(saved_seqs,[]),
 	navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
-	seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
+	[Chromo|_] = strings:tokens(Chunk,"_p"),
+	seed_finder(Chromo,Alq,R_source,FM,SavedSeqs,Ref1,Pc,Pg,Pt,Last,Shift).
 
-seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
+seed_finder(Chromo,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	receive
 		quit -> quit; 
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 			navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
-%% 			io:format("seed finder ~p got ~p~n",[Chunk,length(Batch)]),
 
 			SeedBatch = lists:foldl(
 				fun({Qname,Qseq},SeedsAcc) ->
@@ -58,7 +58,7 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Las
 
 						{GlobalPos,Ref_seq1}
 					end, Seeds),
-					[ {Qname,Chunk,Qseq,SeedSeqs} | SeedsAcc ]
+					[ {Qname,Chromo,Qseq,SeedSeqs} | SeedsAcc ]
 				end, [], Batch),
 
 			case length(SeedBatch) =:= 0 of
@@ -66,7 +66,7 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Las
 				_ -> 
 					navel:call_no_return(AlqN, erlang, send, [AlqP, SeedBatch])
 			end,		
-			seed_finder(Chunk,Alq,R_source,FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift)
+			seed_finder(Chromo,Alq,R_source,FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift)
 	end.
 
 
