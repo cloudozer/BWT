@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -attached -setcookie secret
+%%! -pa ebin apps/source/ebin apps/sink/ebin deps/jsx/ebin -attached -setcookie secret -rsh ssh
 
 main([]) ->
   io:format("Usage: start_local.sh SeqFileName Chromosome HttpStorage Boxes~n");
@@ -39,7 +39,7 @@ start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes = [{_, Host
 
   % TODO: refactor it
   IndexUrl = HttpStorage ++ "/fm_indices/index.json",
-  {ok, FilesInfoJson} = http:get(IndexUrl),
+  {ok, _, FilesInfoJson} = http:get(IndexUrl),
   FilesInfo = jsx:decode(FilesInfoJson),
 
   case schedule:chunks_to_box(ChromosomeList,FilesInfo,Boxes) of
