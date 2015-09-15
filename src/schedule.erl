@@ -11,7 +11,7 @@
 
 -define(EXTRA_MEM_PER_CHUNK,200).
 -define(SOURCE_MEM,500).
--define(SINK_MEM,500).
+-define(SINK_MEM,300).
 
 
 

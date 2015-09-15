@@ -11,7 +11,7 @@
   r_source/8
 ]).
 
--define(SINK_CONFIRM_TIMEOUT,10000).
+-define(SINK_CONFIRM_TIMEOUT,20000).
 -define(SEQ_FILE_CHUNK_SIZE,100000000).
 
 

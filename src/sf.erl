@@ -41,6 +41,8 @@ seed_finder(Chunk,Alq={AlqN,AlqP},R_source={SN,SP},HttpStorage) ->
 seed_finder(Chromo,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift) ->
 	receive
 		quit -> quit; 
+		wait -> timer:sleep(500),
+			seed_finder(Chromo,Alq,R_source,FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift);
 		{data,[]} -> throw({fs, empty_batch});
 		{data,Batch} ->
 			navel:call_no_return(SN,erlang,send,[SP,{{navel:get_node(),self()},ready}]),
@@ -64,7 +66,7 @@ seed_finder(Chromo,Alq={AlqN,AlqP},R_source={SN,SP},FM,SavedSeqs,Ref,Pc,Pg,Pt,La
 			case length(SeedBatch) =:= 0 of
 				true -> ok;
 				_ -> 
-					navel:call_no_return(AlqN, erlang, send, [AlqP, SeedBatch])
+					navel:call_no_return(AlqN, erlang, send, [AlqP, {{navel:get_node(), self()}, SeedBatch}])
 			end,		
 			seed_finder(Chromo,Alq,R_source,FM,SavedSeqs,Ref,Pc,Pg,Pt,Last,Shift)
 	end.
