@@ -4,7 +4,7 @@
 %
 
 -module(schedule).
--export([chunks_to_box/3]).
+-export([chunks_to_box/3, c2b/0]).
 -export([pop_subcluster_element/2]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -13,6 +13,19 @@
 -define(SOURCE_MEM,500).
 -define(SINK_MEM,500).
 
+
+
+c2b() ->
+	ChunkList = [{source,600},{sink,400},
+				{ch1,700},{ch2,700},{ch3,700},
+				{ch4,760},{ch5,760},{ch6,760},{ch7,760},
+				{ch8,770},{ch9,770},{ch10,770},{ch11,770},{ch12,770},
+				{ch13,790},{ch14,790},{ch15,790},{ch16,790},{ch17,790},{ch18,790},
+				{ch19,800},{ch20,800},{ch21,800}],
+	Boxes = [{4,16},{8,24},{8,24},{8,32}],
+
+	CPC = length(ChunkList)/lists:sum([ Cores ||{Cores,_} <- Boxes ]),
+	io:format("CPC: ~p~n",[CPC]).
 
 
 % returns a list of list of chunks.
