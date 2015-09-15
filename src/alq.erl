@@ -10,8 +10,8 @@
 	alq/5
 ]).
 
--define(CIGAR_MAKER_NBR,10).
--define(TASK_BATCH_SIZE,2000).
+-define(CIGAR_MAKER_NBR,8).
+-define(TASK_BATCH_SIZE,5000).
 
 -include("bwt.hrl").
 
@@ -35,7 +35,7 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 
 		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid|CMs]);
 		
-		NewTasks=[_|_] ->
+		{SFPid, NewTasks} ->
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,CMs);
 
 		fastq_done when length(CMs) =:= ?CIGAR_MAKER_NBR ->
@@ -51,7 +51,14 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[]) ->
 		{Pid,ready} ->
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[Pid]);
 			
-		NewTasks=[_|_] -> io:format("Queue: ~p~n", [length(OldTasks)]), cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks++NewTasks,[])
+		{{SFNode,SFPid}=SF, NewTasks} -> 
+			if length(OldTasks) > 20000 ->
+				io:format("Alq sends wait to ~p~n", [SF]),
+				navel:call_no_return(SFNode, erlang, send, [SFPid, wait]);
+			true -> ok
+			end,
+			io:format("Queue ~p: ~p~n", [SFNode, length(OldTasks)]), 
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks++OldTasks,[])
 
 	after 10000 ->
 		throw({timeout, cm_balancer, tasks_orevflow})
