@@ -148,8 +148,8 @@ terminate(Alqs,J) ->
 
 multicast(Batch,SFs,Alqs,{wait,Len}) ->
 	io:format("RS is pausing~n"),
-	if Len > 1000000 -> timer:sleep(10000);
-	Len > 100000 -> timer:sleep(5000);
+	if Len > 100000 -> timer:sleep(10000);
+	Len > 50000 -> timer:sleep(5000);
 	true -> timer:sleep(1000)
 	end,
 	multicast(Batch,SFs,Alqs);
