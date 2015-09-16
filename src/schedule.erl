@@ -21,11 +21,51 @@ c2b() ->
 				{ch4,760},{ch5,760},{ch6,760},{ch7,760},
 				{ch8,770},{ch9,770},{ch10,770},{ch11,770},{ch12,770},
 				{ch13,790},{ch14,790},{ch15,790},{ch16,790},{ch17,790},{ch18,790},
-				{ch19,800},{ch20,800},{ch21,800}],
-	Boxes = [{4,16},{8,24},{8,24},{8,32}],
+				{ch19,800},{ch20,800},{ch21,800},{ch22,800}],
+	Boxes = [{box1,4,16},{box2,8,24},{box3,8,24}],
 
-	CPC = length(ChunkList)/lists:sum([ Cores ||{Cores,_} <- Boxes ]),
-	io:format("CPC: ~p~n",[CPC]).
+	CPC = length(ChunkList)/lists:sum([ Cores ||{_,Cores,_} <- Boxes ]),
+	io:format("CPC: ~p~n",[CPC]),
+
+	MPCs = lists:keysort(2,[ {Name,M/C} || {Name,C,M} <- Boxes ]),
+	{Boxes_down,Boxes_up} = lists:split(round(length(MPCs) / 2), [ Name || {Name,_} <- MPCs]),
+	%io:format("Boxes_up: ~p~nBoxes_down: ~p~n",[Boxes_up,Boxes_down]),
+
+	Min_bucket = [ {Name,ceiling(CPC*Cores),Cores,Mem} || {Name,Cores,Mem} <- Boxes, lists:member(Name,Boxes_up)],
+	Max_bucket = [ {Name,trunc(CPC*Cores),Cores,Mem} || {Name,Cores,Mem} <- Boxes, lists:member(Name,Boxes_down)],
+
+	io:format("Min boxes: ~p~nMax boxes: ~p~n",[Min_bucket,Max_bucket]),
+	{MinB1,MaxB1} = adjust(length(ChunkList),Min_bucket,Max_bucket),
+	io:format("Min boxes: ~p~nMax boxes: ~p~n",[MinB1,MaxB1]),
+
+	{Small_chunks,Large_chunks} = lists:split(lists:sum([Q || {_,Q,_,_}<-MaxB1]),lists:keysort(2,ChunkList)),
+	io:format("Small chunks: ~p~nLarge chunks: ~p~n",[Small_chunks,Large_chunks]),
+	Order = fun({_Na,Qa,ChunksA},{_Nb,Qb,ChunksB}) ->
+				length(ChunksA)/Qa < length(ChunksB)/Qb
+			end,
+	spread2boxes(lists:reverse(Small_chunks),lists:sort(Order,[ {N,Q,[]} || {N,Q,_C,_M}<- MaxB1]), Order)++
+	spread2boxes(lists:reverse(Large_chunks),lists:sort(Order,[ {N,Q,[]} || {N,Q,_C,_M}<- MinB1]), Order).
+
+
+
+spread2boxes([{Chunk,Size}|Chunks],[{N,Q,Ch}|Boxes],Order) -> 
+	spread2boxes(Chunks, lists:sort(Order,[{N,Q,[{Chunk,Size}|Ch]}|Boxes]),Order);
+spread2boxes([],Boxes,_) -> Boxes.
+
+
+
+adjust(Len,MinB,MaxB) ->
+	Diff = lists:sum([ Qty || {_,Qty,_,_} <- MinB++MaxB]) - Len,
+	if
+		Diff =:= 0 -> {MinB,MaxB};
+		Diff < 0 -> 
+			[{N,Q,C,M}|MinB1] = lists:sort(fun({_,Qa,Ca,_},{_,Qb,Cb,_})-> Qa/Ca < Qb/Cb end,MinB),
+			adjust(Len,[{N,Q+1,C,M}|MinB1],MaxB);
+		true ->
+			[{N,Q,C,M}|MaxB1] = lists:sort(fun({_,Qa,Ca,_},{_,Qb,Cb,_})-> Qa/Ca > Qb/Cb end,MaxB),
+			adjust(Len,MinB,[{N,Q-1,C,M}|MaxB1])
+	end.
+
 
 
 % returns a list of list of chunks.
@@ -156,3 +196,12 @@ pop_subcluster_element_test_() ->
 			)
 		end
 	].
+
+ceiling(X) when X < 0 ->
+    trunc(X);
+ceiling(X) ->
+    T = trunc(X),
+    case X - T == 0 of
+        true -> T;
+        false -> T + 1
+    end.
