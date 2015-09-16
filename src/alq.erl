@@ -35,7 +35,7 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,[],CMs) ->
 
 		{Pid,ready} -> cm_balancer(?CIGAR_MAKER_NBR,Sink,[],[Pid|CMs]);
 		
-		{SFPid, NewTasks} ->
+		{SFPid, NewTasks=[_|_]} ->
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks,CMs);
 
 		fastq_done when length(CMs) =:= ?CIGAR_MAKER_NBR ->
@@ -52,13 +52,20 @@ cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[]) ->
 			cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[Pid]);
 			
 		{{SFNode,SFPid}=SF, NewTasks} -> 
-			if length(OldTasks) > 20000 ->
-				io:format("Alq sends wait to ~p~n", [SF]),
-				navel:call_no_return(SFNode, erlang, send, [SFPid, wait]);
-			true -> ok
-			end,
+			%if length(OldTasks) > 20000 ->
+			%	io:format("Alq sends wait to ~p~n", [SF]),
+			%	navel:call_no_return(SFNode, erlang, send, [SFPid, wait]);
+			%true -> ok
+			%end,
 			io:format("Queue ~p: ~p~n", [SFNode, length(OldTasks)]), 
-			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks++OldTasks,[])
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,NewTasks++OldTasks,[]);
+		{whatsup, {SNode,SPid}} ->
+			case length(OldTasks) > 20000 of
+				true ->
+					navel:call_no_return(SNode,erlang,send,[SPid,{wait,length(OldTasks)}]);
+				false -> ok
+			end,
+			cm_balancer(?CIGAR_MAKER_NBR,Sink,OldTasks,[])
 
 	after 10000 ->
 		throw({timeout, cm_balancer, tasks_orevflow})
