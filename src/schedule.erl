@@ -56,7 +56,7 @@ c2b() ->
 
 
 
-spread2boxes(Chunks,Boxes) -> 
+spread2boxes(Chunks,Boxes) ->
 	{[],Res} =
 	lists:foldl(fun({Av,N,Q},{Chunks1,Distributed})->
 				{Selection,Chunks2} = choose_chunks(Av,Q,Chunks1),
@@ -127,22 +127,21 @@ chunks_to_box(ChromoLs,FilesInfo,Boxes) ->
 	ChunkList = lists:keysort(2,[{source,?SOURCE_MEM},{sink,?SINK_MEM}] ++
 	[ {File,(SizeBytes bsr 20)+?EXTRA_MEM_PER_CHUNK} || {File, SizeBytes} <- ChunksInfo]),
 
-	TotalMemory = lists:foldl(fun({_Name,_Cpu,Mem},Acc) -> Mem + Acc end, 0, Boxes),
+	TotalMemory = lists:foldl(fun({_Name,_Host,_Cpu,Mem},Acc) -> Mem + Acc end, 0, Boxes),
 
 	MemoryNeed = (?SOURCE_MEM+lists:sum([ Size || {_,Size} <- ChunkList ])+?SINK_MEM ) bsr 10,
-	io:format("MemoryNeed,TotalMemory ~p~n", [{ChunkList,MemoryNeed,TotalMemory}]),
 	case MemoryNeed > TotalMemory of
 		true -> not_enough_memory;
 		false->
-			CPC = length(ChunkList)/lists:sum([ Cores ||{_,Cores,_} <- Boxes ]),
+			CPC = length(ChunkList)/lists:sum([ Cores ||{_,_,Cores,_} <- Boxes ]),
 			io:format("CPC: ~p~n",[CPC]),
 
-			MPCs = lists:keysort(2,[ {Name,M/C} || {Name,C,M} <- Boxes ]),
+			MPCs = lists:keysort(2,[ {Name,M/C} || {Name,_Host,C,M} <- Boxes ]),
 			{Boxes_down,Boxes_up} = lists:split(round(length(MPCs) / 2), [ Name || {Name,_} <- MPCs]),
 			%io:format("Boxes_up: ~p~nBoxes_down: ~p~n",[Boxes_up,Boxes_down]),
 
-			Min_bucket = [ {Name,ceiling(CPC*Cores),Cores,Mem} || {Name,Cores,Mem} <- Boxes, lists:member(Name,Boxes_up)],
-			Max_bucket = [ {Name,trunc(CPC*Cores),Cores,Mem} || {Name,Cores,Mem} <- Boxes, lists:member(Name,Boxes_down)],
+			Min_bucket = [ {Name,ceiling(CPC*Cores),Cores,Mem} || {Name,_Host,Cores,Mem} <- Boxes, lists:member(Name,Boxes_up)],
+			Max_bucket = [ {Name,trunc(CPC*Cores),Cores,Mem} || {Name,_Host,Cores,Mem} <- Boxes, lists:member(Name,Boxes_down)],
 
 			%io:format("Min boxes: ~p~nMax boxes: ~p~n",[Min_bucket,Max_bucket]),
 			{MinB1,MaxB1} = adjust(length(ChunkList),Min_bucket,Max_bucket),
@@ -155,14 +154,16 @@ chunks_to_box(ChromoLs,FilesInfo,Boxes) ->
 			Total_mem_sizeS = lists:sum([ M || {_,_,_,M} <- MaxB1]),
 			Chunk_size_per_boxS = [ {Total_chunk_sizeS*M/Total_mem_sizeS/Q,N,Q} || {N,Q,_,M} <- MaxB1],
 			%io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxS]),
+			Chunk_size_per_boxS1 = lists:map(fun({X,N,Y}) -> {X,lists:keyfind(N,1,Boxes),Y} end, Chunk_size_per_boxS),
 
 			Total_chunk_sizeL = lists:sum([ S || {_,S} <- Large_chunks]),
 			Total_mem_sizeL = lists:sum([ M || {_,_,_,M} <- MinB1]),
 			Chunk_size_per_boxL = [ {Total_chunk_sizeL*M/Total_mem_sizeL/Q,N,Q} || {N,Q,_,M} <- MinB1],
 			%io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxL]),
+			Chunk_size_per_boxL1 = lists:map(fun({X,N,Y}) -> {X,lists:keyfind(N,1,Boxes),Y} end, Chunk_size_per_boxL),
 
-			spread2boxes(Small_chunks,lists:sort(Chunk_size_per_boxS))++
-			spread2boxes(Large_chunks,lists:sort(Chunk_size_per_boxL))
+			spread2boxes(Small_chunks,lists:sort(Chunk_size_per_boxS1))++
+			spread2boxes(Large_chunks,lists:sort(Chunk_size_per_boxL1))
 	end.
 
 
@@ -198,16 +199,16 @@ chunks_to_box_test_() ->
 	Json = os:cmd("./scripts/make_refs_list.py"),
 	FilesInfo = jsx:decode(list_to_binary(Json)),
 	[fun() ->
-		Box = {box1, 2, 0.5},
+		Box = {box1, host, 2, 0.5},
 		?assertEqual(
 			not_enough_memory,
 			chunks_to_box(["GL000193.1"],FilesInfo,[Box]))
 		end,
 
 		fun() ->
-			Box = {box1, 2, 10},
+			Box = {box1, host, 2, 10},
 			?assertMatch(
-				[{box1, [{source,_},{'GL000193.1_p1.fm',_},{sink,_}]}],
+				[{Box, [{source,_},{'GL000193.1_p1.fm',_},{sink,_}]}],
 				lists:sort(chunks_to_box(["GL000193.1"],FilesInfo,[Box])))
 		end
 	].
