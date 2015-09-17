@@ -22,7 +22,7 @@ c2b() ->
 				{ch8,770},{ch9,770},{ch10,770},{ch11,770},{ch12,770},
 				{ch13,790},{ch14,790},{ch15,790},{ch16,790},{ch17,790},{ch18,790},
 				{ch19,800},{ch20,800},{ch21,800},{ch22,800}],
-	Boxes = [{box1,4,16},{box2,8,24},{box3,8,24}],
+	Boxes = [{box1,4,24},{box2,8,40},{box3,8,46}],
 
 	CPC = length(ChunkList)/lists:sum([ Cores ||{_,Cores,_} <- Boxes ]),
 	io:format("CPC: ~p~n",[CPC]),
@@ -40,30 +40,65 @@ c2b() ->
 
 	{Small_chunks,Large_chunks} = lists:split(lists:sum([Q || {_,Q,_,_}<-MaxB1]),lists:keysort(2,ChunkList)),
 	io:format("Small chunks: ~p~nLarge chunks: ~p~n",[Small_chunks,Large_chunks]),
-	Order = fun({_Na,Qa,ChunksA},{_Nb,Qb,ChunksB}) ->
-				length(ChunksA)/Qa < length(ChunksB)/Qb
-			end,
-	spread2boxes(lists:reverse(Small_chunks),lists:sort(Order,[ {N,Q,[]} || {N,Q,_C,_M}<- MaxB1]), Order)++
-	spread2boxes(lists:reverse(Large_chunks),lists:sort(Order,[ {N,Q,[]} || {N,Q,_C,_M}<- MinB1]), Order).
+
+	Total_chunk_sizeS = lists:sum([ S || {_,S} <- Small_chunks]),
+	Total_mem_sizeS = lists:sum([ M || {_,_,_,M} <- MaxB1]),
+	Chunk_size_per_boxS = [ {Total_chunk_sizeS*M/Total_mem_sizeS/Q,N,Q} || {N,Q,_,M} <- MaxB1],
+	io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxS]),
+
+	Total_chunk_sizeL = lists:sum([ S || {_,S} <- Large_chunks]),
+	Total_mem_sizeL = lists:sum([ M || {_,_,_,M} <- MinB1]),
+	Chunk_size_per_boxL = [ {Total_chunk_sizeL*M/Total_mem_sizeL/Q,N,Q} || {N,Q,_,M} <- MinB1],
+	io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxL]),
+
+	spread2boxes(Small_chunks,lists:sort(Chunk_size_per_boxS))++
+	spread2boxes(Large_chunks,lists:sort(Chunk_size_per_boxL)).
 
 
 
-spread2boxes([{Chunk,Size}|Chunks],[{N,Q,Ch}|Boxes],Order) -> 
-	spread2boxes(Chunks, lists:sort(Order,[{N,Q,[{Chunk,Size}|Ch]}|Boxes]),Order);
-spread2boxes([],Boxes,_) -> Boxes.
+spread2boxes(Chunks,Boxes) -> 
+	{[],Res} =
+	lists:foldl(fun({Av,N,Q},{Chunks1,Distributed})->
+				{Selection,Chunks2} = choose_chunks(Av,Q,Chunks1),
+				{Chunks2,[{N,Selection}|Distributed]}
+				end,{Chunks,[]},Boxes),
+	Res.
 
+
+choose_chunks(Av,Q,Chunks) -> choose_chunks(Av,Q,Chunks,[]).
+
+choose_chunks(_,0,Chunks,Selected) -> {Selected,Chunks};
+choose_chunks(Av,1,Chunks,Selected) -> 
+	{Best,Chunks1} = get_best(Av,Chunks),
+	{[Best|Selected],Chunks1};
+choose_chunks(Av,Q,Chunks,Selected) ->
+	[{F,Sf}|Chunks1] = Chunks,
+	{L,Sl} = lists:last(Chunks),
+	case Sf+Sl > Av of
+		true -> 
+			{Best,Chunks2} = get_best(Av,Chunks1),
+			choose_chunks(Av,Q-2,Chunks2,[{F,Sf},Best|Selected]);
+		false->
+			Chunks2 = lists:droplast(Chunks),
+			{Best,Chunks3} = get_best(Av,Chunks2),
+			choose_chunks(Av,Q-2,Chunks3,[{L,Sl},Best|Selected])
+	end.
+
+get_best(Av,Chunks) ->
+	[{_,Chunk,BestSize}|Rest] = lists:sort([ {abs(Av-Size),Ch,Size} || {Ch,Size} <- Chunks]),
+	{{Chunk,BestSize},lists:keysort(2,[ {Ch,Size} || {_,Ch,Size}<-Rest])}.
 
 
 adjust(Len,MinB,MaxB) ->
 	Diff = lists:sum([ Qty || {_,Qty,_,_} <- MinB++MaxB]) - Len,
 	if
 		Diff =:= 0 -> {MinB,MaxB};
-		Diff < 0 -> 
-			[{N,Q,C,M}|MinB1] = lists:sort(fun({_,Qa,Ca,_},{_,Qb,Cb,_})-> Qa/Ca < Qb/Cb end,MinB),
-			adjust(Len,[{N,Q+1,C,M}|MinB1],MaxB);
+		Diff > 0 -> 
+			[{N,Q,C,M}|MinB1] = lists:sort(fun({_,Qa,Ca,_},{_,Qb,Cb,_})-> Qa/Ca > Qb/Cb end,MinB),
+			adjust(Len,MinB1,[{N,Q-1,C,M}|MaxB]);
 		true ->
-			[{N,Q,C,M}|MaxB1] = lists:sort(fun({_,Qa,Ca,_},{_,Qb,Cb,_})-> Qa/Ca > Qb/Cb end,MaxB),
-			adjust(Len,MinB,[{N,Q-1,C,M}|MaxB1])
+			[{N,Q,C,M}|MaxB1] = lists:sort(fun({_,Qa,Ca,_},{_,Qb,Cb,_})-> Qa/Ca < Qb/Cb end,MaxB),
+			adjust(Len,[{N,Q+1,C,M}|MinB],MaxB1)
 	end.
 
 
