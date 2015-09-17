@@ -14,7 +14,7 @@
 -define(SINK_MEM,300).
 
 
-
+%% returns a list of chunks distributed among boxes [ {box,[list_of_chunks]}, ... ]
 c2b() ->
 	ChunkList = [{source,600},{sink,400},
 				{ch1,700},{ch2,700},{ch3,700},
@@ -34,22 +34,22 @@ c2b() ->
 	Min_bucket = [ {Name,ceiling(CPC*Cores),Cores,Mem} || {Name,Cores,Mem} <- Boxes, lists:member(Name,Boxes_up)],
 	Max_bucket = [ {Name,trunc(CPC*Cores),Cores,Mem} || {Name,Cores,Mem} <- Boxes, lists:member(Name,Boxes_down)],
 
-	io:format("Min boxes: ~p~nMax boxes: ~p~n",[Min_bucket,Max_bucket]),
+	%io:format("Min boxes: ~p~nMax boxes: ~p~n",[Min_bucket,Max_bucket]),
 	{MinB1,MaxB1} = adjust(length(ChunkList),Min_bucket,Max_bucket),
-	io:format("Min boxes: ~p~nMax boxes: ~p~n",[MinB1,MaxB1]),
+	%io:format("Min boxes: ~p~nMax boxes: ~p~n",[MinB1,MaxB1]),
 
 	{Small_chunks,Large_chunks} = lists:split(lists:sum([Q || {_,Q,_,_}<-MaxB1]),lists:keysort(2,ChunkList)),
-	io:format("Small chunks: ~p~nLarge chunks: ~p~n",[Small_chunks,Large_chunks]),
+	%io:format("Small chunks: ~p~nLarge chunks: ~p~n",[Small_chunks,Large_chunks]),
 
 	Total_chunk_sizeS = lists:sum([ S || {_,S} <- Small_chunks]),
 	Total_mem_sizeS = lists:sum([ M || {_,_,_,M} <- MaxB1]),
 	Chunk_size_per_boxS = [ {Total_chunk_sizeS*M/Total_mem_sizeS/Q,N,Q} || {N,Q,_,M} <- MaxB1],
-	io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxS]),
+	%io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxS]),
 
 	Total_chunk_sizeL = lists:sum([ S || {_,S} <- Large_chunks]),
 	Total_mem_sizeL = lists:sum([ M || {_,_,_,M} <- MinB1]),
 	Chunk_size_per_boxL = [ {Total_chunk_sizeL*M/Total_mem_sizeL/Q,N,Q} || {N,Q,_,M} <- MinB1],
-	io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxL]),
+	%io:format("Average chunk size per box: ~n~p~n",[Chunk_size_per_boxL]),
 
 	spread2boxes(Small_chunks,lists:sort(Chunk_size_per_boxS))++
 	spread2boxes(Large_chunks,lists:sort(Chunk_size_per_boxL)).
