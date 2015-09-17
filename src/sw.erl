@@ -48,7 +48,8 @@ rand_seq(Acc,N) ->
 
 
 
-sw([_|_]=Qseq,[_|_]=Ref) -> 
+sw([_|_]=Qseq,[_|_]=Ref) ->
+	process_flag(priority, high),
 	F = fun(_Qseq,_Ref,Tab,V) -> get_CIGAR(Tab,V) end,
 	sw(Qseq,Ref,F);
 sw(N1,N2) when N1 =< N2 -> 
