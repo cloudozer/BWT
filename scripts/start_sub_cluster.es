@@ -32,7 +32,7 @@ list_to_term(String) ->
       Error
   end.
 
-start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes = [{_, Host, _}|_]) ->
+start_subcluster(SeqFileName, ChromosomeList, HttpStorage, VM, Boxes = [{_, Host, _, _}|_]) ->
 
   Name = list_to_atom("launcher@" ++ atom_to_list(Host)),
   {ok,_} = net_kernel:start([Name, longnames]),

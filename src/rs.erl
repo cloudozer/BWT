@@ -8,10 +8,10 @@
 -module(rs).
 -export([
   start/2,
-  r_source/8
+  r_source/9
 ]).
 
--define(SINK_CONFIRM_TIMEOUT,10000).
+-define(SINK_CONFIRM_TIMEOUT,20000).
 -define(SEQ_FILE_CHUNK_SIZE,100000000).
 
 
@@ -34,7 +34,7 @@ start(SeqFileName, HttpStorage) ->
 		receive
 			{run, Alqs,SFs, SinkRef} ->
 StartTime = now(),
-				r_source(Reads, SeqFileNameUrl, ContentLength, DownloadedSize, Alqs,SFs,length(SFs),SinkRef),
+				r_source(Reads, SeqFileNameUrl, ContentLength, DownloadedSize, Alqs,SFs,length(SFs),SinkRef,run),
 io:format("Fastq completed within ~p secs.", [timer:now_diff(now(), StartTime) / 1000000])
 		end
 	end),
@@ -77,7 +77,7 @@ get_next_read(Bin) ->
   end.
 
 
-r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
+r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink,State) ->
   case produce_workload(10000, Reads) of
     {Reads1, []} -> 
       case ContentLength =:= DownloadedSize of
@@ -109,25 +109,32 @@ r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,0,Sink) ->
                 ok
               end
           end,
-          r_source(<< Reads1/binary, ReadsNext/binary >> ,SeqUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink)
+          r_source(<< Reads1/binary, ReadsNext/binary >> ,SeqUrl,ContentLength,DownloadedSize+ContentLength1,Alqs,SFs,0,Sink,State)
       end;
     {Reads1, Batch} -> 
-      multicast(Batch,SFs),
-      r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink)
+      multicast(Batch,SFs,Alqs,State),
+      r_source(Reads1,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,length(SFs),Sink,run)
   end;
 
 
-r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) when N == 1 ->
+r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink,State) when N == 1 ->
 	receive
 		{Pid,ready} -> 
 			io:format("ready ~p: ~p~n", [os:timestamp(), Pid]),
-			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
+			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink,State)
 	end;
 
-r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink) ->
+r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink,State) ->
 	receive
+		{wait,Len} ->
+			case State of
+				{wait,Len1} ->
+					r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink,{wait,max(Len,Len1)});
+				_ ->
+					r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N,Sink,{wait,Len})
+			end;
 		{_Pid,ready} -> 
-			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink)
+			r_source(Reads,SeqUrl,ContentLength,DownloadedSize,Alqs,SFs,N-1,Sink,State)
 	end.
 
 
@@ -139,9 +146,21 @@ terminate(Alqs,J) ->
 	terminate(Alqs,J-1).
 	
 
-multicast(Batch,SFs) ->
+multicast(Batch,SFs,Alqs,{wait,Len}) ->
+	io:format("RS is pausing~n"),
+	if Len > 100000 -> timer:sleep(10000);
+	Len > 50000 -> timer:sleep(5000);
+	true -> timer:sleep(1000)
+	end,
+	multicast(Batch,SFs,Alqs);
+multicast(Batch,SFs,Alqs,_) ->
+	multicast(Batch,SFs,Alqs).
+
+multicast(Batch,SFs,Alqs) ->
 %% 	lists:foreach(fun({_,SF})-> SF ! {data,Batch} end, SFs).  % {_,SF} = {box,pid}
-	lists:foreach(fun({Node,SF})-> navel:call_no_return(Node,erlang,send,[SF,{data,Batch}]) end, SFs).  % {_,SF} = {box,pid}
+	lists:foreach(fun({Node,SF})-> navel:call_no_return(Node,erlang,send,[SF,{data,Batch}]) end, SFs),  % {_,SF} = {box,pid}
+	Self = {navel:get_node(),self()},
+	lists:foreach(fun({Node,Pid})-> navel:call_no_return(Node,erlang,send,[Pid, {whatsup,Self}]) end, Alqs).
 
 
 

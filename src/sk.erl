@@ -48,8 +48,8 @@ sink(R_source,J,Alq_nbr,Dev,Acc) ->
 		quit -> ok;
 
 		SAM_lines=[_|_] -> 
-			lists:foreach(  fun(Line)-> io:format(Dev,"~p~n",[Line])
-							end,SAM_lines),
+%			lists:foreach(  fun(Line)-> io:format(Dev,"~p~n",[Line])
+%							end,SAM_lines),
 			sink(R_source,J,Alq_nbr,Dev,length(SAM_lines)+Acc);
 			
 		fastq_done -> 

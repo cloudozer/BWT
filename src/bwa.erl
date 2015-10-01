@@ -78,7 +78,7 @@ find_interval(FM,Sp,Ep,[C2|Qseq],N) ->
 			find_interval(FM, Sp1, Ep1, Qseq, N+1)
 	end;
 find_interval(FM,Sp,Ep,[],_) -> 
-	Max_range = size(FM)/math:pow(4,?SAVED_SEQ_LEN),
+	Max_range = size(FM)/math:pow(4,?SAVED_SEQ_LEN)/1.2,
 	case Ep-Sp > Max_range of
 		true -> too_many_seeds;
 		_ -> {Sp,Ep}
